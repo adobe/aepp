@@ -73,7 +73,6 @@ class AdobeRequest:
         self.loggingEnabled = loggingEnabled
         self.logger = logger
         self.retry = retry
-        requests.packages.urllib3.disable_warnings()
         if self.config["token"] == "" or time.time() > self.config["date_limit"]:
             if self.config["private_key"] is not None or self.config["pathToKey"] is not None:
                 token_info = self.get_jwt_token_and_expiry_for_config(
@@ -139,7 +138,7 @@ class AdobeRequest:
             "code": config["auth_code"]
         }
         response = requests.post(
-            config["oauthTokenEndpoint"], data=oauth_payload, verify=False
+            config["oauthTokenEndpoint"], data=oauth_payload, verify=self.config["sslVerification"]
         )
         return self._token_postprocess(response=response, verbose=verbose, save=save)
 
@@ -186,7 +185,10 @@ class AdobeRequest:
             "jwt_token": encoded_jwt,
         }
         response = requests.post(
-            config["jwtTokenEndpoint"], headers=header_jwt, data=payload, verify=False
+            config["jwtTokenEndpoint"],
+            headers=header_jwt,
+            data=payload,
+            verify=self.config["sslVerification"]
         )
         return self._token_postprocess(response=response, verbose=verbose, save=save)
 
@@ -298,20 +300,20 @@ class AdobeRequest:
                 f"Start GET request to {endpoint} with header: {json.dumps(headers)}"
             )
         if params is None and data is None:
-            res = requests.get(endpoint, headers=headers, verify=False)
+            res = requests.get(endpoint, headers=headers, verify=self.config["sslVerification"])
         elif params is not None and data is None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
-            res = requests.get(endpoint, headers=headers, params=params, verify=False)
+            res = requests.get(endpoint, headers=headers, params=params, verify=self.config["sslVerification"])
         elif params is None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"data: {json.dumps(data)}")
-            res = requests.get(endpoint, headers=headers, data=data, verify=False)
+            res = requests.get(endpoint, headers=headers, data=data, verify=self.config["sslVerification"])
         elif params is not None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
                 self.logger.debug(f"data: {json.dumps(data)}")
-            res = requests.get(endpoint, headers=headers, params=params, data=data, verify=False)
+            res = requests.get(endpoint, headers=headers, params=params, data=data, verify=self.config["sslVerification"])
         if self.loggingEnabled:
             self.logger.debug(f"endpoint used: {res.request.url}")
             self.logger.debug(f"params used: {params}")
@@ -370,9 +372,9 @@ class AdobeRequest:
                 f"Start GET request to {endpoint} with header: {json.dumps(headers)}"
             )
         if params is None:
-            res = requests.head(endpoint, headers=headers, verify=False)
+            res = requests.head(endpoint, headers=headers, verify=self.config["sslVerification"])
         if params is not None:
-            res = requests.head(endpoint, headers=headers, params=params, verify=False)
+            res = requests.head(endpoint, headers=headers, params=params, verify=self.config["sslVerification"])
         try:
             res_header = res.headers()
         except:
@@ -407,27 +409,27 @@ class AdobeRequest:
                 f"Start POST request to {endpoint} with header: {json.dumps(headers)}"
             )
         if params is None and data is None:
-            res = requests.post(endpoint, headers=headers, verify=False)
+            res = requests.post(endpoint, headers=headers, verify=self.config["sslVerification"])
         elif params is not None and data is None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
-            res = requests.post(endpoint, headers=headers, params=params, verify=False)
+            res = requests.post(endpoint, headers=headers, params=params, verify=self.config["sslVerification"])
         elif params is None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"data: {json.dumps(data)}")
-            res = requests.post(endpoint, headers=headers, data=json.dumps(data), verify=False)
+            res = requests.post(endpoint, headers=headers, data=json.dumps(data), verify=self.config["sslVerification"])
         elif params is not None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
                 self.logger.debug(f"data: {json.dumps(data)}")
             res = requests.post(
-                endpoint, headers=headers, params=params, data=json.dumps(data), verify=False
+                endpoint, headers=headers, params=params, data=json.dumps(data), verify=self.config["sslVerification"]
             )
         elif bytesData is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"bytes data used")
             res = requests.post(
-                endpoint, headers=headers, params=params, data=bytesData, verify=False
+                endpoint, headers=headers, params=params, data=bytesData, verify=self.config["sslVerification"]
             )
         try:
             formatUse = kwargs.get("format", "json")
@@ -482,17 +484,17 @@ class AdobeRequest:
         if params is not None and data is None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
-            res = requests.patch(endpoint, headers=headers, params=params, verify=False)
+            res = requests.patch(endpoint, headers=headers, params=params, verify=self.config["sslVerification"])
         elif params is None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"data: {json.dumps(data)}")
-            res = requests.patch(endpoint, headers=headers, data=json.dumps(data), verify=False)
+            res = requests.patch(endpoint, headers=headers, data=json.dumps(data), verify=self.config["sslVerification"])
         elif params is not None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
                 self.logger.debug(f"data: {json.dumps(data)}")
             res = requests.patch(
-                endpoint, headers=headers, params=params, data=json.dumps(data), verify=False
+                endpoint, headers=headers, params=params, data=json.dumps(data), verify=self.config["sslVerification"]
             )
         try:
             res_json = res.json()
@@ -536,17 +538,17 @@ class AdobeRequest:
         if params is not None and data is None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
-            res = requests.put(endpoint, headers=headers, params=params, verify=False)
+            res = requests.put(endpoint, headers=headers, params=params, verify=self.config["sslVerification"])
         elif params is None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"data: {json.dumps(data)}")
-            res = requests.put(endpoint, headers=headers, data=json.dumps(data), verify=False)
+            res = requests.put(endpoint, headers=headers, data=json.dumps(data), verify=self.config["sslVerification"])
         elif params is not None and data is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"params: {json.dumps(params)}")
                 self.logger.debug(f"data: {json.dumps(data)}")
             res = requests.put(
-                endpoint, headers=headers, params=params, data=json.dumps(data), verify=False
+                endpoint, headers=headers, params=params, data=json.dumps(data), verify=self.config["sslVerification"]
             )
         try:
             res_json = res.json()
@@ -579,9 +581,9 @@ class AdobeRequest:
                 f"Start PUT request to {endpoint} with header: {json.dumps(headers)}"
             )
         if params is None:
-            res = requests.delete(endpoint, headers=headers, verify=False)
+            res = requests.delete(endpoint, headers=headers, verify=self.config["sslVerification"])
         elif params is not None:
-            res = requests.delete(endpoint, headers=headers, params=params, verify=False)
+            res = requests.delete(endpoint, headers=headers, params=params, verify=self.config["sslVerification"])
         try:
             status_code = res.status_code
             if status_code >= 400:

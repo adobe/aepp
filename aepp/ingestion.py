@@ -41,7 +41,6 @@ class DataIngestion:
             header : OPTIONAL : header object  in the config module.
         Additional kwargs will update the header.
         """
-        requests.packages.urllib3.disable_warnings()
         if loggingObject is not None and sorted(
             ["level", "stream", "format", "filename", "file"]
         ) == sorted(list(loggingObject.keys())):
@@ -82,6 +81,7 @@ class DataIngestion:
         self.endpoint = (
             aepp.config.endpoints["global"] + aepp.config.endpoints["ingestion"]
         )
+        self.ssl_verification = config["sslVerification"]
         self.endpoint_streaming = aepp.config.endpoints["streaming"]["collection"]
         self.STREAMING_REFERENCE = {
             "header": {
@@ -331,7 +331,7 @@ class DataIngestion:
         if self.loggingEnabled:
             self.logger.debug(f"Uploading large part for batch ID: ({batchId})")
         path = f"/batches/{batchId}/datasets/{datasetId}/files/{filePath}"
-        res = requests.patch(self.endpoint + path, data=data, headers=privateHeader, verify=False)
+        res = requests.patch(self.endpoint + path, data=data, headers=privateHeader, verify=self.ssl_verification)
         res_json = res.json()
         return res_json
 
