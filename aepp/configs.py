@@ -10,6 +10,7 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 import json
@@ -43,6 +44,7 @@ def createConfigFile(
     environment: str = "prod",
     verbose: object = False,
     auth_type: str = "jwt",
+    ssl_verification: bool = True,
     **kwargs,
 ) -> None:
     """
@@ -50,15 +52,18 @@ def createConfigFile(
     Arguments:
         destination : OPTIONAL : if you wish to save the file at a specific location.
         sandbox : OPTIONAL : You can directly set your sandbox name in this parameter.
+        environment : OPTIONAL : should be set to True except in internal Adobe use cases.
         verbose : OPTIONAL : set to true, gives you a print stateent where is the location.
         auth_type : OPTIONAL : type of authentication, either "jwt" or "oauth"
+        ssl_verification : OPTIONAL : whether to enable SSL verification. True is recommended.
     """
     json_data: dict = {
         "org_id": "<orgID>",
         "client_id": "<client_id>",
         "secret": "<YourSecret>",
         "sandbox-name": sandbox,
-        "environment": environment
+        "environment": environment,
+        "ssl_verification": ssl_verification
     }
     if auth_type == "jwt":
         json_data["tech_id"] = "<something>@techacct.adobe.com"
@@ -124,6 +129,7 @@ def importConfigFile(
             "secret": provided_config["secret"],
             "sandbox": provided_config.get("sandbox-name", "prod"),
             "environment": provided_config.get("environment", "prod"),
+            "ssl_verification": provided_config["ssl_verification"],
             "connectInstance": connectInstance
         }
         if sandbox is not None: ## overriding sandbox from parameter
@@ -153,7 +159,8 @@ def configure(
     sandbox: str = "prod",
     connectInstance: bool = False,
     environment: str = "prod",
-    auth_code: str = None
+    auth_code: str = None,
+    ssl_verification: bool = True
 ):
     """Performs programmatic configuration of the API using provided values.
     Arguments:
@@ -167,6 +174,7 @@ def configure(
         connectInstance : OPTIONAL : If you want to return an instance of the ConnectObject class
         environment : OPTIONAL : If not provided, default to prod
         auth_code : OPTIONAL : If an authorization code is used directly instead of generating via JWT
+        ssl_verification : OPTIONAL : whether to enable SSL verification. True is recommended.
     """
     if not org_id:
         raise ValueError("`org_id` must be specified in the configuration.")
@@ -177,6 +185,9 @@ def configure(
     if (auth_code is not None and (path_to_key is not None or private_key is not None)) \
             or (auth_code is None and path_to_key is None and private_key is None):
         raise ValueError("either `auth_code` needs to be specified or one of `private_key` or `path_to_key`")
+    if ssl_verification is False:
+        print("SSL verification disabled, this is not recommended in production workloads and "
+              "should only be used in development", file=sys.stderr)
     config_object["org_id"] = org_id
     header["x-gw-ims-org-id"] = org_id
     config_object["client_id"] = client_id
@@ -187,6 +198,7 @@ def configure(
     config_object["private_key"] = private_key
     config_object["auth_code"] = auth_code
     config_object["sandbox"] = sandbox
+    config_object["sslVerification"] = ssl_verification
     header["x-sandbox-name"] = sandbox
 
     # ensure we refer to the right environment endpoints

@@ -61,7 +61,8 @@ Normally your config file will look like this:
     "secret": "<YourSecret>",
     "pathToKey": "<path/to/your/privatekey.key>",
     "sandbox-name": "prod",
-    "environment": "prod"
+    "environment": "prod",
+    "ssl_verification": true
 }
 ```
 
@@ -171,6 +172,34 @@ aepp.configure(
 ```
 
 **NOTE** The `environment` parameter is optional and defaults to "prod".
+
+### SSL certificate verification
+
+By default `aepp` will enforce SSL certificate verification on any outgoing HTTP requests.
+
+There can be cases where you might want to disable this verification. This includes, but not limited to:
+- Development workloads might not need the same strong guarantees you would want in production workloads.
+- If you are behind a proxy / VPN you might under certain scenarios get a `SSLCertVerificationError` when trying to connect to AEP APIs.
+
+If you are in one of these situation where disabling SSL certificate verification is appropriate, you can tell `aepp` to do that by using:
+
+```python
+import aepp
+aepp.configure(
+    org_id=my_org_id,
+    tech_id=my_tech_id, 
+    secret=my_secret,
+    private_key=my_key_as_string,
+    client_id=my_client_id,
+    environment="prod",
+    sandbox=my_sandbox_id,
+    ssl_verification=False
+)
+```
+
+Or simply update the JSON configuration generated earlier if you have one and set `ssl_verification` parameter to `false`.
+
+Please note disabling SSL certificate verification is not recommended overall, but we provide this facility in `aepp` for the few situations that do warrant it if you know what you are doing.
 
 ### Tip for multi sandbox work
 

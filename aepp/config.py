@@ -23,7 +23,8 @@ config_object = {
     "token": "",
     "jwtTokenEndpoint": "",
     "oauthTokenEndpoint": "",
-    "imsEndpoint": ""
+    "imsEndpoint": "",
+    "sslVerification": True
 }
 
 header = {"Accept": "application/json",
