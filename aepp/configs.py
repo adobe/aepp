@@ -320,6 +320,7 @@ class ConnectObject:
         self.sandbox = sandbox
         self.scopes = scopes
         self.token = ""
+        self.auth_code = auth_code
         self.__configObject__ = {
             "org_id": self.org_id,
             "client_id": self.client_id,
@@ -334,7 +335,8 @@ class ConnectObject:
             "jwtTokenEndpoint" : self.jwtEndpoint,
             "oauthTokenEndpointV1" : self.oauthEndpointV1,
             "oauthTokenEndpointV2" : self.oauthEndpointV2,
-            "scopes": self.scopes
+            "scopes": self.scopes,
+            "auth_code": self.auth_code
         }
     
     def connect(self)->None:
@@ -344,6 +346,7 @@ class ConnectObject:
         self.connector = connector.AdobeRequest(self.__configObject__,self.header)
         self.token = self.connector.token
         self.header['Authorization'] = 'bearer '+self.token
+        self.connectionType = self.connector.connectionType
     
     def getConfigObject(self)->dict:
         """
@@ -367,3 +370,102 @@ class ConnectObject:
         self.header["x-sandbox-name"] = sandbox
         self.__configObject__["sandbox"] = sandbox
         return self.getConfigObject()
+
+    def setOauthV2setup(self,credentialId:str=None,orgDevId:str=None)->bool:
+        """
+        set the credential ID and the OrgIdDev as attributes of the instance.
+        * credentialId
+        * orgDevId
+        Returns True when success.
+        Argument:
+            credentialId : REQUIRED : The credential id that can be found on your Project page.
+            orgDevId : REQUIRED : the org Id but NOT the IMS string. It is defined on your project page.
+                Example : https://developer.adobe.com/console/projects/<orgId>/<projectId>/credentials/<credentialId>/details/oauthservertoserver
+        """
+        if self.connectionType != "oauthV2":
+            raise Exception("You are trying to set credential ID or orgDevId for auth that is not OauthV2. We do not support these auth type.")
+        if credentialId is None:
+            raise ValueError("credentialId is None")
+        if orgDevId is None:
+            raise ValueError("orgDevId is None")
+        self.credentialId = credentialId
+        self.orgDevId = orgDevId
+        return True
+    
+    def getTokens(self,credentialId:str=None,orgDevId:str=None)->dict:
+        """
+        Access the different token available for your client ID
+        """
+        if self.connectionType != "oauthV2":
+            raise Exception("You are trying to use a service that is only supportede for OauthV2 authen. We do not support the other auth types.")
+        if credentialId is None and self.credentialId is None:
+            raise ValueError("You are not providing the credential ID and did not use the setOauthV2setup method.\n Use it to prepare this method")
+        if orgDevId is None and self.orgDevId is None:
+            raise ValueError("You are not providing the orgDevId and did not use the setOauthV2setup method.\n Use it to prepare this method")
+        if credentialId is None and self.credentialId is not None:
+            credentialId = self.credentialId
+        if orgDevId is None and self.orgDevId is not None:
+            orgDevId = self.orgDevId
+        if self.token is None:
+            raise Exception("You need to generate a token by using the connect method first")
+        myheader = {
+            'Authorization' : 'Bearer '+self.token,
+            'x-api-key' : self.client_id
+        }
+        endpoint = f"https://api.adobe.io/console/organizations/{orgDevId}/credentials/{credentialId}/secrets"
+        res = self.connector.getData(endpoint,headers=myheader)
+        return res
+    
+    def createSecretTokenOauthV2(self,credentialId:str=None,orgDevId:str=None)->dict:
+        """
+        Create a new secret with a new token for Oauth V2 credentials.
+        ATTENTION : In order to use it, you will need to have added the IO Management API to your project.
+        Returns the new token and new secret
+        """
+        if self.connectionType != "oauthV2":
+            raise Exception("You are trying to use a service that is only supportede for OauthV2 authen. We do not support the other auth types.")
+        if credentialId is None and self.credentialId is None:
+            raise ValueError("You are not providing the credential ID and did not use the setOauthV2setup method.\n Use it to prepare this method")
+        if orgDevId is None and self.orgDevId is None:
+            raise ValueError("You are not providing the orgDevId and did not use the setOauthV2setup method.\n Use it to prepare this method")
+        if credentialId is None and self.credentialId is not None:
+            credentialId = self.credentialId
+        if orgDevId is None and self.orgDevId is not None:
+            orgDevId = self.orgDevId
+        if self.token is None:
+            raise Exception("You need to generate a token by using the connect method first")
+        myheader = {
+            'Authorization' : 'Bearer '+self.token,
+            'x-api-key' : self.client_id
+        }
+        endpoint = f"https://api.adobe.io/console/organizations/{orgDevId}/credentials/{credentialId}/secrets"
+        res = self.connector.postData(endpoint,headers=myheader)
+        return res
+    
+    def deleteToken(self,tokenUID:str=None)->None:
+        """
+        Delete an old token from your different token accessed
+        Arguments:
+            tokenUID : REQUIRED : The token to delete
+        """
+        if self.connectionType != "oauthV2":
+            raise Exception("You are trying to use a service that is only supportede for OauthV2 authen. We do not support the other auth types.")
+        if credentialId is None and self.credentialId is None:
+            raise ValueError("You are not providing the credential ID and did not use the setOauthV2setup method.\n Use it to prepare this method")
+        if orgDevId is None and self.orgDevId is None:
+            raise ValueError("You are not providing the orgDevId and did not use the setOauthV2setup method.\n Use it to prepare this method")
+        if credentialId is None and self.credentialId is not None:
+            credentialId = self.credentialId
+        if orgDevId is None and self.orgDevId is not None:
+            orgDevId = self.orgDevId
+        if self.token is None:
+            raise Exception("You need to generate a token by using the connect method first")
+        if tokenUID is None:
+            raise ValueError("You need to pass a correct value for the tokenUID")
+        endpoint = f"https://api.adobe.io/console/organizations/{orgDevId}/credentials/{credentialId}/secrets/{tokenUID}/"
+        myheader = {
+            'Authorization' : 'Bearer '+self.token,
+            'x-api-key' : self.client_id
+        }
+        res = self.connector.postData(endpoint,headers=myheader)
+        return res
