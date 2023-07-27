@@ -1871,7 +1871,7 @@ class Schema:
         res: list = self.connector.postData(self.endpoint + path, data=dataResource)
         return res
 
-    def extendFieldGroup(self,fieldGroupId:str=None,values:list=None)->dict:
+    def extendFieldGroup(self,fieldGroupId:str=None,values:list=None,tenant:str='tenant')->dict:
         """
         Patch a Field Group to extend its compatibility with ExperienceEvents, IndividualProfile and Record.
         Arguments:
@@ -1881,19 +1881,23 @@ class Schema:
                       "https://ns.adobe.com/xdm/context/experienceevent",
                     ]
                 by default profile and experienceEvent will be added to the FieldGroup.
+            tenant : OPTIONAL : default "tenant", possible value 'global'
         """
         if fieldGroupId is None:
             raise Exception("Require a field Group ID")
         if self.loggingEnabled:
             self.logger.debug(f"Starting extendFieldGroup")
-        path = f"/{self.container}/fieldgroups/{fieldGroupId}"
+        path = f"/{tenant}/fieldgroups/{fieldGroupId}"
+        if values is not None:
+            list_fgs = values
+        else:
+            list_fgs = ["https://ns.adobe.com/xdm/context/profile",
+                      "https://ns.adobe.com/xdm/context/experienceevent"]
         operation = [
            { 
             "op": "replace",
             "path": "/meta:intendedToExtend",
-            "value": ["https://ns.adobe.com/xdm/context/profile",
-                      "https://ns.adobe.com/xdm/context/experienceevent",
-                    ]
+            "value": list_fgs
             }
         ]
         res = self.connector.patchData(self.endpoint + path,data=operation)
@@ -2565,7 +2569,7 @@ class FieldGroupManager:
         return list(result_combi)
 
         
-    def addFieldOperation(self,path:str,dataType:str=None,title:str=None,objectComponents:dict=None,array:bool=False,enumValues:dict=None,**kwargs)->None:
+    def addFieldOperation(self,path:str,dataType:str=None,title:str=None,objectComponents:dict=None,array:bool=False,enumValues:dict=None,enumType:bool=None,**kwargs)->None:
         """
         Return the operation to be used on the field group with the Patch method (patchFieldGroup), based on the element passed in argument.
         Arguments:
@@ -2579,6 +2583,7 @@ class FieldGroupManager:
                 Example : {'field1':'string','field2':'double'}
             array : OPTIONAL : Boolean. If the element to create is an array. False by default.
             enumValues : OPTIONAL : If your field is an enum, provid a dictionary of value and display name, such as : {'value':'display'}
+            enumType: OPTIONAL: If your field is an enum, indicates whether it is an enum (True) or suggested values (False)
         possible kwargs:
             defaultPath : Define which path to take by default for adding new field on tenant. Default "property", possible alternative : "customFields"
         """
@@ -2622,14 +2627,16 @@ class FieldGroupManager:
         operation[0]['value']['title'] = title
         if enumValues is not None and type(enumValues) == dict:
             if array == False:
-                operation[0]['value']['enum'] = [enumValues.keys()]
                 operation[0]['value']['meta:enum'] = enumValues
+                if enumType:
+                    operation[0]['value']['enum'] = list(enumValues.keys())
             else:
-                operation[0]['value']['items']['enum'] = [enumValues.keys()]
                 operation[0]['value']['items']['meta:enum'] = enumValues
+                if enumType:
+                    operation[0]['value']['items']['enum'] = list(enumValues.keys())
         return operation
 
-    def addField(self,path:str,dataType:str=None,title:str=None,objectComponents:dict=None,array:bool=False,enumValues:dict=None,**kwargs)->dict:
+    def addField(self,path:str,dataType:str=None,title:str=None,objectComponents:dict=None,array:bool=False,enumValues:dict=None,enumType:bool=None,**kwargs)->dict:
         """
         Add the field to the existing fieldgroup definition.
         Returns False when the field could not be inserted.
@@ -2643,6 +2650,7 @@ class FieldGroupManager:
                 Example : {'field1:'string','field2':'double'}
             array : OPTIONAL : Boolean. If the element to create is an array. False by default.
             enumValues : OPTIONAL : If your field is an enum, provid a dictionary of value and display name, such as : {'value':'display'}
+            enumType: OPTIONAL: If your field is an enum, indicates whether it is an enum (True) or suggested values (False)
         possible kwargs:
             defaultPath : Define which path to take by default for adding new field on tenant. Default "property", possible alternative : "customFields"
         """
@@ -2681,11 +2689,13 @@ class FieldGroupManager:
                 obj['items'] = self.__transformFieldType__(dataType)
         if enumValues is not None and type(enumValues) == dict:
             if array == False:
-                obj['enum'] = [enumValues.keys()]
                 obj['meta:enum'] = enumValues
+                if enumType:
+                    obj['enum'] = list(enumValues.keys())
             else:
-                obj['items']['enum'] = [enumValues.keys()]
                 obj['items']['meta:enum'] = enumValues
+                if enumType:
+                    obj['items']['enum'] = list(enumValues.keys())
         completePath:list[str] = [kwargs.get('defaultPath','property')] + pathSplit
         customFields,foundFlag = self.__setField__(completePath, self.fieldGroup['definitions'],newField,obj)
         if foundFlag == False:
@@ -2860,7 +2870,7 @@ class SchemaManager:
                     else:
                         definition = self.schemaAPI.getFieldGroup(ref,full=True)
                         definition['definitions'] = definition['properties']
-                    self.fieldGroupsManagers.append(FieldGroupManager(fieldGroup=definition))
+                    self.fieldGroupsManagers.append(FieldGroupManager(fieldGroup=definition,config=config))
         elif type(schema) == str:
             if self.schemaAPI is None:
                 Warning("No schema instance has been passed or config file imported.\n Aborting the retrieveal of the Schema Definition")
@@ -2868,17 +2878,20 @@ class SchemaManager:
                 self.schema = self.schemaAPI.getSchema(schema,full=False)
                 self.__setAttributes__(self.schema)
                 allOf = self.schema.get("allOf",[])
-                self.fieldGroupIds = [obj['$ref'] for obj in allOf if ('/mixins/' in obj['$ref'] or '/experience/' in obj['$ref'] or '/context/' in obj['$ref']) and obj['$ref'] != self.classId]
+                self.fieldGroupIds = [obj.get('$ref','') for obj in allOf if ('/mixins/' in obj.get('$ref','') or '/experience/' in obj.get('$ref','') or '/context/' in obj.get('$ref','')) and obj.get('$ref','') != self.classId]
                 if self.schemaAPI is None:
                     Warning("fgManager is set to True but no schema instance has been passed.\n Aborting the creation of field Group Manager")
                 else:
                     for ref in self.fieldGroupIds:
                         if '/mixins/' in ref:
                             definition = self.schemaAPI.getFieldGroup(ref,full=False)
+                        elif ref == '':
+                            pass
                         else:
+                            ## if the fieldGroup is an OOTB one
                             definition = self.schemaAPI.getFieldGroup(ref,full=True)
                             definition['definitions'] = definition['properties']
-                        self.fieldGroupsManagers.append(FieldGroupManager(fieldGroup=definition))
+                        self.fieldGroupsManagers.append(FieldGroupManager(fieldGroup=definition,config=config))
         elif schema is None:
             self.schema = {
                     "title": None,
@@ -2899,11 +2912,11 @@ class SchemaManager:
                         Warning("fgManager is set to True but no schema instance has been passed.\n Aborting the creation of field Group Manager")
                     else:
                         definition = self.schemaAPI.getFieldGroup(ref)
-                        self.fieldGroupsManagers.append(FieldGroupManager(definition))
+                        self.fieldGroupsManagers.append(FieldGroupManager(definition,config=config))
             elif fieldGroupIds[0] == dict:
                 for fg in fieldGroupIds:
                     self.fieldGroupIds.append(fg.get('$id'))
-                    self.fieldGroupsManagers.append(FieldGroupManager(fg))
+                    self.fieldGroupsManagers.append(FieldGroupManager(fg,config=config))
         self.fieldGroupTitles= tuple(fg.title for fg in self.fieldGroupsManagers)
         self.fieldGroups = {fg.id:fg.title for fg in self.fieldGroupsManagers}
     
