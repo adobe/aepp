@@ -12,7 +12,7 @@ import unittest
 from aepp.destination import Authoring
 from unittest.mock import patch, MagicMock, ANY
 
-
+@patch("aepp.connector.AdobeRequest", MagicMock())
 class DestinationTest(unittest.TestCase):
     config = {
         "org_id": "3ADF23C463D98F640A494032@AdobeOrg",

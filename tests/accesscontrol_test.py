@@ -12,6 +12,7 @@ import unittest
 from aepp.accesscontrol import AccessControl
 from unittest.mock import patch, MagicMock, ANY
 
+@patch("aepp.connector.AdobeRequest", MagicMock())
 class AccessControlTest(unittest.TestCase):
     config = {
         "org_id": "3ADF23C463D98F640A494032@AdobeOrg",
