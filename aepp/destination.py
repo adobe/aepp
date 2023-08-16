@@ -80,7 +80,7 @@ class Authoring:
             self.connector.header.update({"x-sandbox-name":kwargs.get('sandbox')})
         else:
             self.sandbox = self.connector.config["sandbox"]
-        self.endpoint = config.endpoints["global"] + config.endpoints["destinationAuthoring"]
+        self.endpoint = aepp.config.endpoints["global"] + aepp.config.endpoints["destinationAuthoring"]
     
     def getDestinations(self)->list:
         """
