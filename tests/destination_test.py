@@ -14,7 +14,23 @@ from unittest.mock import patch, MagicMock, ANY
 
 
 class DestinationTest(unittest.TestCase):
-    destination_instance = Authoring(config=MagicMock(), header=MagicMock())
+    config = {
+        "org_id": "3ADF23C463D98F640A494032@AdobeOrg",
+        "client_id": "35e6e4d205274c4ca1418805ac41153b",
+        "tech_id": "test005@techacct.adobe.com",
+        "pathToKey": "/Users/Downloads/config/private.key",
+        "auth_code": "",
+        "secret": "test",
+        "date_limit": 0,
+        "sandbox": "prod",
+        "environment": "stage",
+        "token": "token",
+        "jwtTokenEndpoint": "https://ims-na1.adobelogin.com/ims/exchange/jwt/",
+        "oauthTokenEndpoint": "",
+        "imsEndpoint": "https://ims-na1-stg1.adobelogin.com",
+        "private_key": ""
+    }
+    destination_instance = Authoring(config=config, header=MagicMock())
     destination_list_response = [
         {"id": "destination1"},
         {"id": "destination2"}
