@@ -12,7 +12,6 @@ import unittest
 from aepp.accesscontrol import AccessControl
 from unittest.mock import patch, MagicMock, ANY
 
-@patch("aepp.connector.AdobeRequest", MagicMock())
 class AccessControlTest(unittest.TestCase):
     config = {
         "org_id": "3ADF23C463D98F640A494032@AdobeOrg",
@@ -31,6 +30,7 @@ class AccessControlTest(unittest.TestCase):
         "private_key": ""
     }
     access_control_instance = AccessControl(config=config, header=MagicMock())
+    @patch("aepp.connector.AdobeRequest", MagicMock())
     @patch("aepp.connector.AdobeRequest.getData", return_value = MagicMock())
     def test_get_reference(self, mock_connector):
         self.access_control_instance.getReferences()
@@ -42,6 +42,7 @@ class AccessControlTest(unittest.TestCase):
         except TypeError:
             pass
 
+    @patch("aepp.connector.AdobeRequest", MagicMock())
     @patch("aepp.connector.AdobeRequest.postData", return_value = {"result"})
     def test_post_effective_policies(self, mock_connector):
         result = self.access_control_instance.postEffectivePolicies(["test"])
