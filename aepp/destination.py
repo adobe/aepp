@@ -24,6 +24,8 @@ class Authoring:
     It is a suite of configuration APIs that allow you to configure destination integration patterns for Experience Platform to deliver audience and profile data to your endpoint, based on data and authentication formats of your choice.
     More information on the API, available at: https://developer.adobe.com/experience-platform-apis/references/destination-authoring/
     """
+    loggingEnabled = False
+    logger = None
 
     def __init__(self, 
         config: Union[dict,ConnectObject] = aepp.config.config_object,

@@ -8,12 +8,13 @@
 #  OF ANY KIND, either express or implied. See the License for the specific language
 #  governing permissions and limitations under the License.
 
-from aepp.schema import Schema
+from aepp.flowservice import FlowService
 import unittest
 from unittest.mock import patch, MagicMock
 
 
 class FlowserviceTest(unittest.TestCase):
+    flow_service = FlowService(config=MagicMock(), header=MagicMock())
 
     def test_flowservice_get_resource(self):
         assert True
