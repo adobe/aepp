@@ -390,7 +390,6 @@ class ConnectObject:
             raise ValueError("orgDevId is None")
         self.credentialId = credentialId
         self.orgDevId = orgDevId
-        return True
     
     def getSecrets(self,credentialId:str=None,orgDevId:str=None)->dict:
         """
