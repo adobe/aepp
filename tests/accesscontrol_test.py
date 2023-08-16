@@ -29,21 +29,24 @@ class AccessControlTest(unittest.TestCase):
         "imsEndpoint": "https://ims-na1-stg1.adobelogin.com",
         "private_key": ""
     }
-    access_control_instance = AccessControl(config=config, header=MagicMock())
-    @patch("aepp.connector.AdobeRequest.__init__", MagicMock())
+
+    # @patch("aepp.connector.AdobeRequest", MagicMock())
     @patch("aepp.connector.AdobeRequest.getData", return_value = MagicMock())
     def test_get_reference(self, mock_connector):
-        self.access_control_instance.getReferences()
+        access_control_instance = AccessControl(config=self.config, header=MagicMock())
+        access_control_instance.getReferences()
 
     def test_post_effective_policies_with_invalid_input(self):
+        access_control_instance = AccessControl(config=self.config, header=MagicMock())
         try:
-            self.access_control_instance.postEffectivePolicies(listElements="test")
+            access_control_instance.postEffectivePolicies(listElements="test")
             self.fail("expect a type error")
         except TypeError:
             pass
 
-    @patch("aepp.connector.AdobeRequest.__init__", MagicMock())
+    # @patch("aepp.connector.AdobeRequest.__init__", MagicMock())
     @patch("aepp.connector.AdobeRequest.postData", return_value = {"result"})
     def test_post_effective_policies(self, mock_connector):
-        result = self.access_control_instance.postEffectivePolicies(["test"])
+        access_control_instance = AccessControl(config=self.config, header=MagicMock())
+        result = access_control_instance.postEffectivePolicies(["test"])
         assert (result == {"result"})
