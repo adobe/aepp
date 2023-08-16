@@ -12,7 +12,6 @@ import unittest
 from aepp.destination import Authoring
 from unittest.mock import patch, MagicMock, ANY
 
-@patch("aepp.connector.AdobeRequest", MagicMock())
 class DestinationTest(unittest.TestCase):
     config = {
         "org_id": "3ADF23C463D98F640A494032@AdobeOrg",
@@ -30,7 +29,6 @@ class DestinationTest(unittest.TestCase):
         "imsEndpoint": "https://ims-na1-stg1.adobelogin.com",
         "private_key": ""
     }
-    destination_instance = Authoring(config=config, header=MagicMock())
     destination_list_response = [
         {"id": "destination1"},
         {"id": "destination2"}
@@ -66,128 +64,149 @@ class DestinationTest(unittest.TestCase):
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = destination_list_response)
     def test_get_destinations(self, mock_connector):
-        res = self.destination_instance.getDestinations()
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getDestinations()
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_list_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = destination_response)
     def test_get_destination(self, mock_connector):
-        res = self.destination_instance.getDestination(destinationId="test_destination_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getDestination(destinationId="test_destination_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_response
 
     @patch("aepp.connector.AdobeRequest.deleteData", return_value = destination_response)
     def test_delete_destination(self, mock_connector):
-        res = self.destination_instance.deleteDestination(destinationId="test_delete_destination_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.deleteDestination(destinationId="test_delete_destination_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_response
 
     def test_create_destination_with_invalid_input(self):
+        destination_instance = Authoring(config=self.config, header=MagicMock())
         try:
-            self.destination_instance.createDestination(destinationObj="test")
+            destination_instance.createDestination(destinationObj="test")
             self.fail("Expect an exception")
         except Exception as e:
             assert str(e) == "Require a dictionary defining the destination configuration"
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = destination_response)
     def test_create_destination(self, mock_connector):
-        res = self.destination_instance.createDestination(destinationObj=self.destination_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.createDestination(destinationObj=self.destination_response)
         mock_connector.assert_called_once_with(ANY, data = {'id': 'test_destination_id'})
         assert res == self.destination_response
 
     @patch("aepp.connector.AdobeRequest.putData", return_value = destination_response)
     def test_update_destination(self, mock_connector):
-        res = self.destination_instance.updateDestination(destinationId="test_update", destinationObj={"destination": "update"})
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.updateDestination(destinationId="test_update", destinationObj={"destination": "update"})
         mock_connector.assert_called_once_with(ANY, data = {"destination": "update"})
         assert res == self.destination_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = destination_server_list_response)
     def test_get_destination_server_list(self, mock_connector):
-        res = self.destination_instance.getDestinationServers()
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getDestinationServers()
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_server_list_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = destination_server_response)
     def test_get_destination_server_by_id(self, mock_connector):
-        res = self.destination_instance.getDestinationServer(serverId="test_server_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getDestinationServer(serverId="test_server_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_server_response
 
     @patch("aepp.connector.AdobeRequest.deleteData", return_value = destination_server_response)
     def test_delete_destination_server_by_id(self, mock_connector):
-        res = self.destination_instance.deleteDestinationServer(serverId="test_server_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.deleteDestinationServer(serverId="test_server_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_server_response
 
     @patch("aepp.connector.AdobeRequest.putData", return_value = destination_server_response)
     def test_update_destination_server(self, mock_connector):
-        res = self.destination_instance.updateDestinationServer(serverId="test_server_id", serverObj=self.destination_server_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.updateDestinationServer(serverId="test_server_id", serverObj=self.destination_server_response)
         mock_connector.assert_called_once_with(ANY, data={'id': 'test_server'} )
         assert res == self.destination_server_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = audience_template_list)
     def test_get_audience_template_list(self, mock_connector):
-        res = self.destination_instance.getAudienceTemplates()
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getAudienceTemplates()
         mock_connector.assert_called_once_with(ANY)
         assert res == self.audience_template_list
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = audience_template_response)
     def test_get_audience_template_by_id(self, mock_connector):
-        res = self.destination_instance.getAudienceTemplate(audienceId="test_audience_template_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getAudienceTemplate(audienceId="test_audience_template_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.audience_template_response
 
     @patch("aepp.connector.AdobeRequest.deleteData", return_value = audience_template_response)
     def test_delete_audience_template(self, mock_connector):
-        res = self.destination_instance.deleteAudienceTemplate(audienceId="test_audience_template_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.deleteAudienceTemplate(audienceId="test_audience_template_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.audience_template_response
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = audience_template_response)
     def test_create_audience_template(self, mock_connector):
-        res = self.destination_instance.createAudienceTemplate(templateObj=self.audience_template_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.createAudienceTemplate(templateObj=self.audience_template_response)
         mock_connector.assert_called_once_with(ANY, data = self.audience_template_response)
         assert res == self.audience_template_response
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = audience_template_response)
     def test_update_audience_template(self, mock_connector):
-        res = self.destination_instance.updateAudienceTemplate(audienceId="test_audience_template_id", templateObj=self.audience_template_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.updateAudienceTemplate(audienceId="test_audience_template_id", templateObj=self.audience_template_response)
         mock_connector.assert_called_once_with(ANY, data = self.audience_template_response)
         assert res == self.audience_template_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = credential_list_response)
     def test_get_credential_list(self, mock_connector):
-        res = self.destination_instance.getCredentials()
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getCredentials()
         mock_connector.assert_called_once_with(ANY)
         assert res == self.credential_list_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = credential_response)
     def test_get_credential_by_id(self, mock_connector):
-        res = self.destination_instance.getCredential(credentialId="test_credential_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getCredential(credentialId="test_credential_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.credential_response
 
     @patch("aepp.connector.AdobeRequest.deleteData", return_value = credential_response)
     def test_delete_credential_by_id(self, mock_connector):
-        res = self.destination_instance.deleteCredential(credentialId="test_credential_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.deleteCredential(credentialId="test_credential_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.credential_response
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = credential_response)
     def test_create_credential(self, mock_connector):
-        res = self.destination_instance.createCredential(credentialObj=self.credential_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.createCredential(credentialObj=self.credential_response)
         mock_connector.assert_called_once_with(ANY, data={'id': 'test_credential_id'})
         assert res == self.credential_response
 
     @patch("aepp.connector.AdobeRequest.putData", return_value = credential_response)
     def test_update_credential(self, mock_connector):
-        res = self.destination_instance.updateCredential(credentialId= "test_credential_id", credentialObj=self.credential_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.updateCredential(credentialId= "test_credential_id", credentialObj=self.credential_response)
         mock_connector.assert_called_once_with(ANY, data={'id': 'test_credential_id'})
         assert res == self.credential_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = sample_profile)
     def test_get_sample_profile(self, mock_connector):
-        res = self.destination_instance.getSampleProfile(destinationInstanceId= "test_instance_id", destinationId="test_destination_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getSampleProfile(destinationInstanceId= "test_instance_id", destinationId="test_destination_id")
         mock_connector.assert_called_once_with(ANY, params={
             "destinationInstanceId" : "test_instance_id",
             "destinationId" : "test_destination_id",
@@ -197,13 +216,15 @@ class DestinationTest(unittest.TestCase):
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = sample_destination)
     def test_get_sample_destination(self, mock_connector):
-        res = self.destination_instance.getSampleDestination(destinationConfigId="test_destination_id")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getSampleDestination(destinationConfigId="test_destination_id")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.sample_destination
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = sample_destination)
     def test_generate_profile(self, mock_connector):
-        res = self.destination_instance.generateTestProfile(destinationId="test_destination_id", template="test")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.generateTestProfile(destinationId="test_destination_id", template="test")
         mock_connector.assert_called_once_with(ANY, data = {
             "destinationId": "test_destination_id",
             "template": "test",
@@ -212,30 +233,35 @@ class DestinationTest(unittest.TestCase):
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = sample_destination)
     def test_send_message(self, mock_connector):
-        res = self.destination_instance.sendMessageToPartner(destinationInstanceId="test", profiles=["1", "2"])
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.sendMessageToPartner(destinationInstanceId="test", profiles=["1", "2"])
         mock_connector.assert_called_once_with(ANY, data = ["1", "2"])
         assert res == self.sample_destination
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = destination_list_response)
     def test_get_submission_list(self, mock_connector):
-        res = self.destination_instance.getSubmissions()
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getSubmissions()
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_list_response
 
     @patch("aepp.connector.AdobeRequest.getData", return_value = destination_response)
     def test_get_submission_by_id(self, mock_connector):
-        res = self.destination_instance.getSubmission(destinationConfigId="test")
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.getSubmission(destinationConfigId="test")
         mock_connector.assert_called_once_with(ANY)
         assert res == self.destination_response
 
     @patch("aepp.connector.AdobeRequest.postData", return_value = destination_response)
     def test_submit_destination(self, mock_connector):
-        res = self.destination_instance.SubmitDestination(destinationObj=self.destination_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.SubmitDestination(destinationObj=self.destination_response)
         mock_connector.assert_called_once_with(ANY, data = self.destination_response)
         assert res == self.destination_response
 
     @patch("aepp.connector.AdobeRequest.putData", return_value = destination_response)
     def test_update_submission(self, mock_connector):
-        res = self.destination_instance.updateSubmissionRequest(destinationConfigId= "test", destinationObj=self.destination_response)
+        destination_instance = Authoring(config=self.config, header=MagicMock())
+        res = destination_instance.updateSubmissionRequest(destinationConfigId= "test", destinationObj=self.destination_response)
         mock_connector.assert_called_once_with(ANY, data = self.destination_response)
         assert res == self.destination_response

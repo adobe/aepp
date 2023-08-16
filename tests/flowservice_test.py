@@ -14,7 +14,6 @@ from unittest.mock import patch, MagicMock
 
 
 class FlowserviceTest(unittest.TestCase):
-    flow_service = FlowService(config=MagicMock(), header=MagicMock())
 
     def test_flowservice_get_resource(self):
         assert True

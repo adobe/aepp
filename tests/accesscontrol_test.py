@@ -30,7 +30,6 @@ class AccessControlTest(unittest.TestCase):
         "private_key": ""
     }
 
-    # @patch("aepp.connector.AdobeRequest", MagicMock())
     @patch("aepp.connector.AdobeRequest.getData", return_value = MagicMock())
     def test_get_reference(self, mock_connector):
         access_control_instance = AccessControl(config=self.config, header=MagicMock())
@@ -44,7 +43,6 @@ class AccessControlTest(unittest.TestCase):
         except TypeError:
             pass
 
-    # @patch("aepp.connector.AdobeRequest.__init__", MagicMock())
     @patch("aepp.connector.AdobeRequest.postData", return_value = {"result"})
     def test_post_effective_policies(self, mock_connector):
         access_control_instance = AccessControl(config=self.config, header=MagicMock())
