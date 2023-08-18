@@ -11,6 +11,7 @@
 import unittest
 from aepp.sandboxes import Sandboxes
 from unittest.mock import patch, MagicMock, ANY
+import time
 
 class SandboxTest(unittest.TestCase):
     config = {
@@ -20,7 +21,7 @@ class SandboxTest(unittest.TestCase):
         "pathToKey": "/Users/Downloads/config/private.key",
         "auth_code": "",
         "secret": "test",
-        "date_limit": 0,
+        "date_limit": time.time() + 60 * 30,
         "sandbox": "prod",
         "environment": "stage",
         "token": "token",
