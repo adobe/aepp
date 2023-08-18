@@ -95,6 +95,9 @@ class AdobeRequest:
                     config=self.config,
                     verbose=verbose
                 )
+                # x-sandbox-id is required when using non-user token, but forbidden for user token
+                if "x-sandbox-id" not in self.header:
+                    self.update_sandbox_id(self.config["sandbox"])
             self.token = token_info.token
             self.config["token"] = self.token
             if self.connectionType == 'jwt':
@@ -105,9 +108,7 @@ class AdobeRequest:
                 time.time() + token_info.expiry / timeScale - 500
             )
             self.header.update({"Authorization": f"Bearer {self.token}"})
-        # x-sandbox-id is required when using non-user token, but forbidden for user token
-        if self.connectionType == 'oauthV1' and "x-sandbox-id" not in self.header:
-            self.update_sandbox_id(self.config["sandbox"])
+
 
     def _find_path(self, path: str) -> Optional[Path]:
         """Checks if the file denoted by the specified `path` exists and returns the Path object
