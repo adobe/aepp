@@ -376,7 +376,6 @@ class ConnectObject:
         set the credential ID and the OrgIdDev as attributes of the instance.
         * credentialId
         * orgDevId
-        Returns True when success.
         Argument:
             credentialId : OPTIONAL : The credential id that can be found on your Project page.
             orgDevId : OPTIONAL : the org Id but NOT the IMS string. It is defined on your project page.
@@ -459,7 +458,6 @@ class ConnectObject:
     def updateConfigFile(self,destination:str=None)->None:
         """
         Once creating a client secret, you would need to update your config file with your new secret.
-        Returns True when successful
         Arguments:
             destination : REQUIRED : Destination path of the file name to updated.
         """
@@ -475,7 +473,6 @@ class ConnectObject:
         }
         with open(destination, "w") as cf:
             cf.write(json.dumps(json_data, indent=4))
-        return True
     
     def deleteSecrete(self,secretUID:str=None,credentialId:str=None,orgDevId:str=None,)->None:
         """
