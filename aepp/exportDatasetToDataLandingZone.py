@@ -138,7 +138,7 @@ class ExportDatasetToDataLandingZone:
             on_schedule: bool,
             config_path: str,
             entity_name: str,
-            initial_delay: int = 600):
+            initial_delay: int = 600) -> str:
         """
         Create a data flow if not being saved in config file
         Arguments:
@@ -152,6 +152,8 @@ class ExportDatasetToDataLandingZone:
           export_path : REQUIRED : define the folder path in your dlz container
           on_schedule: REQUIRED: define whether you would like to have the export following a fixed schedule or not
           config_path: REQUIRED: define the path of your aepp config file
+        Returns:
+            dataflow_id(str)
         """
         dataflow_id = Utils.check_if_exists("Platform", "dataflow_id", config_path)
         if dataflow_id is not None:
@@ -170,6 +172,7 @@ class ExportDatasetToDataLandingZone:
         else:
             dataflow_id = self.createDataFlow(dataset_id, compression_type, data_format, export_path, on_schedule, config_path, entity_name)
         self.createFlowRun(dataflow_id, dataset_id, on_schedule, initial_delay)
+        return dataflow_id
 
     def createDataFlow(
             self,
