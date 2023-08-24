@@ -14,11 +14,11 @@ pip install twine
 ```shell
 python -m build
 ```
-![Screen Shot 2023-08-24 at 11.43.37 AM.png](..%2F..%2FDesktop%2FScreen%20Shot%202023-08-24%20at%2011.43.37%20AM.png)
+![release-build.png](docs%2Frelease-build.png)
 7. Upload the two files in dist folder by running the command below
 ```shell
 python -m twine upload --repository-url https://upload.pypi.org/legacy/ dist/* 
 ```
 When prompted for username, enter `__token__` as username, and use the api token generated in step 2 as password
-![Screen Shot 2023-08-24 at 11.47.27 AM.png](..%2F..%2FDesktop%2FScreen%20Shot%202023-08-24%20at%2011.47.27%20AM.png)
+![release-upload.png](docs%2Frelease-upload.png)
 8. You can find the latest published aepp from https://pypi.org/project/aepp/#history
