@@ -366,6 +366,3 @@ class FlowserviceTest(unittest.TestCase):
         res = flow_service_conn.getLandingZoneContent()
         mock_connector.assert_called_once_with('/data/foundation/flowservice/connectionSpecs/26f526f2-58f4-4712-961d-e41bf1ccc0e8/explore', params={'objectType': 'file', 'preview': True, 'determineProperties': True})
         assert res == self.entity_response
-
-if __name__ == '__main__':
-    unittest.main()
