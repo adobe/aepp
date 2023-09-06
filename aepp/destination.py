@@ -24,6 +24,8 @@ class Authoring:
     It is a suite of configuration APIs that allow you to configure destination integration patterns for Experience Platform to deliver audience and profile data to your endpoint, based on data and authentication formats of your choice.
     More information on the API, available at: https://developer.adobe.com/experience-platform-apis/references/destination-authoring/
     """
+    loggingEnabled = False
+    logger = None
 
     def __init__(self, 
         config: Union[dict,ConnectObject] = aepp.config.config_object,
@@ -78,7 +80,7 @@ class Authoring:
             self.connector.header.update({"x-sandbox-name":kwargs.get('sandbox')})
         else:
             self.sandbox = self.connector.config["sandbox"]
-        self.endpoint = config.endpoints["global"] + config.endpoints["destinationAuthoring"]
+        self.endpoint = aepp.config.endpoints["global"] + aepp.config.endpoints["destinationAuthoring"]
     
     def getDestinations(self)->list:
         """

@@ -8,143 +8,361 @@
 #  OF ANY KIND, either express or implied. See the License for the specific language
 #  governing permissions and limitations under the License.
 
-from aepp.schema import Schema
+from aepp.flowservice import FlowService
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
+import time
 
 
 class FlowserviceTest(unittest.TestCase):
+    config = {
+        "org_id": "3ADF23C463D98F640A494032@AdobeOrg",
+        "client_id": "35e6e4d205274c4ca1418805ac41153b",
+        "tech_id": "test005@techacct.adobe.com",
+        "pathToKey": "/Users/Downloads/config/private.key",
+        "auth_code": "",
+        "secret": "test",
+        "date_limit": time.time() + 60 * 30,
+        "sandbox": "prod",
+        "environment": "stage",
+        "token": "token",
+        "jwtTokenEndpoint": "https://ims-na1.adobelogin.com/ims/exchange/jwt/",
+        "oauthTokenEndpoint": "",
+        "imsEndpoint": "https://ims-na1-stg1.adobelogin.com",
+        "private_key": ""
+    }
+    entity_response = {
+        "id": "test",
+        "name": "test"
+    }
+    entity_items_response = {
+        "items": [
+            entity_response
+        ],
+        "_links": {
+            "next": {
+                "href": "test=token"
+            }
+        }
+    }
 
-    def test_flowservice_get_resource(self):
-        assert True
+    entity_list_response = [
+            {"id": "test1", "name": "test1"},
+            {"id": "test2", "name": "test2"}
+    ]
+    entity_map_response = {
+        "test1": "test1",
+        "test2": "test2"
+    }
+    source_connection_response = {
+        "name": "test",
+        "connectionSpec": "test"
+    }
 
-    def test_flowservice_get_connections(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_get_resource(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getResource(ANY)
+        mock_connector.assert_called_once_with(ANY, params=None, format='json')
+        assert res == self.entity_response
 
-    def test_flowservice_create_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_list_response)
+    def test_flowservice_get_connections(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getConnections(ANY)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/connections', params={'limit': 20})
+        assert res == self.entity_list_response
 
-    def test_flowservice_create_streaming_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_response)
+    def test_flowservice_create_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createConnection(data={"name": "test", "auth": "none", "connectionSpec": "connectionSpec"})
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/connections', data={'name': 'test', 'auth': 'none', 'connectionSpec': 'connectionSpec'}, format='json')
+        assert res == self.entity_response
 
-    def test_flowservice_get_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_response)
+    def test_flowservice_create_streaming_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createStreamingConnection(name="test", sourceId="sourceId", dataType="json", paramName="test")
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/connections', data={'name': 'test', 'providerId': '521eee4d-8cbe-4906-bb48-fb6bd4450033', 'description': 'provided by aepp', 'connectionSpec': {'id': 'bc7b00d6-623a-4dfc-9fdb-f1240aeadaeb', 'version': '1.0'}, 'auth': {'specName': 'Streaming Connection', 'params': {'sourceId': 'sourceId', 'dataType': 'json', 'name': 'test'}}}, format='json')
+        assert res == self.entity_response
 
-    def test_flowservice_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_get_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getConnection(connectionId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_delete_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.connectionTest(connectionId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_get_connection_specs(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.deleteData", return_value = entity_response)
+    def test_flowservice_delete_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.deleteConnection(connectionId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_get_connection_specs_map(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_list_response)
+    def test_flowservice_get_connection_specs(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getConnectionSpecs()
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_list_response
 
-    def test_flowservice_get_connection_spec(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_list_response)
+    def test_flowservice_get_connection_specs_map(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getConnectionSpecsMap()
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_map_response
 
-    def test_flowservice_get_connection_specid_from_name(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_connection_spec(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getConnectionSpec(specId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_get_flows(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_list_response)
+    def test_flowservice_get_connection_specid_from_name(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getConnectionSpecIdFromName(name="test1")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == "test1"
 
-    def test_flowservice_get_flow(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_flows(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getFlows(limit=1, n_results=1)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/flows', params={'limit': 1, 'count': False, 'property': None})
+        assert res == [self.entity_response]
 
-    def test_flowservice_delete_flow(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_flow(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getFlow(flowId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_create_flow(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.deleteData", return_value = entity_response)
+    def test_flowservice_delete_flow(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.deleteFlow(flowId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_create_flow_data_lake_to_data_landing_zone(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_response)
+    def test_flowservice_create_flow(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createFlow(flow_spec_id="test", name="test", source_connection_id="test", target_connection_id="test")
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/flows', data={'name': 'test', 'flowSpec': {'id': 'test', 'version': '1.0'}, 'sourceConnectionIds': ['test'], 'targetConnectionIds': ['test'], 'transformations': [], 'scheduleParams': {'frequency': 'minute', 'interval': '15'}})
+        assert res == self.entity_response
 
-    def test_flowservice_create_data_landing_zone_to_datalake(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_response)
+    @patch("aepp.flowservice.FlowService.getFlowSpecIdFromNames", return_value = "test")
+    def test_flowservice_create_flow_data_lake_to_data_landing_zone(self, mock_connector, mock_spec_id):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createFlowDataLakeToDataLandingZone(name="test", source_connection_id="test", target_connection_id="test", schedule_start_time=12345)
+        mock_connector.assert_called_once_with('Data Landing Zone', 'activation-datalake', 'Data Landing Zone')
+        assert res == self.entity_response
 
-    def test_flowservice_updateFlow(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_response)
+    @patch("aepp.flowservice.FlowService.getFlowSpecIdFromNames", return_value = "test")
+    def test_flowservice_create_data_landing_zone_to_datalake(self, mock_connector, mock_spec_id):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createFlowDataLandingZoneToDataLake(name="test", source_connection_id="test", target_connection_id="test", schedule_start_time=12345)
+        mock_connector.assert_called_once_with('CloudStorageToAEP', 'landing-zone', 'datalake')
+        assert res == self.entity_response
 
-    def test_flowservice_get_flow_specs(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.patchData", return_value = entity_response)
+    def test_flowservice_updateFlow(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.updateFlow(flowId="test", etag="etag", updateObj=self.entity_response)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/flows/test', headers=ANY, data={'id': 'test', 'name': 'test'})
+        assert res == self.entity_response
 
-    def test_flowservice_get_flow_spec_id_from_names(self):
-         assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_flow_specs(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getFlowSpecs()
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/flowSpecs', params={})
+        assert res == self.entity_items_response["items"]
 
-    def test_flowservice_get_flow_spec(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_flow_spec_id_from_names(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getFlowSpecIdFromNames(flow_spec_name="test")
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/flowSpecs', params={'property': 'name==test'})
+        assert res == "test"
 
-    def test_flowservice_get_runs(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_flow_spec(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getFlowSpec(flowSpecId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_create_run(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_runs(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getRuns(limit=1, n_results=1)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/runs', params={'limit': 1, 'count': False})
+        assert res == [self.entity_response]
 
-    def test_flowservice_get_run(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_items_response)
+    def test_flowservice_create_run(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createRun(flowId="test", status="test")
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/runs', data={'flowId': 'test', 'status': 'test'})
+        assert res == self.entity_items_response
 
-    def test_flowservice_get_source_connections(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_get_run(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getRun(runId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_get_source_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_source_connections(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getSourceConnections(n_results=1)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/sourceConnections', params={})
+        assert res == [self.entity_response]
 
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_source_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getSourceConnection(sourceConnectionId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowsevrice_delete_source_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.deleteData", return_value = entity_response)
+    def test_flowsevrice_delete_source_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.deleteFlow(flowId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_create_source_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = source_connection_response)
+    def test_flowservice_create_source_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createSourceConnection(data=self.source_connection_response)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/sourceConnections', data={'name': 'test', 'connectionSpec': 'test'})
+        assert res == self.source_connection_response
 
-    def test_flowservice_create_source_connection_streaming(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = source_connection_response)
+    @patch("aepp.flowservice.FlowService.getConnectionSpecIdFromName", return_value = "test")
+    def test_flowservice_create_source_connection_streaming(self, mock_post_data, mock_get_data):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createSourceConnectionStreaming(name="test", description="test", )
+        mock_post_data.assert_called_once_with(ANY)
+        assert res == self.source_connection_response
 
-    def test_flowservice_create_source_connectionDataLandingZone(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = source_connection_response)
+    @patch("aepp.flowservice.FlowService.getConnectionSpecIdFromName", return_value = "test")
+    def test_flowservice_create_source_connectionDataLandingZone(self, mock_connector, mock_spec_id):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createSourceConnectionDataLandingZone(name="test", format="test", path="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.source_connection_response
 
-    def test_flowservice_create_source_connection_datalake(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = source_connection_response)
+    @patch("aepp.flowservice.FlowService.getConnectionSpecIdFromName", return_value = "test")
+    def test_flowservice_create_source_connection_datalake(self, mock_connector, mock_spec_id):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createSourceConnectionDataLake(name="test", dataset_ids=["1", "2"])
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.source_connection_response
 
-    def test_flowservice_update_source_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.patchData", return_value = entity_response)
+    def test_flowservice_update_source_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.updateSourceConnection(sourceConnectionId="test", etag="testEtag", updateObj=self.entity_response)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/sourceConnections/test', headers=ANY, data={'id': 'test', 'name': 'test'})
+        assert res == self.entity_response
 
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_target_connections(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getTargetConnections(n_results=1)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/targetConnections', params={})
+        assert res == [self.entity_response]
 
-    def test_flowservice_get_target_connections(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_items_response)
+    def test_flowservice_get_target_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getTargetConnection(targetConnectionId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_get_target_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.deleteData", return_value = entity_response)
+    def test_flowservice_delete_target_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.deleteTargetConnection(targetConnectionId="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.entity_response
 
-    def test_flowservice_delete_target_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = entity_response)
+    def test_flowservice_create_target_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createTargetConnection(data=self.entity_response)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/targetConnections', data={'id': 'test', 'name': 'test'})
+        assert res == self.entity_response
 
-    def test_flowservice_create_target_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = source_connection_response)
+    @patch("aepp.flowservice.FlowService.getConnectionSpecIdFromName", return_value = "test")
+    def test_flowservice_create_target_connection_data_landing_zone(self, mock_connector, mock_spec_id):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createTargetConnectionDataLandingZone(name="test", path="test", type="test", version="1.0", format="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.source_connection_response
 
-    def test_flowservice_create_target_connection_data_landin_zone(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.postData", return_value = source_connection_response)
+    @patch("aepp.flowservice.FlowService.getConnectionSpecIdFromName", return_value = "test")
+    def test_flowservice_create_target_connection_datalake(self, mock_connector, mock_spec_id):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.createTargetConnectionDataLake(name="test", datasetId="test", schemaId="test", version="1.0", format="test")
+        mock_connector.assert_called_once_with(ANY)
+        assert res == self.source_connection_response
 
-    def test_flowservice_create_target_connection_datalake(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.patchData", return_value = entity_response)
+    def test_flowservice_update_target_connection(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.updateTargetConnection(targetConnectionId="test", etag="testEtag", updateObj=self.entity_response)
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/targetConnections/test', headers=ANY, data={'id': 'test', 'name': 'test'})
+        assert res == self.entity_response
 
-    def test_flowservice_update_target_connection(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_get_landing_zone_container(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getLandingZoneContainer()
+        mock_connector.assert_called_once_with('/data/foundation/connectors/landingzone', params={'type': 'user_drop_zone'})
+        assert res == self.entity_response
 
-    def test_flowservice_update_policy(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_get_landing_zone_credential(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getLandingZoneCredential()
+        mock_connector.assert_called_once_with('/data/foundation/connectors/landingzone/credentials', params={'type': 'user_drop_zone'})
+        assert res == self.entity_response
 
-    def test_flowservice_get_landing_zone_container(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_explore_landing_zone(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.exploreLandingZone()
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/connectionSpecs/26f526f2-58f4-4712-961d-e41bf1ccc0e8/explore', params={'objectType': 'root'})
+        assert res == self.entity_response
 
-    def test_flowservice_get_landing_zone_credential(self):
-        assert True
-
-    def test_flowservice_explore_landing_zone(self):
-        assert True
-
-    def test_flowservice_get_landing_zone_content(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest.getData", return_value = entity_response)
+    def test_flowservice_get_landing_zone_content(self, mock_connector):
+        flow_service_conn = FlowService(config=self.config, header=MagicMock())
+        res = flow_service_conn.getLandingZoneContent()
+        mock_connector.assert_called_once_with('/data/foundation/flowservice/connectionSpecs/26f526f2-58f4-4712-961d-e41bf1ccc0e8/explore', params={'objectType': 'file', 'preview': True, 'determineProperties': True})
+        assert res == self.entity_response

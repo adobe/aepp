@@ -383,7 +383,7 @@ class FlowService:
             raise Exception("Require a name to be present")
         spec_name_to_id = self.getConnectionSpecsMap()
         if name not in spec_name_to_id:
-            raise Exception(f"Connection spec name '{name}' not found")
+            raise Exception(f"Connection spec name {name} not found")
         return spec_name_to_id[name]
 
     def getFlows(
