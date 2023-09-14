@@ -961,8 +961,8 @@ class Schema:
         if self.loggingEnabled:
             self.logger.debug(f"Starting getFieldGroups")
         path = f"/{self.container}/fieldgroups/"
-        start = kwargs.get("start", 0)
-        params = {"start": start}
+        start = kwargs.get("page", 0)
+        params = {"page": start}
         verbose = kwargs.get("debug", False)
         privateHeader = deepcopy(self.header)
         privateHeader["Accept"] = f"application/vnd.adobe.{format}+json"
