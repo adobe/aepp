@@ -20,6 +20,7 @@ import pandas as pd
 import json
 import re
 from .configs import ConnectObject
+from .catalog import ObservableSchemaManager
 
 json_extend = [
     {
