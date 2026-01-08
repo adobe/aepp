@@ -400,6 +400,9 @@ def __extractFieldGroup__(fieldGroup: str,folder: Union[str, Path] = None,sandbo
         for descriptor in descriptors:
             with open(f"{descriptorPath / descriptor['@id']}.json",'w') as f:
                 json.dump(descriptor,f,indent=2)
+    classes = myfg_manager.classIds
+    for cls in classes:
+        __extractClass__(cls,folder,sandbox)
 
 def __extractSchema__(schemaEl: str,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None,region:str=None):
     schemaPath = Path(folder) / 'schema'
@@ -435,6 +438,9 @@ def __extractSchema__(schemaEl: str,folder: Union[str, Path] = None,sandbox: 'Co
             if descriptor.get('@type','') == 'xdm:descriptorIdentity':
                 namespace = descriptor['xdm:namespace']
                 __extractIdentity__(namespace,region,folder,sandbox)
+            if descriptor.get('@type','') == 'xdm:descriptorRelationship' or descriptor.get('@type','') == 'xdm:descriptorOneToOne':
+                targetSchema = descriptor['xdm:destinationSchema']
+                __extractSchema__(targetSchema,folder,sandbox,region)
 
 
 def __extractIdentity__(identityStr: str,region:str=None,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None):

@@ -776,7 +776,6 @@ class Profile:
         privateHeader['Accept'] = "application/json"
         params = {"offset":0,"limit":20}
         res = self.connector.getData(self.endpoint_global + path,params=params,headers=privateHeader)
-        print(res)
         data = res.get("computedAttributes",[])
         offset = res.get("_page",{}).get("offset", 0)
         while offset != 0:

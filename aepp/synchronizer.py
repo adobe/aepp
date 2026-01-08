@@ -340,6 +340,11 @@ class Synchronizer:
                     print(f"field group '{name_base_fieldgroup}' already exists in target {target}, checking it")
                 if t_fieldgroup is None: ## if need to create the FieldGroupManager
                     t_fieldgroup = fieldgroupmanager.FieldGroupManager(targetSchema.data.fieldGroups_altId[name_base_fieldgroup],config=self.dict_targetsConfig[target],sandbox=target)
+                for fg_class in t_fieldgroup.classIds:
+                    if fg_class not in fg_class_ids:
+                        fg_class_ids.append(fg_class)
+                ### Aligning class support to the field groups
+                t_fieldgroup.schemaAPI.extendFieldGroup(t_fieldgroup.id,fg_class_ids)
                 df_base = baseFieldGroup.to_dataframe(full=True)
                 df_target = t_fieldgroup.to_dataframe(full=True)
                 base_paths = df_base['path'].tolist()
@@ -515,6 +520,8 @@ class Synchronizer:
                         ## adding the field group to the target components
                         self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
                     else:
+                        if verbose:
+                            print(f"field group '{fg_name}' is a custom field group, using it")
                         tmp_FieldGroup = baseSchema.getFieldGroupManager(fg_name)
                         self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose)
                         new_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][fg_name].id)

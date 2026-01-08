@@ -122,9 +122,7 @@ class SchemaManager:
                             break
             self.fieldGroupIds = [obj['$ref'] for obj in allOf if ('/mixins/' in obj['$ref'] or '/experience/' in obj['$ref'] or '/context/' in obj['$ref']) and obj['$ref'] != self.classId]
             self.classIds = [self.classId]
-            print(self.tenantId)
             for ref in self.fieldGroupIds:
-                print(ref)
                 if '/mixins/' in ref and self.tenantId[1:] in ref:
                     if self.localfolder is not None:
                         for json_file in self.fieldgroupFolder.glob('*.json'):
@@ -134,7 +132,6 @@ class SchemaManager:
                                 break
                     elif self.schemaAPI is not None:
                         definition = self.schemaAPI.getFieldGroup(ref,full=False)
-                    print(definition.get('title'))
                     fgM = FieldGroupManager(fieldGroup=definition,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
                 else:
                     if self.localfolder is not None:
@@ -206,7 +203,6 @@ class SchemaManager:
                                 tmp_def = json.load(FileIO(json_file))
                                 if tmp_def.get('$id') == ref:
                                     definition = tmp_def
-                                    print(definition.get('title'))
                                     break
                 if 'properties' in definition.keys():
                     definition['definitions'] = definition['properties']
@@ -260,7 +256,6 @@ class SchemaManager:
                                 tmp_def = json.load(FileIO(json_file))
                                 if tmp_def.get('$id') == ref:
                                     definition = tmp_def
-                                    print(definition.get('title'))
                                     break 
                     fgM = FieldGroupManager(definition,schemaAPI=self.schemaAPI, localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
                     self.fieldGroupsManagers[fgM.title] = fgM
@@ -585,7 +580,6 @@ class SchemaManager:
         res = self.schemaAPI.putSchema(self.id,self.schema)
         if 'status' in res.keys():
             if res['status'] == 400:
-                print(res['title'])
                 return res
             else:
                 return res

@@ -13,7 +13,9 @@ This page list all of the changes that came during the different release of the 
 * Surfacing issue with `sandboxId` in an Error and in logs.\
 Patch:
 * Fixing the creation of descriptor for labels
-* Upgrading capability of synchronizer to support deprecated fields
+* Upgrading capability of synchronizer to support deprecated fields\
+* Fix some print statement left in the code
+* Upgrading the extractArtefact method
 
 
 ## version 0.4.0

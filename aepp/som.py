@@ -567,7 +567,6 @@ class Som:
                 list_path = list(reversed(list_path))
                 path = '.'.join(list_path)
                 o_data = self.get(path,merge=True)
-                print(o_data)
         self.__mergedata__(o_data,deepcopy(data))
         return None
         

@@ -1765,6 +1765,9 @@ class Schema:
             raise Exception("Require a field Group ID")
         if self.loggingEnabled:
             self.logger.debug(f"Starting extendFieldGroup")
+        if fieldGroupId.startswith("https://"):
+            from urllib import parse
+            fieldGroupId = parse.quote_plus(fieldGroupId)
         path = f"/{tenant}/fieldgroups/{fieldGroupId}"
         if values is not None:
             list_fgs = values
