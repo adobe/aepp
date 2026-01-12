@@ -67,11 +67,49 @@ class Synchronizer:
             self.descriptorFolder = self.localfolder / 'descriptor'
             if baseSandbox is not None:
                 self.baseSandbox = baseSandbox
+            else:
+                with open(self.localfolder / 'config.json','r') as f:
+                    local_config = json.load(f)
+                    self.baseSandbox = local_config.get('sandbox',None)
         self.dict_targetsConfig = {target: aepp.configure(org_id=config_object['org_id'],client_id=config_object['client_id'],scopes=config_object['scopes'],secret=config_object['secret'],sandbox=target,connectInstance=True) for target in targets}
         self.region = region
+        self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{}}  
         self.dict_targetComponents = {target:{'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{}} for target in targets}
 
-    def syncComponent(self,component:Union[str,dict],componentType:str=None,verbose:bool=False)-> dict:
+    def getSyncFieldGroupManager(self,fieldgroup:str,sandbox:str=None)-> dict:
+        """
+        Get a field group Manager from the synchronizer.
+        Arguments:
+            fieldgroup : REQUIRED : Either $id, or name or alt:Id of the field group to get
+            config : REQUIRED : ConnectObject with the configuration. Make sure that the configuration of your API allows connection to the sandbox.
+            sandbox : REQUIRED : name of the sandbox to get the field group from
+        """
+        if sandbox is None:
+            raise ValueError("a sandbox name must be provided")
+        if sandbox == self.baseSandbox:
+            if fieldgroup in self.dict_baseComponents['fieldgroup'].keys():
+                return self.dict_baseComponents['fieldgroup'][fieldgroup]
+            elif fieldgroup in [self.dict_baseComponents['fieldgroup'][fg].id for fg in self.dict_baseComponents['fieldgroup'].keys()]:
+                fg_key = [fg for fg in self.dict_baseComponents['fieldgroup'].keys() if self.dict_baseComponents['fieldgroup'][fg].id == fieldgroup][0]
+                return self.dict_baseComponents['fieldgroup'][fg_key]
+            elif fieldgroup in [self.dict_baseComponents['fieldgroup'][fg].altId for fg in self.dict_baseComponents['fieldgroup'].keys()]:
+                fg_key = [fg for fg in self.dict_baseComponents['fieldgroup'].keys() if self.dict_baseComponents['fieldgroup'][fg].altId == fieldgroup][0]
+                return self.dict_baseComponents['fieldgroup'][fg_key]
+            else:
+                raise ValueError(f"the field group '{fieldgroup}' has not been synchronized to the sandbox '{sandbox}'")
+        else:
+            if fieldgroup in self.dict_targetComponents[sandbox]['fieldgroup'].keys():
+                return self.dict_targetComponents[sandbox]['fieldgroup'][fieldgroup]
+            elif fieldgroup in [self.dict_targetComponents[sandbox]['fieldgroup'][fg].id for fg in self.dict_targetComponents[sandbox]['fieldgroup'].keys()]:
+                fg_key = [fg for fg in self.dict_targetComponents[sandbox]['fieldgroup'].keys() if self.dict_targetComponents[sandbox]['fieldgroup'][fg].id == fieldgroup][0]
+                return self.dict_targetComponents[sandbox]['fieldgroup'][fg_key]
+            elif fieldgroup in [self.dict_targetComponents[sandbox]['fieldgroup'][fg].altId for fg in self.dict_targetComponents[sandbox]['fieldgroup'].keys()]:
+                fg_key = [fg for fg in self.dict_targetComponents[sandbox]['fieldgroup'].keys() if self.dict_targetComponents[sandbox]['fieldgroup'][fg].altId == fieldgroup][0]
+                return self.dict_targetComponents[sandbox]['fieldgroup'][fg_key]
+            else:
+                raise ValueError(f"the field group '{fieldgroup}' has not been synchronized to the sandbox '{sandbox}'")
+    
+    def syncComponent(self,component:Union[str,dict],componentType:str=None,force:bool=False,verbose:bool=False)-> dict:
         """
         Synchronize a component to the target sandbox.
         The component could be a string (name or id of the component in the base sandbox) or a dictionary with the definition of the component.
@@ -79,7 +117,8 @@ class Synchronizer:
         Arguments:
             component : REQUIRED : name or id of the component or a dictionary with the component definition
             componentType : OPTIONAL : type of the component (e.g. "schema", "fieldgroup", "datatypes", "class", "identity", "dataset"). Required if a string is passed. 
-            It is not required but if the type cannot be inferred from the component, it will raise an error. 
+                It is not required but if the type cannot be inferred from the component, it will raise an error. 
+            force : OPTIONAL : if True, it will force the synchronization of the component even if it already exists in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
             verbose : OPTIONAL : if True, it will print the details of the synchronization process
         """
         if type(component) == str:
@@ -184,26 +223,28 @@ class Synchronizer:
                 raise TypeError("the component type could not be inferred from the component or is not supported. Please provide the type as a parameter")
         ## Synchronize the component to the target sandboxes
         if componentType == 'datatypes':
-            self.__syncDataType__(component,verbose=verbose)
+            self.__syncDataType__(component,verbose=verbose,force=force)
         if componentType == 'fieldgroup':
-            self.__syncFieldGroup__(component,verbose=verbose)
+            self.__syncFieldGroup__(component,verbose=verbose,force=force)
         if componentType == 'schema':
-            self.__syncSchema__(component,verbose=verbose)
+            self.__syncSchema__(component,verbose=verbose,force=force)
         if componentType == 'class': 
-            self.__syncClass__(component,verbose=verbose)
+            self.__syncClass__(component,verbose=verbose,force=force)
         if componentType == 'identity':
             self.__syncIdentity__(component,verbose=verbose)
         if componentType == 'dataset':
             self.__syncDataset__(component,verbose=verbose)
 
-    def __syncClass__(self,baseClass:'ClassManager',verbose:bool=False)-> dict:
+    def __syncClass__(self,baseClass:'ClassManager',force:bool=False,verbose:bool=False)-> dict:
         """
         Synchronize a class to the target sandboxes.
         Arguments:
             baseClass : REQUIRED : class id or name to synchronize
+            force : OPTIONAL : if True, it will force the synchronization of the class even if it already exists in the target sandbox
         """
         if not isinstance(baseClass,classmanager.ClassManager):
             raise TypeError("the baseClass must be a classManager instance")
+        self.dict_baseComponents['class'][baseClass.title] = baseClass
         baseClassName = baseClass.title
         baseBehavior = baseClass.behavior
         for target in self.dict_targetsConfig.keys():
@@ -223,14 +264,16 @@ class Synchronizer:
                 self.dict_targetComponents[target]['class'][baseClassName] = t_newClass
 
             
-    def __syncDataType__(self,baseDataType:'DataTypeManager',verbose:bool=False)-> dict:
+    def __syncDataType__(self,baseDataType:'DataTypeManager',force:bool=False,verbose:bool=False)-> dict:
         """
         Synchronize a data type to the target sandbox.
         Arguments:
             baseDataType : REQUIRED : DataTypeManager object with the data type to synchronize
+            force : OPTIONAL : if True, it will force the synchronization of the data type even if it already exists in the target sandbox
         """
         if not isinstance(baseDataType,datatypemanager.DataTypeManager):
             raise TypeError("the baseDataType must be a DataTypeManager object")
+        self.dict_baseComponents['datatype'][baseDataType.title] = baseDataType
         name_base_datatype = baseDataType.title
         for target in self.dict_targetsConfig.keys():
             targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
@@ -249,7 +292,7 @@ class Synchronizer:
                 base_paths = df_base['path'].tolist()
                 target_paths = df_target['path'].tolist()
                 diff_paths = list(set(base_paths) - set(target_paths))
-                if len(diff_paths) > 0: ## there are differences
+                if len(diff_paths) > 0 or force==True: ## there are differences
                     base_datatypes_paths = baseDataType.getDataTypePaths()
                     df_base_limited = df_base[df_base['origin'] == 'self'].copy() ## exclude field group native fields
                     df_base_limited = df_base_limited[~df_base_limited['path'].isin(list(base_datatypes_paths.keys()))] ## exclude base of datatype rows
@@ -258,7 +301,7 @@ class Synchronizer:
                     base_dict_path_dtTitle = {}
                     for path,dt_id in base_datatypes_paths.items():
                         tmp_dt_manager = baseDataType.getDataTypeManager(dt_id)
-                        self.__syncDataType__(tmp_dt_manager,verbose=verbose)
+                        self.__syncDataType__(tmp_dt_manager,force=force,verbose=verbose)
                         base_dict_path_dtTitle[path] = tmp_dt_manager.title
                     target_datatypes_paths = t_datatype.getDataTypePaths(som_compatible=True)
                     target_datatypes_paths_list = list(target_datatypes_paths.keys())
@@ -289,7 +332,7 @@ class Synchronizer:
                 base_dict_path_dtTitle = {}
                 for path,dt_id in base_datatypes_paths.items():
                     tmp_dt_manager = baseDataType.getDataTypeManager(dt_id)
-                    self.__syncDataType__(tmp_dt_manager,verbose=verbose)
+                    self.__syncDataType__(tmp_dt_manager,force=force,verbose=verbose)
                     base_dict_path_dtTitle[path] = tmp_dt_manager.title
                 target_datatypes_paths = new_datatype.getDataTypePaths(som_compatible=True)
                 target_datatypes_paths_list = list(target_datatypes_paths.keys())
@@ -309,14 +352,16 @@ class Synchronizer:
                     raise Exception("the data type could not be created in the target sandbox")
             self.dict_targetComponents[target]['datatype'][name_base_datatype] = t_datatype
 
-    def __syncFieldGroup__(self,baseFieldGroup:'FieldGroupManager',verbose:bool=False)-> dict:
+    def __syncFieldGroup__(self,baseFieldGroup:'FieldGroupManager',force:bool=True,verbose:bool=False)-> dict:
         """
         Synchronize a field group to the target sandboxes.
         Argument: 
             baseFieldGroup : REQUIRED : FieldGroupManager object with the field group to synchronize
+            force : OPTIONAL : if True, it will force the synchronization of the field group even if it already exists in the target sandbox
         """
         if not isinstance(baseFieldGroup,fieldgroupmanager.FieldGroupManager):
             raise TypeError("the baseFieldGroup must be a FieldGroupManager object")
+        self.dict_baseComponents['fieldgroup'][baseFieldGroup.title] = baseFieldGroup
         name_base_fieldgroup = baseFieldGroup.title
         base_fg_classIds = baseFieldGroup.classIds
         for target in self.dict_targetsConfig.keys():
@@ -350,7 +395,7 @@ class Synchronizer:
                 base_paths = df_base['path'].tolist()
                 target_paths = df_target['path'].tolist()
                 diff_paths = [path for path in base_paths if path not in target_paths]
-                if len(diff_paths) > 0:
+                if len(diff_paths) > 0 or force==True:
                     base_datatypes_paths = baseFieldGroup.getDataTypePaths()
                     ## handling fieldgroup native fields
                     df_base_limited = df_base[df_base['origin'] == 'fieldGroup'].copy() ## exclude datatypes
@@ -371,7 +416,7 @@ class Synchronizer:
                     base_dict_path_dtTitle = {}
                     for path,dt_id in base_datatypes_paths.items():
                         tmp_dt_manager = baseFieldGroup.getDataTypeManager(dt_id)
-                        self.__syncDataType__(tmp_dt_manager,verbose=verbose)
+                        self.__syncDataType__(tmp_dt_manager,force=force,verbose=verbose)
                         base_dict_path_dtTitle[path] = tmp_dt_manager.title
                     target_datatypes_paths = t_fieldgroup.getDataTypePaths(som_compatible=True)
                     target_datatypes_paths_list = list(target_datatypes_paths.keys())
@@ -423,7 +468,7 @@ class Synchronizer:
                 base_dict_path_dtTitle = {}
                 for path,dt_id in base_datatypes_paths.items():
                     tmp_dt_manager = baseFieldGroup.getDataTypeManager(dt_id)
-                    self.__syncDataType__(tmp_dt_manager,verbose=verbose)
+                    self.__syncDataType__(tmp_dt_manager,force=force,verbose=verbose)
                     base_dict_path_dtTitle[path] = tmp_dt_manager.title
                 for path,dt_title in base_dict_path_dtTitle.items():
                     tmp_t_dt = self.dict_targetComponents[target]['datatype'][dt_title]
@@ -442,16 +487,18 @@ class Synchronizer:
             self.dict_targetComponents[target]['fieldgroup'][name_base_fieldgroup] = t_fieldgroup
 
 
-    def __syncSchema__(self,baseSchema:'SchemaManager',verbose:bool=False)-> dict:
+    def __syncSchema__(self,baseSchema:'SchemaManager',force:bool=False,verbose:bool=False)-> dict:
         """
         Sync the schema to the target sandboxes.
         Arguments:
             baseSchema : REQUIRED : SchemaManager object to synchronize
+            force : OPTIONAL : if True, it will force the synchronization of field groups even if they already exist in the target schema
         """
         ## TO DO -> sync required fields
         if not isinstance(baseSchema,schemamanager.SchemaManager):
             raise TypeError("the baseSchema must be a SchemaManager object")
         name_base_schema = baseSchema.title
+        self.dict_baseComponents['schema'][name_base_schema] = baseSchema
         descriptors = baseSchema.getDescriptors()
         base_field_groups_names = list(baseSchema.fieldGroups.values())
         dict_base_fg_name_id = {name:fg_id for fg_id,name in baseSchema.fieldGroups.items()}
@@ -465,7 +512,7 @@ class Synchronizer:
                 t_schema = schemamanager.SchemaManager(targetSchemaAPI.data.schemas_altId[name_base_schema],config=self.dict_targetsConfig[target],sandbox=target)
                 new_fieldgroups = [fg for fg in base_field_groups_names if fg not in t_schema.fieldGroups.values()]
                 existing_fieldgroups = [fg for fg in base_field_groups_names if fg in t_schema.fieldGroups.values()]
-                if len(new_fieldgroups) > 0: ## if new field groups
+                if len(new_fieldgroups) > 0 or force==True: ## if new field groups
                     if verbose:
                         print('found new field groups to add to the schema')
                     for new_fieldgroup in new_fieldgroups:
@@ -478,7 +525,8 @@ class Synchronizer:
                             if verbose:
                                 print(f"field group '{new_fieldgroup}' is a custom field group, syncing it")
                             tmp_FieldGroup = baseSchema.getFieldGroupManager(new_fieldgroup)
-                            self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose)
+                            print(f"Creating new custom field group '{tmp_FieldGroup.title}'")
+                            self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose,force=force)
                             t_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup].id)
                     t_schema.setDescription(baseSchema.description)
                     res = t_schema.updateSchema()
@@ -490,13 +538,35 @@ class Synchronizer:
                 for fg_name in existing_fieldgroups:
                     if baseSchema.tenantId[1:] in dict_base_fg_name_id[fg_name]: ## custom field group
                         tmp_fieldGroupManager = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.baseConfig,sandbox=target,localFolder=self.localfolder)
-                        self.__syncFieldGroup__(tmp_fieldGroupManager,verbose=verbose)
+                        self.__syncFieldGroup__(tmp_fieldGroupManager,force=force,verbose=verbose)
                     else:
                         if verbose:
                             print(f"field group '{fg_name}' is a OOTB field group, using it")
                         self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
                 list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI=targetSchemaAPI,verbose=verbose)
+                ## handling the meta:refProperty setup if any
+                base_allOf = baseSchema.schema.get('allOf',[])
+                base_fg_name_metaref = {}
+                for refEl in base_allOf: ## retrieving the meta:refProperty from the base schema
+                    if 'meta:refProperty' in refEl.keys():
+                        tmp_base_fg_id = refEl['$ref']
+                        if baseSchema.tenantId[1:] in tmp_base_fg_id:
+                            tmp_base_fg_manager = self.getSyncFieldGroupManager(tmp_base_fg_id,sandbox=baseSchema.sandbox)
+                            base_fg_name_metaref[tmp_base_fg_manager.title] = refEl['meta:refProperty']
+                        else:
+                            base_fg_name_metaref[tmp_base_fg_id] = refEl['meta:refProperty']
+                for fg_name,ref_property in base_fg_name_metaref.items(): ## updating the target schema with the meta:refProperty
+                    for ref in t_schema.schema.get('allOf',[]):
+                        tmp_target_fg_id = ref['$ref']
+                        if baseSchema.tenantId[1:] in tmp_target_fg_id:
+                            tmp_target_fg_manager = self.getSyncFieldGroupManager(tmp_target_fg_id,sandbox=target)
+                            if fg_name == tmp_target_fg_manager.title:
+                                ref['meta:refProperty'] = ref_property
+                        else:
+                            if fg_name == ref['$ref']:
+                                ref['meta:refProperty'] = ref_property
                 self.dict_targetComponents[target]['schemaDescriptors'][name_base_schema] = list_new_descriptors
+                t_schema.updateSchema()
             else: ## schema does not exist in target
                 if verbose:
                     print(f"schema '{name_base_schema}' does not exist in target {target}, creating it")
@@ -506,7 +576,7 @@ class Synchronizer:
                 tenantidId = baseSchema.tenantId
                 if tenantidId[1:] in baseClassId: ## custom class
                     baseClassManager = classmanager.ClassManager(baseClassId,config=self.baseConfig,sandbox=target,localFolder=self.localfolder,sandboxBase=self.baseSandbox,tenantidId=tenantidId)
-                    self.__syncClass__(baseClassManager,verbose=verbose)
+                    self.__syncClass__(baseClassManager,force=force,verbose=verbose)
                     targetClassManager = self.dict_targetComponents[target]['class'][baseClassManager.title]
                     classId_toUse = targetClassManager.id
                 else:
@@ -523,7 +593,7 @@ class Synchronizer:
                         if verbose:
                             print(f"field group '{fg_name}' is a custom field group, using it")
                         tmp_FieldGroup = baseSchema.getFieldGroupManager(fg_name)
-                        self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose)
+                        self.__syncFieldGroup__(tmp_FieldGroup,force=force,verbose=verbose)
                         new_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][fg_name].id)
                 new_schema.setDescription(baseSchema.description)
                 res = new_schema.createSchema()
@@ -535,6 +605,28 @@ class Synchronizer:
                 ## handling descriptors
                 list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI,verbose=verbose)
                 self.dict_targetComponents[target]['schemaDescriptors'][name_base_schema] = list_new_descriptors
+                ## handling the meta:refProperty setup if any
+                base_allOf = baseSchema.schema.get('allOf',[])
+                base_fg_name_metaref = {}
+                for refEl in base_allOf: ## retrieving the meta:refProperty from the base schema
+                    if 'meta:refProperty' in refEl.keys():
+                        tmp_base_fg_id = refEl['$ref']
+                        if baseSchema.tenantId[1:] in tmp_base_fg_id:
+                            tmp_base_fg_manager = self.getSyncFieldGroupManager(tmp_base_fg_id,sandbox=baseSchema.sandbox)
+                            base_fg_name_metaref[tmp_base_fg_manager.title] = refEl['meta:refProperty']
+                        else:
+                            base_fg_name_metaref[tmp_base_fg_id] = refEl['meta:refProperty']
+                for fg_name,ref_property in base_fg_name_metaref.items(): ## updating the target schema with the meta:refProperty
+                    for ref in t_schema.schema.get('allOf',[]):
+                        tmp_target_fg_id = ref['$ref']
+                        if baseSchema.tenantId[1:] in tmp_target_fg_id:
+                            tmp_target_fg_manager = self.getSyncFieldGroupManager(tmp_target_fg_id,sandbox=target)
+                            if fg_name == tmp_target_fg_manager.title:
+                                ref['meta:refProperty'] = ref_property
+                        else:
+                            if fg_name == ref['$ref']:
+                                ref['meta:refProperty'] = ref_property
+                t_schema.updateSchema()
             self.dict_targetComponents[target]['schema'][name_base_schema] = t_schema
 
     def __syncDescriptor__(self,baseSchemaManager:'SchemaManager'=None,targetSchemaManager:'SchemaManager'=None,targetSchemaAPI:'Schema'=None,verbose:bool=False)-> dict:
@@ -553,6 +645,7 @@ class Synchronizer:
         if not isinstance(targetSchemaManager,schemamanager.SchemaManager):
             raise TypeError("the targetSchemaManager must be a SchemaManager object")
         base_descriptors = baseSchemaManager.getDescriptors()
+        self.dict_baseComponents['schemaDescriptors'][baseSchemaManager.title] = {}
         if self.baseConfig is not None:
             baseSchemaAPI = schema.Schema(config=self.baseConfig)
             myschemas = baseSchemaAPI.getSchemas() ## to populate the data object
@@ -717,6 +810,7 @@ class Synchronizer:
         if not isinstance(identityDefiniton,dict):
             raise TypeError("the identityDefinition must be a dictionary")
         code_base_identity = identityDefiniton['code']
+        self.dict_baseComponents['identities'][code_base_identity] = identityDefiniton
         for target in self.dict_targetsConfig.keys():
             targetIdentity = identity.Identity(config=self.dict_targetsConfig[target],region=self.region)
             t_identities = targetIdentity.getIdentities()
@@ -742,7 +836,8 @@ class Synchronizer:
             baseDataset : REQUIRED : dictionary with the dataset definition
         """
         if len(baseDataset) == 1: ## if receiving the dataset as provided by the API {datasetId:{...definition}}
-            baseDataset = deepcopy(baseDataset[list(baseDataset.keys()[0])])
+            baseDataset = deepcopy(baseDataset[list(baseDataset.keys())[0]])
+        self.dict_baseComponents['datasets'][baseDataset['name']] = baseDataset
         base_datasetName = baseDataset['name']
         base_dataset_related_schemaId = baseDataset['schemaRef']['id']
         if self.baseConfig is not None:

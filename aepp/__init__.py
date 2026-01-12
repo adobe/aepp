@@ -160,7 +160,8 @@ def extractSandboxArtefacts(
     completePath.mkdir(exist_ok=True)
     globalConfig = {
         "imsOrgId":sandbox.org_id,
-        "tenantId":f"_{sch.getTenantId()}"
+        "tenantId":f"_{sch.getTenantId()}",
+        "sandbox":sandbox.sandbox
     }
     with open(f'{completePath}/config.json','w') as f:
         json.dump(globalConfig,f,indent=2)
@@ -287,7 +288,8 @@ def extractSandboxArtefact(
     sch = schema.Schema(config=sandbox)
     globalConfig = {
         "imsOrgId":sandbox.org_id,
-        "tenantId":f"_{sch.getTenantId()}"
+        "tenantId":f"_{sch.getTenantId()}",
+        "sandbox":sandbox.sandbox
     }
     with open(f'{completePath}/config.json','w') as f:
         json.dump(globalConfig,f,indent=2)
