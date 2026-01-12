@@ -10,7 +10,7 @@
 
 import json
 import aepp
-from aepp import schema, schemamanager, fieldgroupmanager, datatypemanager,classmanager,identity,catalog
+from aepp import schema, schemamanager, fieldgroupmanager, datatypemanager,classmanager,identity,catalog,customerprofile,segmentation
 from copy import deepcopy
 from typing import Union
 from pathlib import Path
@@ -65,6 +65,8 @@ class Synchronizer:
             self.identityFolder = self.localfolder / 'identity'
             self.datasetFolder = self.localfolder / 'dataset'
             self.descriptorFolder = self.localfolder / 'descriptor'
+            self.mergePolicyFolder = self.localfolder / 'mergepolicy'
+            self.audienceFolder = self.localfolder / 'audience'
             if baseSandbox is not None:
                 self.baseSandbox = baseSandbox
             else:
@@ -73,15 +75,16 @@ class Synchronizer:
                     self.baseSandbox = local_config.get('sandbox',None)
         self.dict_targetsConfig = {target: aepp.configure(org_id=config_object['org_id'],client_id=config_object['client_id'],scopes=config_object['scopes'],secret=config_object['secret'],sandbox=target,connectInstance=True) for target in targets}
         self.region = region
-        self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{}}  
-        self.dict_targetComponents = {target:{'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{}} for target in targets}
+        self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}}  
+        self.dict_targetComponents = {target:{'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}} for target in targets}
 
     def getSyncFieldGroupManager(self,fieldgroup:str,sandbox:str=None)-> dict:
         """
         Get a field group Manager from the synchronizer.
+        It searches through the component cache to see if the FieldGroupManager for the target sandbox is already instantiated.
+        If not, it generate an error.
         Arguments:
             fieldgroup : REQUIRED : Either $id, or name or alt:Id of the field group to get
-            config : REQUIRED : ConnectObject with the configuration. Make sure that the configuration of your API allows connection to the sandbox.
             sandbox : REQUIRED : name of the sandbox to get the field group from
         """
         if sandbox is None:
@@ -109,6 +112,26 @@ class Synchronizer:
             else:
                 raise ValueError(f"the field group '{fieldgroup}' has not been synchronized to the sandbox '{sandbox}'")
     
+    def getDatasetName(self,datasetId:str,sandbox:str=None)-> str:
+        """
+        Get a dataset name from the synchronizer base on the ID of the dataset.
+        Arguments:
+            datasetId : REQUIRED : id of the dataset to get
+            sandbox : REQUIRED : name of the sandbox to get the dataset from
+        """
+        if sandbox is None:
+            raise ValueError("a sandbox name must be provided")
+        if sandbox == self.baseSandbox:
+            if datasetId in [item.get('id') for key,item in self.dict_baseComponents['datasets'].items()]:
+                return [key for key,item in self.dict_baseComponents['datasets'].items() if item.get('id') == datasetId][0]
+            else:
+                raise ValueError(f"the dataset '{datasetId}' has not been synchronized to the sandbox '{sandbox}'")
+        else:
+            if datasetId in [item.get('id') for key,item in self.dict_targetComponents[sandbox]['datasets'].items()]:
+                return [key for key,item in self.dict_targetComponents[sandbox]['datasets'].items() if item.get('id') == datasetId][0]
+            else:
+                raise ValueError(f"the dataset '{datasetId}' has not been synchronized to the sandbox '{sandbox}'")
+
     def syncComponent(self,component:Union[str,dict],componentType:str=None,force:bool=False,verbose:bool=False)-> dict:
         """
         Synchronize a component to the target sandbox.
@@ -116,7 +139,7 @@ class Synchronizer:
         If the component is a string, you have to have provided a base sandbox in the constructor.
         Arguments:
             component : REQUIRED : name or id of the component or a dictionary with the component definition
-            componentType : OPTIONAL : type of the component (e.g. "schema", "fieldgroup", "datatypes", "class", "identity", "dataset"). Required if a string is passed. 
+            componentType : OPTIONAL : type of the component (e.g. "schema", "fieldgroup", "datatypes", "class", "identity", "dataset", "mergepolicy", "audience"). Required if a string is passed. 
                 It is not required but if the type cannot be inferred from the component, it will raise an error. 
             force : OPTIONAL : if True, it will force the synchronization of the component even if it already exists in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
             verbose : OPTIONAL : if True, it will print the details of the synchronization process
@@ -126,8 +149,8 @@ class Synchronizer:
                 raise ValueError("a base sandbox or a local folder must be provided to synchronize a component by name or id")
             if componentType is None:
                 raise ValueError("the type of the component must be provided if the component is a string")
-            if componentType not in ['schema', 'fieldgroup', 'datatypes', 'class', 'identity', 'dataset']:
-                raise ValueError("the type of the component is not supported. Please provide one of the following types: schema, fieldgroup, datatypes, class, identity, dataset")
+            if componentType not in ['schema', 'fieldgroup', 'datatypes', 'class', 'identity', 'dataset', 'mergepolicy', 'audience']:
+                raise ValueError("the type of the component is not supported. Please provide one of the following types: schema, fieldgroup, datatypes, class, identity, dataset, mergepolicy, audience")
             if componentType in ['schema', 'fieldgroup', 'datatypes', 'class']:
                 if self.baseConfig is not None:
                     base_schema = schema.Schema(config=self.baseConfig)
@@ -204,6 +227,30 @@ class Synchronizer:
                             break
                 if len(component) == 1: ## if the component is the catalog API response {'key': {dataset definition}}
                     component = component[list(component.keys())[0]] ## accessing the real dataset definition
+            elif componentType == "mergepolicy":
+                if self.baseConfig is not None:
+                    ups_base = customerprofile.Profile(config=self.baseConfig)
+                    base_mergePolicies = ups_base.getMergePolicies()
+                    if component in [el.get('id','') for el in base_mergePolicies] or component in [el.get('name','') for el in base_mergePolicies]:
+                        component = [el for el in base_mergePolicies if el.get('id','') == component or el.get('name','') == component][0]
+                elif self.localfolder is not None:
+                    for file in self.mergePolicyFolder.glob('*.json'):
+                        mp_file = json.load(FileIO(file))
+                        if mp_file.get('id','') == component or mp_file.get('name','') == component:
+                            component = mp_file
+                            break
+            elif componentType == 'audience':
+                if self.baseConfig is not None:
+                    seg_base = segmentation.Segmentation(config=self.baseConfig)
+                    base_audiences = seg_base.getAudiences()
+                    if component in [el.get('id','') for el in base_audiences] or component in [el.get('name','') for el in base_audiences]:
+                        component = [el for el in base_audiences if el.get('id','') == component or el.get('name','') == component][0]
+                elif self.localfolder is not None:
+                    for file in self.audienceFolder.glob('*.json'):
+                        au_file = json.load(FileIO(file))
+                        if au_file.get('id','') == component or au_file.get('name','') == component:
+                            component = au_file
+                            break
         elif type(component) == dict:
             if 'meta:resourceType' in component.keys():
                 componentType = component['meta:resourceType']
@@ -219,6 +266,10 @@ class Synchronizer:
                 componentType = 'identity'
             elif 'files' in component.keys():
                 componentType = 'dataset'
+            elif 'attributeMerge' in component.keys():
+                componentType = 'mergepolicy'
+            elif 'expression' in component.keys():
+                componentType = 'audience'
             else:
                 raise TypeError("the component type could not be inferred from the component or is not supported. Please provide the type as a parameter")
         ## Synchronize the component to the target sandboxes
@@ -234,7 +285,12 @@ class Synchronizer:
             self.__syncIdentity__(component,verbose=verbose)
         if componentType == 'dataset':
             self.__syncDataset__(component,verbose=verbose)
+        if componentType == 'mergepolicy':
+            self.__syncMergePolicy__(component,verbose=verbose)
+        if componentType == 'audience':
+            self.__syncAudience__(component,verbose=verbose)
 
+            
     def __syncClass__(self,baseClass:'ClassManager',force:bool=False,verbose:bool=False)-> dict:
         """
         Synchronize a class to the target sandboxes.
@@ -881,4 +937,94 @@ class Synchronizer:
                 t_schemas = targetSchema.getSchemas()
                 baseSchemaManager = schemamanager.SchemaManager(base_dataset_related_schemaId,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                 self.__syncSchema__(baseSchemaManager,verbose=verbose)
+                self.dict_targetComponents[target]['datasets'][base_datasetName] = t_dataset
+
+    def __syncMergePolicy__(self,mergePolicy:dict,verbose:bool=False)->None:
+        """
+        Synchronize the dataset to the target sandboxes. Mostly creating a new dataset and associated artefacts when not already created.
+        Arguments:
+            mergePolicy : REQUIRED : The merge policy dictionary to sync
+        """
+        if not isinstance(mergePolicy,dict):
+            raise TypeError("the mergePolicy must be a dictionary")
+        self.dict_baseComponents['mergePolicy'][mergePolicy.get('id','unknown')] = mergePolicy
+        mergePolicy_name = mergePolicy.get('name','unknown')
+        if mergePolicy['attributeMerge'].get('type','timestampOrdered') == 'dataSetPrecedence':
+            if verbose:
+                print(f"handling dataset precedence for merge policy '{mergePolicy_name}'")
+                print("syncing the datasets involved in the precedence order")
+            base_list_precedenceDatasets = mergePolicy['attributeMerge'].get('order',[])
+            for ds_id in base_list_precedenceDatasets:
+                res = self.syncComponent(ds_id,componentType='dataset',verbose=verbose)
+        for target in self.dict_targetsConfig.keys():
+            targetCustomerProfile = customerprofile.Profile(config=self.dict_targetsConfig[target])
+            t_mergePolicies = targetCustomerProfile.getMergePolicies()
+            if mergePolicy_name not in [el.get('name','') for el in t_mergePolicies]: ## merge policy does not exist in target
+                if verbose:
+                    print(f"merge policy '{mergePolicy_name}' does not exist in target {target}, creating it")
+                mergePolicyDef = {
+                    "name":mergePolicy.get('name',''),
+                    "schema":mergePolicy.get('schema','_xdm.context.profile'),
+                    "identityGraph":mergePolicy.get('identityGraph','pdg'),
+                    "isActiveOnEdge":mergePolicy.get('isActiveOnEdge',False),
+                }
+                if mergePolicy['attributeMerge'].get('type','timestampOrdered') == 'dataSetPrecedence':
+                    target_list_precedenceDatasets = []
+                    for base_ds_id in mergePolicy['attributeMerge'].get('order',[]):
+                        base_ds_name = self.getDatasetName(base_ds_id,sandbox=target)
+                        target_ds_id = self.dict_targetComponents[target]['datasets'][base_ds_name]['id']
+                        target_list_precedenceDatasets.append(target_ds_id)
+                    mergePolicyDef['attributeMerge'] = {
+                        "type":mergePolicy['attributeMerge'].get('type','timestampOrdered'),
+                        "order":target_list_precedenceDatasets
+                    }
+                else:
+                    mergePolicyDef['attributeMerge'] = {'type':'timestampOrdered'}
+                res = targetCustomerProfile.createMergePolicy(mergePolicyDef)
+                if 'id' in res.keys():
+                    self.dict_targetComponents[target]['mergePolicy'][res['id']] = res
+                else:
+                    print(res)
+                    raise Exception("the merge policy could not be created in the target sandbox")
+            else: ## merge policy already exists in target
+                if verbose:
+                    print(f"merge policy '{mergePolicy_name}' already exists in target {target}, saving it")
+                self.dict_targetComponents[target]['mergePolicy'][mergePolicy_name] = [el for el in t_mergePolicies if el.get('name','') == mergePolicy_name][0]
+
+    def __syncAudience__(self,baseAudience:dict,verbose:bool=False)-> None:
+        """
+        Synchronize an audience to the target sandboxes.
+        Arguments:
+            baseAudience : REQUIRED : dictionary with the audience definition
+        """
+        if not isinstance(baseAudience,dict):
+            raise TypeError("the baseAudience must be a dictionary")
+        audience_name = baseAudience.get('name','unknown')
+        self.dict_baseComponents['audience'][audience_name] = baseAudience
+        for target in self.dict_targetsConfig.keys():
+            targetAudiences = segmentation.Segmentation(config=self.dict_targetsConfig[target])
+            t_audiences = targetAudiences.getAudiences()
+            if audience_name not in [el['name'] for el in t_audiences]: ## audience does not exist in target
+                if verbose:
+                    print(f"audience '{audience_name}' does not exist in target {target}, creating it")
+                audienceDef = {
+                    "name":baseAudience.get('name',''),
+                    "description":baseAudience.get('description',''),
+                    "type":baseAudience.get('type','SegmentDefinition'),
+                    "schema":baseAudience.get('schema','_xdm.context.profile'),
+                    "expression":baseAudience.get('expression',[]),
+                    "ansibleDataModel":baseAudience.get('ansibleDataModel',{}),
+                    "profileInstanceId":baseAudience.get('profileInstanceId',''),
+                    "evaluationInfo":baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}})
+                }
+                res = targetAudiences.createAudience(audienceDef)
+                if 'id' in res.keys():
+                    self.dict_targetComponents[target]['audience'][res['id']] = res
+                else:
+                    print(res)
+                    raise Exception("the audience could not be created in the target sandbox")
+            else: ## audience already exists in target
+                if verbose:
+                    print(f"audience '{audience_name}' already exists in target {target}, saving it")
+                self.dict_targetComponents[target]['audience'][audience_name] = [el for el in t_audiences if el['name'] == audience_name][0]
 

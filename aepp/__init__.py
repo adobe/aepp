@@ -153,7 +153,7 @@ def extractSandboxArtefacts(
         completePath = mypath / f'{sandbox.sandbox}'
     else:
         completePath = Path(localFolder)
-    from aepp import schema, catalog, identity
+    from aepp import schema, catalog, identity,customerprofile, segmentation
     sch = schema.Schema(config=sandbox)
     cat = catalog.Catalog(config=sandbox)
     ide = identity.Identity(config=sandbox,region=region)
@@ -185,6 +185,10 @@ def extractSandboxArtefacts(
     identityPath.mkdir(exist_ok=True)
     datasetPath = completePath / 'dataset'
     datasetPath.mkdir(exist_ok=True)
+    mergePolicyPath = completePath / 'mergePolicy'
+    mergePolicyPath.mkdir(exist_ok=True)
+    audiencePath = completePath / 'audience'
+    audiencePath.mkdir(exist_ok=True)
     myclasses = sch.getClasses()
     classesGlobal = sch.getClassesGlobal()
     behaviors = sch.getBehaviors()
@@ -258,6 +262,19 @@ def extractSandboxArtefacts(
     for el in identities:
         with open(f"{identityPath / el['code']}.json",'w') as f:
             json.dump(el,f,indent=2)
+    ## merge policies
+    ups = customerprofile.Profile(config=sandbox)
+    mymergePolicies = ups.getMergePolicies()
+    for el in mymergePolicies:
+        with open(f"{mergePolicyPath / el.get('id','unknown')}.json",'w') as f:
+            json.dump(el,f,indent=2)
+    ## audiences
+    mysegmentation = segmentation.Segmentation(config=sandbox) 
+    audiences = mysegmentation.getAudiences()
+    for el in audiences:
+        safe_name = __titleSafe__(el.get('name','unknown'))
+        with open(f"{audiencePath / safe_name}.json",'w') as f:
+            json.dump(el,f,indent=2)
 
 def extractSandboxArtefact(
     sandbox: 'ConnectObject' = None,
@@ -272,7 +289,7 @@ def extractSandboxArtefact(
         sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
         localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the folder the name of the sandbox.
         artefact: REQUIRED: the id or the name of the artefact to export.
-        artefactType: REQUIRED: the type of artefact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity'
+        artefactType: REQUIRED: the type of artefact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy'
         region: OPTIONAL: the region of the sandbox (default: nld2). This is used to fetch the correct API endpoints for the identities. 
             Possible values: "va7","aus5", "can2", "ind2"
     """
@@ -309,6 +326,10 @@ def extractSandboxArtefact(
         __extractDataset__(artefact,completePath,sandbox,region)
     elif artefactType == 'identity':
         __extractIdentity__(artefact,region,completePath,sandbox)
+    elif artefactType == 'mergepolicy':
+        __extractMergePolicy__(artefact,completePath,sandbox)
+    elif artefactType == 'audience':
+        __extractAudience__(artefact,completePath,sandbox)
     else:
         raise ValueError("artefactType not recognized")
     
@@ -475,3 +496,28 @@ def __extractDataset__(dataset: str,folder: Union[str, Path] = None,sandbox: 'Co
     schema = myDataset.get('schemaRef',{}).get('id',None)
     if schema is not None:
         __extractSchema__(schema,folder,sandbox,region)
+
+def __extractMergePolicy__(mergePolicy: str = None,folder:Union[str, Path]=None, sandbox: 'ConnectObject' = None,region:str=None):
+    from aepp import customerprofile
+    ups = customerprofile.Profile(config=sandbox)
+    mymergePolicies = ups.getMergePolicies()
+    mymergePolicy = [el for el in mymergePolicies if el.get('id','') == mergePolicy or el.get('name','') == mergePolicy][0]
+    if mymergePolicy['attributeMerge'].get('type','timestampOrdered') == 'dataSetPrecedence':
+        list_ds = mymergePolicy['attributeMerge'].get('order',[])
+        for ds in list_ds:
+            __extractDataset__(ds,folder,sandbox,region)
+    mergePolicyPath = Path(folder) / 'mergePolicy'
+    mergePolicyPath.mkdir(exist_ok=True)
+    with open(f"{mergePolicyPath / mymergePolicy.get('id','unknown')}.json",'w') as f:
+        json.dump(mymergePolicy,f,indent=2)
+
+def __extractAudience__(audienceName: str = None,folder:Union[str, Path]=None, sandbox: 'ConnectObject' = None):
+    from aepp import segmentation
+    mysegmentation = segmentation.Segmentation(config=sandbox) 
+    audiences = mysegmentation.getAudiences()
+    myaudience = [el for el in audiences if el.get('name','') == audienceName or el.get('id','') == audienceName][0]
+    audiencePath = Path(folder) / 'audience'
+    audiencePath.mkdir(exist_ok=True)
+    safe_name = __titleSafe__(myaudience.get('name','unknown'))
+    with open(f"{audiencePath / safe_name}.json",'w') as f:
+        json.dump(myaudience,f,indent=2)
