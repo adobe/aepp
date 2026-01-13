@@ -2,6 +2,19 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.4.2
+* supporting segmentation in `extractSandboxArtefacts` and `extractSandboxArtefact` method
+* supporting merge policies in `extractSandboxArtefacts` and `extractSandboxArtefact`  method
+* supporting segmentation and merge policies in `Synchronizer` class. [See notes](.synchronizer.md#notes-on-merge-policies-synchronization)
+* adding helper functions to `Synchronizer` class 
+  * getSyncFieldGroupManager : Get the field group manager in the target or base sandbox
+  * getDatasetName : Get the name of a dataset based on its id in the target or base sandbox
+* extending capability of schema synchronization in `Synchronizer` class to support schema with hidden fields.\
+Patch:
+* Supporting update of segment via `synchronizer` module.
+* improving parameterize support for template queries in `QueryService` module. 
+
+
 ## version 0.4.1
 * extending support to export more elements from schemaManager, FieldGroupManager and DataTypeManager
   * Supporting Map capability for `addField` method
