@@ -87,7 +87,7 @@ As of today, the synchronization will realize the following operation for the di
 Operation |Schema | Class | Field Groups | Data Type | Descriptors | Dataset | Identity | Merge Policy | Audiences
 --| -- | -- | -- | -- | -- | -- | -- | -- | -- |
 Create | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
-Update | Supported | Supported | Supported | Supported | Suppported | - | - | - | - |
+Update | Supported | Supported | Supported | Supported | Suppported | - | - | - | Supported |
 Delete | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported |
 
 It is not supported to delete an artefact or delete a field in an Field Group or Data Type via the Synchronizer.\
@@ -118,6 +118,9 @@ It also supports the addition of a field group to a `schema` and replicate that 
 When creating a merge policy, if the merge policy is of type `dataSetPrecedence`, the synchronizer will automatically map the dataset IDs from the base sandbox to the target sandbox.\
 This means that the datasets used in the merge policy in the base sandbox will be created in the target sandbox for the merge policy creation to succeed.
 Additionally, if the dataset reference a schema that does not exist in the target sandbox, the synchronizer will also create the schema and its associated field groups and data types. 
+
+**HOWEVER**, the datasets and schema artefacts will not be enabled for Profile automatically. If you want to enable them for profile, you need to do it manually after the synchronization. 
+The synchronization of this merge policy will fail until these datasets are enabled for profile in the target sandbox.
 
 ### Notes on Audience synchronization
 

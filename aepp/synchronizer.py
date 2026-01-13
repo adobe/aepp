@@ -1025,6 +1025,12 @@ class Synchronizer:
                     raise Exception("the audience could not be created in the target sandbox")
             else: ## audience already exists in target
                 if verbose:
-                    print(f"audience '{audience_name}' already exists in target {target}, saving it")
-                self.dict_targetComponents[target]['audience'][audience_name] = [el for el in t_audiences if el['name'] == audience_name][0]
+                    print(f"audience '{audience_name}' already exists in target {target}, upadting it")
+                t_audience = [el for el in t_audiences if el['name'] == audience_name][0]
+                t_audience['description'] = baseAudience.get('description','')
+                t_audience['expression'] = baseAudience.get('expression',[])
+                t_audience['ansibleDataModel'] = baseAudience.get('ansibleDataModel',{})
+                t_audience['evaluationInfo'] = baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}})
+                res = targetAudiences.updateSegment(t_audience['id'],t_audience)
+                self.dict_targetComponents[target]['audience'][audience_name] = res
 
