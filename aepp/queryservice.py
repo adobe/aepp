@@ -706,27 +706,35 @@ class QueryService:
         res = self.connector.deleteData(self.endpoint + path)
         return res
 
-    def createQueryTemplate(self, queryData: dict = None) -> dict:
+    def createQueryTemplate(self, queryData: dict = None,name: str = None,sql: str = None,queryParameters: dict = None) -> dict:
         """
         Create a query template based on the dictionary passed.
         Arguments:
-            queryData : REQUIED : An object that contains "sql", "queryParameter" and "name" keys.
-        more info : https://www.adobe.io/apis/experienceplatform/home/api-reference.html#/Query-Templates/create_query_template
+            queryData : REQUIED : An object that contains "sql" and "name" keys.
+            name : OPTIONAL : Name of the template
+            sql : OPTIONAL : SQL query as a string.
+            queryParameters : OPTIONAL : in case you are using template, providing the paramter in a dictionary.
+        more info : https://developer.adobe.com/experience-platform-apis/references/query-service/#tag/Query-Templates
         """
         path = "/query-templates"
         if self.loggingEnabled:
             self.logger.debug(f"Starting createTemplate")
-        if isinstance(queryData, dict):
-            if (
-                "sql" not in queryData.keys()
-                or "queryParameters" not in queryData.keys()
-                or "name" not in queryData.keys()
-            ):
-                raise KeyError(
-                    "Minimum key value are not respected.\nPlease see here for more info :\nhttps://www.adobe.io/apis/experienceplatform/home/api-reference.html#/Query-Templates/create_query_template "
-                )
+        if queryData is not None:
+            if isinstance(queryData, dict):
+                if ("sql" not in queryData.keys() or "name" not in queryData.keys()):
+                    raise KeyError(
+                        "Minimum key value are not respected.\nPlease see here for more info :\nhttps://www.adobe.io/apis/experienceplatform/home/api-reference.html#/Query-Templates/create_query_template "
+                    )
+            else:
+                raise Exception("expected a dictionary for queryData")
         else:
-            raise Exception("expected a dictionary for queryData")
+            if name is None or sql is None:
+                raise Exception(
+                    "Either queryData dictionary or name and sql parameters are required."
+                )
+            queryData = {"name": name, "sql": sql}
+            if queryParameters is not None:
+                queryData["queryParameters"] = queryParameters
         res = self.connector.postData(
             self.endpoint + path, headers=self.header, data=queryData
         )

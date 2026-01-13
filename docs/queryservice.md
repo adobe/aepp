@@ -19,7 +19,7 @@ Alternatively, you can use the docstring in the methods to have more information
       - [postQueries](#postqueries)
       - [getQuery](#getquery)
       - [cancelQuery](#cancelquery)
-    - [deleteQuery](#deletequery)
+      - [deleteQuery](#deletequery)
       - [getSchedules](#getschedules)
       - [getSchedule](#getschedule)
       - [getScheduleRuns](#getscheduleruns)
@@ -247,7 +247,7 @@ Cancel a specific query based on its ID.\
 Argument:
 * queryId : REQUIRED : the query ID to cancel
 
-### deleteQuery
+#### deleteQuery
 Delete a specific query based on its ID.\
 Argument:
 * queryId : REQUIRED : the query ID to delete
@@ -346,7 +346,10 @@ Arguments:
 #### createQueryTemplate
 Create a query template based on the dictionary passed.\
 Arguments:
-* queryData : REQUIED : An object that contains "sql", "queryParameter" and "name" keys.\
+* queryData : REQUIED : An object that contains "sql", "queryParameter" and "name" keys.
+* name : OPTIONAL : Name of the template
+* sql : OPTIONAL : SQL query as a string.
+* queryParameters : OPTIONAL : in case you are using template, providing the paramter in a dictionary
 more info : https://www.adobe.io/apis/experienceplatform/home/api-reference.html#/Query-Templates/create_query_template
 
 #### getDatasetStatistics
