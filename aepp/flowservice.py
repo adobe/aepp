@@ -784,7 +784,7 @@ class FlowService:
                             authenticationRequired:bool=False
                             )-> dict:
         """
-        Create a streaming flow with or without transformation
+        Create a source flow streaming with or without transformation
             name : REQUIRED : The name of the Data Flow (Optional if you are just passing a datasetId).
             description : OPTIONAL : description of the Flow
             source_connection_id : REQUIRED : The ID of the source connection tied to Data Lake (Optional if you are just passing a datasetId).

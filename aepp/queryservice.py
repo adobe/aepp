@@ -227,6 +227,8 @@ class QueryService:
             if orderby == "+":
                 orderby = "%2B"
             arguments["orderby"] = orderby
+        else:
+            arguments["orderby"] = "-created"
         if start is not None:
             arguments["start"] = start
         if limit is not None:

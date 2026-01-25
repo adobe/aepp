@@ -261,6 +261,7 @@ class Schema:
             classFilter: str = None,
             excludeAdhoc: bool = True,
             output: str = 'raw',
+            prop: str = None,
             **kwargs
     ) -> list:
         """
@@ -285,6 +286,8 @@ class Schema:
             params["property"] = f"meta:extends=={classFilter}"
         elif excludeAdhoc:
             params["property"] = "meta:extends!=https://ns.adobe.com/xdm/data/adhoc"
+        if prop is not None:
+            params["property"] = prop
         verbose = kwargs.get("debug", False)
         privateHeader = deepcopy(self.header)
         format = kwargs.get("format", "xed-id")
@@ -1783,7 +1786,7 @@ class Schema:
         ]
         res = self.connector.patchData(self.endpoint + path,data=operation)
         return res
-    
+
     def enableSchemaForRealTime(self,schemaId:str=None)->dict:
         """
         Enable a schema for real time based on its ID.
@@ -1797,6 +1800,30 @@ class Schema:
             schemaId = parse.quote_plus(schemaId)
         if self.loggingEnabled:
             self.logger.debug(f"Starting enableSchemaForRealTime")
+        path = f"/{self.container}/schemas/{schemaId}/"
+        operation = [
+           { 
+            "op": "add",
+            "path": "/meta:immutableTags",
+            "value": ["union"]
+            }
+        ]
+        res = self.connector.patchData(self.endpoint + path,data=operation)
+        return res
+    
+    def enableSchemaForUPS(self,schemaId:str=None)->dict:
+        """
+        Enable a schema for UPS based on its ID.
+        Arguments:
+            schemaId : REQUIRED : The schema ID required to be updated
+        """
+        if schemaId is None:
+            raise Exception("Require a schema ID")
+        if schemaId.startswith("https://"):
+            from urllib import parse
+            schemaId = parse.quote_plus(schemaId)
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting enableSchemaForUPS")
         path = f"/{self.container}/schemas/{schemaId}/"
         operation = [
            { 
