@@ -1214,8 +1214,9 @@ class ServiceShell(cmd.Cmd):
         console.print(Panel("Exiting...", style="blue"))
         return True
 
-# --- 3. The Entry Point ---
-if __name__ == "__main__":
+# --- 3. The Entry Point ---#
+
+def main():
     # ARGPARSE: Handles the initial setup flags
     parser = argparse.ArgumentParser(description="Interactive Client Tool",add_help=True)
     
@@ -1233,3 +1234,6 @@ if __name__ == "__main__":
         shell.cmdloop()
     except KeyboardInterrupt:
         console.print(Panel("\nForce closing...", style="red"))
+
+if __name__ == "__main__":
+    main()
