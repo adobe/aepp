@@ -930,7 +930,7 @@ class ServiceShell(cmd.Cmd):
                 table.add_column("Total Runs", style="blue")
                 table.add_column("Successful", style="green")
                 table.add_column("Failed", style="red")
-                table.add_columns("Partial Success", style='orange')
+                table.add_column("Partial Success", style='orange')
                 table.add_column("Success Rate", style="green")
                 table.add_column("Failure Rate", style="red")
                 
