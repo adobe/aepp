@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aepp"
+dynamic = ["version"]
+authors = [
+  { name="Julien Piccini", email="piccini.julien@gmail.com" },
+]
+description = "Package to manage AEP API endpoint and some helper functions"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Utilities",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries",
+    "Development Status :: 2 - Pre-Alpha"
+]
+dependencies = [
+    "pandas",
+    "requests",
+    "pathlib2",
+    "tenacity",
+    "deprecation",
+    "datamodel-code-generator",
+    "rich"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/adobe/aepp"
+
+[project.scripts]
+aepp = "aepp.cli.__main__:main"
+
+[tool.setuptools]
+packages = ["aepp"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "aepp.__version__.__version__"}

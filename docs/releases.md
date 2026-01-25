@@ -2,6 +2,12 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.4.3
+* adding better support for the `saveFile` method.
+* Starting integration of CLI capability
+* Moving the project publishing from setup.py to pyproject.toml
+ 
+
 ## version 0.4.2
 * supporting segmentation in `extractSandboxArtefacts` and `extractSandboxArtefact` method
 * supporting merge policies in `extractSandboxArtefacts` and `extractSandboxArtefact`  method

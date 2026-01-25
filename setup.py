@@ -39,6 +39,11 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/adobe/aepp",
+    entry_points={
+        'console_scripts': [
+            'aepp = aepp.cli.__main__:main',
+        ],
+    },
     packages=setuptools.find_packages(),
     include_package_data=True,
     classifiers=[
@@ -51,5 +56,5 @@ setuptools.setup(
         "Development Status :: 2 - Pre-Alpha"
     ],
     python_requires='>=3.10',
-    install_requires=['pandas', "requests", "pathlib2", "tenacity", "deprecation","datamodel-code-generator"],
+    install_requires=['pandas', "requests", "pathlib2", "tenacity", "deprecation","datamodel-code-generator","rich"],
 )

@@ -14,6 +14,7 @@ from aepp import connector
 from .configs import *
 from .__version__ import __version__
 from typing import Union
+import re
 
 ## other libraries
 from copy import deepcopy
@@ -83,8 +84,33 @@ def getPlatformEvents(
     return data
 
 
+def __make_filename_safe__(filename, replacement="_"):
+    # 1. Remove characters that are illegal in Windows or Linux
+    # Windows: < > : " / \ | ? * # Linux: / (and NULL)
+    filename = re.sub(r'[<>:"/\\|?*]', replacement, filename)
+    # 2. Remove control characters (ASCII 0-31)
+    filename = re.sub(r'[\x00-\x1f]', replacement, filename)
+    # 3. Trim whitespace and trailing dots (Windows doesn't like trailing dots)
+    filename = filename.strip().strip('.')
+    # 4. Handle Windows Reserved Names (CON, PRN, AUX, NUL, COM1, LPT1, etc.)
+    reserved_names = {
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
+        "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5",
+        "LPT6", "LPT7", "LPT8", "LPT9"
+    }
+    # Check the base name without extension
+    base_name = os.path.splitext(filename)[0].upper()
+    if base_name in reserved_names:
+        filename = f"{replacement}{filename}"
+    # 5. Length limit (standard for most file systems is 255 chars)
+    if len(filename) > 255:
+        filename = filename[:255]
+    # 6. Default to a placeholder if the string is empty after cleaning
+    return filename if filename else "unnamed_file"
+
+
 def saveFile(
-    module: str = None,
+    module: str | None = None,
     file: object = None,
     filename: str = None,
     type_file: str = "json",
@@ -93,31 +119,39 @@ def saveFile(
     """
     Save the file in the approriate folder depending on the module sending the information.
      Arguments:
-          module: REQUIRED: Module requesting the save file.
+          module: OPTIONAL: Module requesting the save file.
           file: REQUIRED: an object containing the file to save.
           filename: REQUIRED: the filename to be used.
           type_file: REQUIRED: the type of file to be saveed(default: json)
           encoding : OPTIONAL : encoding used to write the file.
     """
-    if module is None:
-        raise ValueError("Require the module to create a folder")
     if file is None or filename is None:
         raise ValueError("Require a object for file and a name for the file")
     here = Path(Path.cwd())
-    folder = module.capitalize()
-    new_location = Path.joinpath(here, folder)
+    if module is not None:
+        folder = module.capitalize()
+        new_location = Path.joinpath(here, folder)
+    else:
+        new_location = here
     if new_location.exists() == False:
         new_location.mkdir()
+    filename = __make_filename_safe__(filename)
     if type_file == "json":
         filename = f"{filename}.json"
         complete_path = Path.joinpath(new_location, filename)
         with open(complete_path, "w", encoding=encoding) as f:
             f.write(json.dumps(file, indent=4))
-    else:
+    elif type_file == "txt":
         filename = f"{filename}.txt"
         complete_path = Path.joinpath(new_location, filename)
         with open(complete_path, "w", encoding=encoding) as f:
             f.write(file)
+    else:
+        filename = f"{filename}.{type_file}"
+        complete_path = Path.joinpath(new_location, filename)
+        with open(complete_path, "wb") as f:
+            f.write(file)
+    return complete_path
 
 def __titleSafe__(text: str) -> str:
     """
@@ -289,7 +323,7 @@ def extractSandboxArtefact(
         sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
         localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the folder the name of the sandbox.
         artefact: REQUIRED: the id or the name of the artefact to export.
-        artefactType: REQUIRED: the type of artefact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy'
+        artefactType: REQUIRED: the type of artefact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy',audience'
         region: OPTIONAL: the region of the sandbox (default: nld2). This is used to fetch the correct API endpoints for the identities. 
             Possible values: "va7","aus5", "can2", "ind2"
     """
