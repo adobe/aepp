@@ -867,6 +867,7 @@ class ServiceShell(cmd.Cmd):
                             "total_runs": 0,
                             "failed_runs": 0,
                             "success_runs": 0,
+                            "partial_success":0,
                         }
                     runs_by_flow[flow_id]["total_runs"] += 1
                     status = run.get("metrics",{}).get("statusSummary",{}).get("status","unknown")
