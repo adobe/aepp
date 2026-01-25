@@ -964,7 +964,7 @@ class ServiceShell(cmd.Cmd):
                     successful_runs = fl.get("Successful Runs", 0)
                     failed_runs = fl.get("Failed Runs", 0)
                     partial_success = fl.get('Partial Success Runs',0)
-                    if partialpartial_success>0:
+                    if partial_success>0:
                         partialColorStart = "[orange]"
                         partialColorEnd = "[/orange]"
                     else:

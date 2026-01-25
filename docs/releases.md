@@ -8,7 +8,9 @@ This page list all of the changes that came during the different release of the 
 * Moving the project publishing from setup.py to pyproject.toml
 * Adding better methods on some native methods for `schema`, `queryservice` and `flowservice`.
 * Adding documentation on CLI module [here](./cli.md)
-* Fixing some relative import issues for packaging.
+* Fixing some relative import issues for packaging.\
+Patch:
+* adding `partialSuccess` to flow analysis, and fixing typos
  
 
 ## version 0.4.2
