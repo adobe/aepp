@@ -33,24 +33,25 @@ class ServiceShell(cmd.Cmd):
         super().__init__()
         self.config = None
         self.connectInstance = True
-        if kwargs.get("config_file"):
-            mypath = Path.cwd()
-            dict_config = json.load(FileIO( mypath / Path(kwargs.get("config_file"))))
+        config_path = Path(kwargs.get("config_file"))
+        if not config_path.is_absolute():
+            config_path = Path.cwd() / config_path
+        if config_path.exists() and kwargs.get("config_file") is not None:
+            dict_config = json.load(FileIO(config_path))
             self.sandbox = kwargs.get("sandbox",dict_config.get("sandbox-name","prod"))
             self.secret = dict_config.get("secret",kwargs.get("secret"))
             self.org_id = dict_config.get("org_id",kwargs.get("org_id"))
             self.client_id = dict_config.get("client_id",kwargs.get("client_id"))
             self.scopes = dict_config.get("scopes",kwargs.get("scopes"))
-            self.connectInstance = True
         else:
             self.sandbox = kwargs.get("sandbox","prod")
             self.secret = kwargs.get("secret")
             self.org_id = kwargs.get("org_id")
             self.client_id = kwargs.get("client_id")
             self.scopes = kwargs.get("scopes")
-            self.connectInstance = True
-        if self.sandbox is not None and self.secret is not None and self.org_id is not None and self.client_id is not None:
-            print("Auto-configuring connection...")
+        self.connectInstance = True
+        if self.sandbox is not None and self.secret is not None and self.org_id is not None and self.client_id is not None and self.scopes is not None:
+            print("Configuring connection...")
             self.config = aepp.configure(
                 connectInstance=self.connectInstance,
                 sandbox=self.sandbox,
@@ -111,7 +112,7 @@ class ServiceShell(cmd.Cmd):
             if args.sandbox:
                 self.config.setSandbox(args.sandbox)
                 self.prompt = f"{self.config.sandbox}> "
-                console.print(Panel(f"Sandbox changed to: {self.config.sandbox}", style="blue"))
+                console.print(Panel(f"Sandbox changed to: [bold green]{self.config.sandbox}[/bold green]", style="blue"))
         else:
             console.print(Panel("(!) You must configure the connection first using the 'config' command.", style="red"))
     
@@ -1227,8 +1228,7 @@ def main():
     parser.add_argument("-sc", "--scopes", help="Scopes")
     parser.add_argument("-cid", "--client_id", help="Auto-login client ID")
     parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
-    args = parser.parse_args()
-    # Initialize the shell
+    args = parser.parse_args() 
     shell = ServiceShell(**vars(args))
     try:
         shell.cmdloop()

@@ -2,10 +2,13 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
-## version 0.4.3
+## version 0.5.0
 * adding better support for the `saveFile` method.
 * Starting integration of CLI capability
 * Moving the project publishing from setup.py to pyproject.toml
+* Adding better methods on some native methods for `schema`, `queryservice` and `flowservice`.
+* Adding documentation on CLI module [here](./cli.md)
+* Fixing some relative import issues for packaging.
  
 
 ## version 0.4.2

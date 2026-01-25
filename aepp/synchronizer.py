@@ -15,11 +15,12 @@ from copy import deepcopy
 from typing import Union
 from pathlib import Path
 from io import FileIO
+from .configs import ConnectObject
 
 
 class Synchronizer:
     ## TO DO -> Add support for local environment
-    def __init__(self,targets:list=None,config:aepp.ConnectObject=None,baseSandbox:str=None,region:str='nld2',localFolder:str=None):
+    def __init__(self,targets:list=None,config:'ConnectObject'=None,baseSandbox:str=None,region:str='nld2',localFolder:str=None):
         """
         Setup the synchronizor object with the base sandbox and target sandbox.
         Arguments:
@@ -42,7 +43,7 @@ class Synchronizer:
         self.localfolder = None
         if targets is None:
             raise ValueError("a list of target sandboxes must be provided - at least one")
-        if config is None or type(config) != aepp.ConnectObject:
+        if config is None or type(config) != ConnectObject:
             raise ValueError("a ConnectObject must be provided")
         config_object = deepcopy(config.getConfigObject())
         if baseSandbox is not None and localFolder is None:

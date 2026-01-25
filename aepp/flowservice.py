@@ -1993,7 +1993,7 @@ class FlowManager:
 
     def __init__(self,
                 flowId:str=None,
-                config: Union[dict,aepp.ConnectObject] = aepp.config.config_object
+                config: Union[dict,ConnectObject] = aepp.config.config_object
                 )->None:
         """
         Instantiate a Flow Manager Instance based on the flow ID.
