@@ -966,6 +966,9 @@ class ServiceShell(cmd.Cmd):
                     if partialpartial_success>0:
                         partialColorStart = "[orange]"
                         partialColorEnd = "[/orange]"
+                    else:
+                        partialColorStart = colorStart
+                        partialColorEnd = colorEnd
                     success_rate = (successful_runs / total_runs * 100) if total_runs > 0 else 0
                     failure_rate = (failed_runs / total_runs * 100) if total_runs > 0 else 0
                     row_data.extend([
