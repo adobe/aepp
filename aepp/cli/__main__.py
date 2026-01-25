@@ -874,6 +874,8 @@ class ServiceShell(cmd.Cmd):
                         runs_by_flow[flow_id]["failed_runs"] += 1
                     elif status == "success":
                         runs_by_flow[flow_id]["success_runs"] += 1
+                    elif status == "partialSuccess":
+                        runs_by_flow[flow_id]["partial_success"] += 1
             report_flows = []
             for fl in list_flows:
                 obj = {
@@ -901,6 +903,7 @@ class ServiceShell(cmd.Cmd):
                     obj["Total Runs"] = run_info.get("total_runs",0)
                     obj["Failed Runs"] = run_info.get("failed_runs",0)
                     obj["Successful Runs"] = run_info.get("success_runs",0)
+                    obj["Partial Success Runs"] = run_info.get("partial_success",0)
                 report_flows.append(obj)
             df_flows = pd.DataFrame(list_flows)
             filename = f"{self.config.sandbox}_flows_{timereference/1000}"
@@ -915,19 +918,21 @@ class ServiceShell(cmd.Cmd):
             table = Table(title=f"Flows in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="cyan")
             table.add_column("Name", style="magenta")
-            table.add_column("Created", style="white")
             table.add_column("Type", style="white")
-            table.add_column("Transformation", style="white")
             if args.advanced == False:
+                table.add_column("Created", style="white")
+                table.add_column("Transformation", style="white")
                 table.add_column("Flow Spec", style="white")
                 table.add_column("Source Conn ID", style="white")
                 table.add_column("Target Conn ID", style="white")
             if args.advanced:
                 table.add_column("Total Runs", style="blue")
-                table.add_column("Failed Runs", style="red")
-                table.add_column("Successful Runs", style="green")
+                table.add_column("Successful", style="green")
+                table.add_column("Failed", style="red")
+                table.add_columns("Partial Success", style='orange')
                 table.add_column("Success Rate", style="green")
                 table.add_column("Failure Rate", style="red")
+                
             for fl in report_flows:
                 row_data = []
                 if args.advanced:
@@ -943,26 +948,31 @@ class ServiceShell(cmd.Cmd):
                 row_data = [
                     f"{colorStart}{fl.get('id','N/A')}{colorEnd}",
                     f"{colorStart}{fl.get('name','N/A')}{colorEnd}",
-                    f"{colorStart}{datetime.fromtimestamp(fl.get('created',1000)/1000).isoformat().split('T')[0]}{colorEnd}",
                     f"{colorStart}{fl.get('type','N/A')}{colorEnd}",
-                    f"{colorStart}{str(fl.get('Transformation', False))}{colorEnd}",
                 ]
                 if args.advanced == False:
                     row_data.extend([
+                        f"{colorStart}{datetime.fromtimestamp(fl.get('created',1000)/1000).isoformat().split('T')[0]}{colorEnd}",
+                        f"{colorStart}{str(fl.get('Transformation', False))}{colorEnd}",
                         f"{colorStart}{fl.get('flowSpec','N/A')}{colorEnd}",
                         f"{colorStart}{fl.get('sourceConnectionId','N/A')}{colorEnd}",
                         f"{colorStart}{fl.get('targetConnectionId','N/A')}{colorEnd}",
                     ])
                 if args.advanced:
                     total_runs = fl.get("Total Runs", 0)
-                    failed_runs = fl.get("Failed Runs", 0)
                     successful_runs = fl.get("Successful Runs", 0)
+                    failed_runs = fl.get("Failed Runs", 0)
+                    partial_success = fl.get('Partial Success Runs',0)
+                    if partialpartial_success>0:
+                        partialColorStart = "[orange]"
+                        partialColorEnd = "[/orange]"
                     success_rate = (successful_runs / total_runs * 100) if total_runs > 0 else 0
                     failure_rate = (failed_runs / total_runs * 100) if total_runs > 0 else 0
                     row_data.extend([
                         f"{colorStart}{str(total_runs)}{colorEnd}",
-                        f"{colorStart}{str(failed_runs)}{colorEnd}",
                         f"{colorStart}{str(successful_runs)}{colorEnd}",
+                        f"{colorStart}{str(failed_runs)}{colorEnd}",
+                        f"{partialColorStart}{str(partial_success)}{partialColorEnd}"
                         f"{colorStart}{success_rate:.0f}%{colorEnd}",
                         f"{colorStart}{failure_rate:.0f}%{colorEnd}"
                     ])
