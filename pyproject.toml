@@ -38,7 +38,7 @@ dependencies = [
 aepp = "aepp.cli.__main__:main"
 
 [tool.setuptools]
-packages = ["aepp"]
+packages = { find = { where = ["."], include = ["aepp*"] } }
 include-package-data = true
 
 [tool.setuptools.dynamic]
