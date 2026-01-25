@@ -976,7 +976,7 @@ class ServiceShell(cmd.Cmd):
                         f"{colorStart}{str(total_runs)}{colorEnd}",
                         f"{colorStart}{str(successful_runs)}{colorEnd}",
                         f"{colorStart}{str(failed_runs)}{colorEnd}",
-                        f"{partialColorStart}{str(partial_success)}{partialColorEnd}"
+                        f"{partialColorStart}{str(partial_success)}{partialColorEnd}",
                         f"{colorStart}{success_rate:.0f}%{colorEnd}",
                         f"{colorStart}{failure_rate:.0f}%{colorEnd}"
                     ])
