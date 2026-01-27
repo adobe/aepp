@@ -44,6 +44,12 @@ At the start of your instantiation, you can provide optional parameters that wou
 ## Available Commands
 The CLI provides a variety of commands to manage and interact with Adobe Experience Platform resources. Below is a list of available commands:
 
+### createConfigFile
+Generate a JSON configuration file with your connection parameters for future use.\
+Arguments:
+* `-f`, `--file_name` : File name for your config file (default: "aepp_config.json")
+
+
 ### config
 In case you did not provide the connection parameters at the start of the CLI, you can use this command to set up your connection configuration.
 Parameters:

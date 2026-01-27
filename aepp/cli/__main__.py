@@ -200,6 +200,7 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
+    
     @login_required
     def do_get_ups_fieldgroups(self, args):
         """List all field groups enabled for Profile in the current sandbox"""
@@ -560,6 +561,7 @@ class ServiceShell(cmd.Cmd):
         except SystemExit:
             return
         
+    @login_required
     def do_get_datatypes(self, args):
         """List all data types in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_datatypes', add_help=True)
