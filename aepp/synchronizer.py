@@ -719,7 +719,7 @@ class Synchronizer:
             match descType:
                 case "xdm:descriptorIdentity":
                     target_identitiesDecs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorIdentity']
-                    baseIdentityNS = baseDescriptor['xdm:namespace']
+                    baseIdentityNS = baseDescriptor['xdm:namespace'].lower()
                     if self.baseConfig is not None and self.localfolder is None:
                         identityConn = identity.Identity(config=self.baseConfig,region=self.region)
                         baseIdentities = identityConn.getIdentities()
@@ -728,8 +728,8 @@ class Synchronizer:
                         for file in self.identityFolder.glob('*.json'):
                             id_file = json.load(FileIO(file))
                             baseIdentities.append(id_file)
-                    if baseIdentityNS not in [el['xdm:namespace'] for el in target_identitiesDecs]: ## identity descriptor does not exists in target schema
-                        def_identity = [el for el in baseIdentities if el['code'] == baseIdentityNS][0]
+                    if baseIdentityNS not in [el['xdm:namespace'].lower() for el in target_identitiesDecs]: ## identity descriptor does not exists in target schema
+                        def_identity = [el for el in baseIdentities if el['code'].lower() == baseIdentityNS][0]
                         self.__syncIdentity__(def_identity,verbose=verbose)
                         new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,
                                                                             completePath=baseDescriptor['xdm:sourceProperty'],
@@ -738,7 +738,7 @@ class Synchronizer:
                                                                             )
                         res = targetSchemaManager.createDescriptor(new_desc)
                     else:
-                        res = [el for el in target_identitiesDecs if el['xdm:namespace'] == baseIdentityNS][0]
+                        res = [el for el in target_identitiesDecs if el['xdm:namespace'].lower() == baseIdentityNS][0]
                     list_descriptors.append(res)
                 case "xdm:descriptorOneToOne": ## lookup definition
                     target_OneToOne = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorOneToOne']
@@ -866,15 +866,15 @@ class Synchronizer:
         """
         if not isinstance(identityDefiniton,dict):
             raise TypeError("the identityDefinition must be a dictionary")
-        code_base_identity = identityDefiniton['code']
+        code_base_identity = identityDefiniton['code'].lower()
         self.dict_baseComponents['identities'][code_base_identity] = identityDefiniton
         for target in self.dict_targetsConfig.keys():
             targetIdentity = identity.Identity(config=self.dict_targetsConfig[target],region=self.region)
             t_identities = targetIdentity.getIdentities()
-            if code_base_identity in [el['code'] for el in t_identities]:## identity already exists in target
+            if code_base_identity in [el['code'].lower() for el in t_identities]:## identity already exists in target
                 if verbose:
                     print(f"identity '{code_base_identity}' already exists in target {target}, saving it")
-                self.dict_targetComponents[target]['identities'][code_base_identity] = [el for el in t_identities if el['code'] == code_base_identity][0]
+                self.dict_targetComponents[target]['identities'][code_base_identity] = [el for el in t_identities if el['code'].lower() == code_base_identity][0]
             else:
                 if verbose:
                     print(f"identity '{code_base_identity}' does not exist in target {target}, creating it")

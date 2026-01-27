@@ -63,6 +63,18 @@ class ServiceShell(cmd.Cmd):
             self.prompt = f"{self.config.sandbox}> "
             console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
         
+    def do_createConfigFile(self, arg):
+        """Create a configuration file for future use"""
+        parser = argparse.ArgumentParser(prog='createConfigFile', add_help=True)
+        parser.add_argument("-f", "--file_name", help="file name for your config file", default="aepp_config.json")
+        args = parser.parse_args(shlex.split(arg))
+        filename = args.file_name
+        aepp.createConfigFile(destination=filename)
+        filename_json = filename + ".json" if not filename.endswith(".json") else filename
+        console.print(f"Configuration file created at {Path.cwd() / Path(filename_json)}", style="green")
+        return
+
+
     # # --- Commands ---
     def do_config(self, arg):
         """connect to an AEP instance"""
@@ -964,19 +976,19 @@ class ServiceShell(cmd.Cmd):
                     successful_runs = fl.get("Successful Runs", 0)
                     failed_runs = fl.get("Failed Runs", 0)
                     partial_success = fl.get('Partial Success Runs',0)
-                    if partial_success>0:
-                        partialColorStart = "[orange1]"
-                        partialColorEnd = "[/orange1]"
-                    else:
-                        partialColorStart = colorStart
-                        partialColorEnd = colorEnd
+                    if partial_success>0 and failed_runs==0:
+                        colorStart = "[orange1]"
+                        colorEnd = "[/orange1]"
+                    row_data[0] = f"{colorStart}{fl.get('id','N/A')}{colorEnd}"
+                    row_data[1] = f"{colorStart}{fl.get('name','N/A')}{colorEnd}"
+                    row_data[2] = f"{colorStart}{fl.get('type','N/A')}{colorEnd}"
                     success_rate = (successful_runs / total_runs * 100) if total_runs > 0 else 0
                     failure_rate = (failed_runs / total_runs * 100) if total_runs > 0 else 0
                     row_data.extend([
                         f"{colorStart}{str(total_runs)}{colorEnd}",
                         f"{colorStart}{str(successful_runs)}{colorEnd}",
                         f"{colorStart}{str(failed_runs)}{colorEnd}",
-                        f"{partialColorStart}{str(partial_success)}{partialColorEnd}",
+                        f"{colorStart}{str(partial_success)}{colorEnd}",
                         f"{colorStart}{success_rate:.0f}%{colorEnd}",
                         f"{colorStart}{failure_rate:.0f}%{colorEnd}"
                     ])

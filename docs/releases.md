@@ -11,6 +11,8 @@ This page list all of the changes that came during the different release of the 
 * Fixing some relative import issues for packaging.\
 Patch:
 * adding `partialSuccess` to flow analysis, and fixing typos
+* adding new methods to CLI 
+* fixing some case sensitivity issues in the `synchronizer` module
  
 
 ## version 0.4.2
