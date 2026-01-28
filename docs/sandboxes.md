@@ -14,8 +14,36 @@ To be noted, some documentation about the sandbox tooling can be found here:[san
   - [The Sandboxes class](#the-sandboxes-class)
   - [Sandboxes attributes](#sandboxes-attributes)
   - [Sandboxes methods](#sandboxes-methods)
-  - [Sandboxes use-cases](#segmentation-use-cases)
-    - [1. List all of your sandboxes](#list-all-of-your-sandboxes)
+    - [getSandboxes](#getsandboxes)
+    - [getSandboxTypes](#getsandboxtypes)
+    - [createSandbox](#createsandbox)
+    - [getSandbox](#getsandbox)
+    - [getSandboxId](#getsandboxid)
+    - [deleteSandbox](#deletesandbox)
+    - [resetSandbox](#resetsandbox)
+    - [updateSandbox](#updatesandbox)
+    - [getPackages](#getpackages)
+    - [getPackage](#getpackage)
+    - [deletePackage](#deletepackage)
+    - [createPackage](#createpackage)
+    - [updatePackage](#updatepackage)
+    - [publishPackage](#publishpackage)
+    - [importPackageCheck](#importpackagecheck)
+    - [importPackage](#importpackage)
+    - [getPackageDependencies](#getpackagedependencies)
+    - [getImportExportJobs](#getimportexportjobs)
+    - [checkPermissions](#checkpermissions)
+    - [createShareRequest](#createsharerequest)
+    - [approvingShareRequest](#approvingsharerequest)
+    - [getShareRequests](#getsharerequests)
+    - [transferPackage](#transferpackage)
+    - [getTransfer](#gettransfer)
+    - [getTransfers](#gettransfers)
+    - [getPublicPackages](#getpublicpackages)
+    - [importPublicPackage](#importpublicpackage)
+    - [publishPackage](#publishpackage-1)
+  - [Sandboxes use-cases](#sandboxes-use-cases)
+    - [List all of your sandboxes and create a connector for each](#list-all-of-your-sandboxes-and-create-a-connector-for-each)
 
 ## Importing the module
 
@@ -64,7 +92,7 @@ Once you have instantiated the `Sandboxes` class, you have access to some attrib
 * header : provide the default header which is used for the requests.
 * loggingEnabled : if the logging capability has been used
 * endpoint : the default endpoint used for all methods.
-* ARTIFACS_TYPE : The type of artefact you can use to migrate between sandboxes
+* ARTIFACTS_TYPE : The type of artifact you can use to migrate between sandboxes
 
 
 ## Sandboxes methods
@@ -134,7 +162,7 @@ Arguments:
 * name : REQUIRED : Name of the package.
 * description : OPTIONAL : Description of the package
 * fullPackage : OPTIONAL : If you want to copy the whole sandbox. (default False)
-* artefacts : OPTIONAL : If you set fullPackage to False, then you need to provide a list of dictionaries susch as [{"id":"myId","title":"mytitle",:"type":"typeOfArtefact"}]\
+* artifacts : OPTIONAL : If you set fullPackage to False, then you need to provide a list of dictionaries susch as [{"id":"myId","title":"mytitle",:"type":"typeOfArtifact"}]\
     example :
     ```py 
     [
@@ -151,7 +179,7 @@ Arguments:
 * operation : OPTIONAL : Type of update, either "UPDATE", "DELETE","ADD"
 * name : OPTIONAL : In case you selected UPDATE and want to change the name of the package.
 * description : OPTIONAL : In case you selected UPDATE and want to change the description of the package.
-* artifacts : OPTIONAL : In case you used DELETE or ADD, a list of dictionary as [{"id":"myId","title":"mytitle",:"type":"typeOfArtefact"}]\
+* artifacts : OPTIONAL : In case you used DELETE or ADD, a list of dictionary as [{"id":"myId","title":"mytitle",:"type":"typeOfArtifact"}]\
     example :
     ```py 
     [

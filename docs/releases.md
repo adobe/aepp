@@ -2,6 +2,12 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.5.1
+* changing the method name from `extractSandboxArtefacts` to `extractSandboxArtifacts` to follow the American English spelling.
+* updating all references to the new method name in the documentation and code base.
+* fixing parameters in CLI
+* Updating CLI for mypy compliance
+
 ## version 0.5.0
 * adding better support for the `saveFile` method.
 * Starting integration of CLI capability

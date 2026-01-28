@@ -888,7 +888,7 @@ class Synchronizer:
     
     def __syncDataset__(self,baseDataset:dict,verbose:bool=False)-> dict:
         """
-        Synchronize the dataset to the target sandboxes. Mostly creating a new dataset and associated artefacts when not already created.
+        Synchronize the dataset to the target sandboxes. Mostly creating a new dataset and associated artifacts when not already created.
         Arguments:
             baseDataset : REQUIRED : dictionary with the dataset definition
         """
@@ -942,7 +942,7 @@ class Synchronizer:
 
     def __syncMergePolicy__(self,mergePolicy:dict,verbose:bool=False)->None:
         """
-        Synchronize the dataset to the target sandboxes. Mostly creating a new dataset and associated artefacts when not already created.
+        Synchronize the dataset to the target sandboxes. Mostly creating a new dataset and associated artifacts when not already created.
         Arguments:
             mergePolicy : REQUIRED : The merge policy dictionary to sync
         """

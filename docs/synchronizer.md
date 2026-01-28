@@ -4,7 +4,7 @@ The `synchronizer` is a sub module that lives on top of several sub modules of a
 **NOTE** : The synchronizer module is currently a **work in progress** and is expected to support more capabilities in the future. Some elements could change in the future and the module is not stable since stated otherwise here. 
 
 The module is intended to create or update elements between sandboxes within an organization.
-The current supported artefacts for the synchronization job are: 
+The current supported artifacts for the synchronization job are: 
 * data type
 * field group
 * schema
@@ -79,10 +79,10 @@ Arguments:
 
 The synchronization capabilities are very similar to the sandbox tooling.
 
-Due to the potential issue with ID management, the synchronizer bases its capabilities on name of the artefact.\
+Due to the potential issue with ID management, the synchronizer bases its capabilities on name of the artifact.\
 It means that the **name** of the schema, class, field group, data type, dataset, identity namespace are used. 
 
-As of today, the synchronization will realize the following operation for the different artefacts: 
+As of today, the synchronization will realize the following operation for the different artifacts: 
 
 Operation |Schema | Class | Field Groups | Data Type | Descriptors | Dataset | Identity | Merge Policy | Audiences
 --| -- | -- | -- | -- | -- | -- | -- | -- | -- |
@@ -90,17 +90,17 @@ Create | Supported | Supported | Supported | Supported | Supported | Supported |
 Update | Supported | Supported | Supported | Supported | Suppported | - | - | - | Supported |
 Delete | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported |
 
-It is not supported to delete an artefact or delete a field in an Field Group or Data Type via the Synchronizer.\
+It is not supported to delete an artifact or delete a field in an Field Group or Data Type via the Synchronizer.\
 The synchronizer only supports additive operations 
 
-The synchronizer will automatically resolve the dependency to create the elements require for the artefact used.\
+The synchronizer will automatically resolve the dependency to create the elements require for the artifact used.\
 Example:\
 Synchronizing a dataset will automatically synchronize the underlying schema and the different field groups.\
 If the schema is in a relationship with another schema (lookup), the associated lookup schema will also be created and the associated created. (note: The dataset associated with the lookup schema won't be created)
 
 ### Create 
 
-For all artefacts, if the element does not exist in the target sandbox, it will automatically create it.\
+For all artifacts, if the element does not exist in the target sandbox, it will automatically create it.\
 The synchronizer automatically resolves all dependencies, which mean that the associated elements Schema associated to a dataset, or field group associated to a schema or a data type associated to a field groups are automatically created as well.
 
 As of today, the schema and datasets are not enabled for profile per default during creation.
@@ -122,7 +122,7 @@ When creating a merge policy, if the merge policy is of type `dataSetPrecedence`
 This means that the datasets used in the merge policy in the base sandbox will be created in the target sandbox for the merge policy creation to succeed.\
 Additionally, if the dataset reference a schema that does not exist in the target sandbox, the synchronizer will also create the schema and its associated field groups and data types. 
 
-**HOWEVER**, the datasets and schema artefacts will not be enabled for Profile automatically. If you want to enable them for profile, you need to do it manually after the synchronization.\
+**HOWEVER**, the datasets and schema artifacts will not be enabled for Profile automatically. If you want to enable them for profile, you need to do it manually after the synchronization.\
 The synchronization of this merge policy will fail until these datasets are enabled for profile in the target sandbox.
 
 ### Notes on Audience synchronization

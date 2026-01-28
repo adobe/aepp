@@ -20,11 +20,11 @@ from aepp import connector
 
 class Deletion:
     """
-    This class regroups differet methods and combine some to clean and delete artefact from Adobe Experience Platform.
+    This class regroups differet methods and combine some to clean and delete artifact from Adobe Experience Platform.
     Supported in this class:
-    - Deleting datasets (and associated artefacts)
-    - Deleteting dataflows (and associated artefacts)
-    - Deleting schemas (and associated artefacts)
+    - Deleting datasets (and associated artifacts)
+    - Deleteting dataflows (and associated artifacts)
+    - Deleting schemas (and associated artifacts)
     - Deleting audiences
     """
     loggingEnabled = False
@@ -83,14 +83,14 @@ class Deletion:
     def __repr__self(self):
         return f"Deletion(config={self.config})"
     
-    def deleteDataset(self,datasetId: str,associatedArtefacts:bool=False) -> dict:
+    def deleteDataset(self,datasetId: str,associatedArtifacts:bool=False) -> dict:
         """
-        Delete a dataset and all associated artefacts (dataflows, schemas, data connections).
+        Delete a dataset and all associated artifacts (dataflows, schemas, data connections).
         Arguments:
             datasetId : REQUIRED : The identifier of the dataset to delete.
-            associatedArtefacts : OPTIONAL : If set to True, all associated artefacts (dataflows, schemas) will also be deleted (default False).
-                Note : Deleting associated arterfacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.
-                In case, it is not possible to delete artefacts, it will be silently ignored and returns in the output dictionary.
+            associatedArtifacts : OPTIONAL : If set to True, all associated artifacts (dataflows, schemas) will also be deleted (default False).
+                Note : Deleting associated artifacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.
+                In case, it is not possible to delete artifacts, it will be silently ignored and returns in the output dictionary.
         """
         result = {}
         from aepp import catalog
@@ -100,7 +100,7 @@ class Deletion:
         schemaRef = datasetInfo.get('schemaRef',{}).get('id',None)
         res = cat.deleteDataSet(datasetId=datasetId)
         result['dataset'] = res
-        if associatedArtefacts:
+        if associatedArtifacts:
             # Deleting associated dataflows
             result['flows'] = {'connections':{}, 'flows': {}} 
             from aepp import flowservice
@@ -113,21 +113,21 @@ class Deletion:
             flows = flow.getFlows()
             list_flowIds = [f['id'] for f in flows if f.get('sourceConnectionIds',[""])[0] in list_source_dataflowsIds or f.get('targetConnectionIds',[""])[0] in list_target_dataflowsIds]
             for flowId in list_flowIds:
-                res_flow = self.deleteDataFlow(flowId=flowId, associatedArtefacts=associatedArtefacts)
+                res_flow = self.deleteDataFlow(flowId=flowId, associatedArtifacts=associatedArtifacts)
                 result['flows']['flows'][flowId] = res_flow
             # Deleting associated schema
             if schemaRef is not None:
-                result['schema'] = self.deleteSchema(schemaId=schemaRef, associatedArtefacts=associatedArtefacts)
+                result['schema'] = self.deleteSchema(schemaId=schemaRef, associatedArtifacts=associatedArtifacts)
         return result
 
-    def deleteSchema(self,schemaId: str,associatedArtefacts:bool=False) -> dict:
+    def deleteSchema(self,schemaId: str,associatedArtifacts:bool=False) -> dict:
         """
-        Delete a schema and possibly all associated artefacts.
+        Delete a schema and possibly all associated artifacts.
         Arguments:
             schemaId : REQUIRED : The identifier of the schema to delete.
-            associatedArtefacts : OPTIONAL : If set to True, all associated artefacts (fieldGroup, datatype) will also be deleted (default False).
-                Note : Deleting associated arterfacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.
-                In case, it is not possible to delete artefacts, it will be silently ignored and returns in the output dictionary.
+            associatedArtifacts : OPTIONAL : If set to True, all associated artifacts (fieldGroup, datatype) will also be deleted (default False).
+                Note : Deleting associated artifacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.
+                In case, it is not possible to delete artifacts, it will be silently ignored and returns in the output dictionary.
         """
         result = {'fieldGroup': {}, 'schema': {} , 'datatypes':{} }
         from aepp import schema, schemamanager
@@ -135,7 +135,7 @@ class Deletion:
         schemaInfo = schemamanager.SchemaManager(schemaId,config=self.config)
         res = sch.deleteSchema(schemaId=schemaId)
         result['schema'] = res
-        if associatedArtefacts:
+        if associatedArtifacts:
             for fieldgroupId, fieldgroupName in schemaInfo.fieldGroups.items():
                 myFG = schemaInfo.getFieldGroupManager(fieldgroupName)
                 datatypes = myFG.dataTypes
@@ -146,12 +146,12 @@ class Deletion:
                 result['fieldGroupName'][fieldgroupId] = res_fg
         return result
     
-    def deleteDataFlow(self,flowId: str,associatedArtefacts:bool=False) -> dict:
+    def deleteDataFlow(self,flowId: str,associatedArtifacts:bool=False) -> dict:
         """
-        Delete a dataflow and possibly all associated artefacts.
+        Delete a dataflow and possibly all associated artifacts.
         Arguments:
             flowId : REQUIRED : The identifier of the dataflow to delete.
-            associatedArtefacts : OPTIONAL : If set to True, all associated artefacts (source and target) will also be deleted (default False).
+            associatedArtifacts : OPTIONAL : If set to True, all associated artifacts (source and target) will also be deleted (default False).
                 Note : The base connection will be identified and returned but not deleted. It can contains other dataflows still actives."""
         result = {'flow': {}, 'targetConnection': {},'sourceConnection':{}, 'baseConnection': {} }
         from aepp import flowservice
@@ -163,7 +163,7 @@ class Deletion:
         result['baseConnection'] = baseConn
         res = flow.deleteFlow(flowId=flowId)
         result['response_flow'] = res
-        if associatedArtefacts:
+        if associatedArtifacts:
             for sourceConnectionId in sourceConnectionIds:
                 res_sc = flow.deleteSourceConnection(connectionId=sourceConnectionId)
                 result["response_sourceConn"] = res_sc

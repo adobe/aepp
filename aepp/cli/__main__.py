@@ -13,12 +13,16 @@ from io import FileIO
 import pandas as pd
 from datetime import datetime
 import urllib.parse
+from typing import Any, Concatenate, ParamSpec, ParamSpecKwargs
+from collections.abc import Callable
+
+P = ParamSpec("P")
 
 # --- 1. The Decorator (The Gatekeeper) ---
-def login_required(f):
+def login_required(f:Callable[Concatenate["ServiceShell", P], None]) -> Callable[Concatenate["ServiceShell", P], None]:
     """Decorator to block commands if not logged in."""
     @wraps(f)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self:"ServiceShell", *args:P.args, **kwargs:P.kwargs) -> None:
         if not hasattr(self, 'config') or self.config is None:
             print("(!) Access Denied: You must setup config first.")
             return
@@ -29,26 +33,30 @@ console = Console()
 
 # --- 2. The Interactive Shell ---
 class ServiceShell(cmd.Cmd):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs:ParamSpecKwargs) -> None:
         super().__init__()
         self.config = None
         self.connectInstance = True
-        config_path = Path(kwargs.get("config_file"))
-        if not config_path.is_absolute():
-            config_path = Path.cwd() / config_path
-        if config_path.exists() and kwargs.get("config_file") is not None:
+        if kwargs.get("config_file") is not None:
+            config_path = Path(kwargs.get("config_file"))
+            if not config_path.is_absolute():
+                config_path = Path.cwd() / config_path
+        if kwargs.get("config_file") is not None:
             dict_config = json.load(FileIO(config_path))
-            self.sandbox = kwargs.get("sandbox",dict_config.get("sandbox-name","prod"))
-            self.secret = dict_config.get("secret",kwargs.get("secret"))
-            self.org_id = dict_config.get("org_id",kwargs.get("org_id"))
-            self.client_id = dict_config.get("client_id",kwargs.get("client_id"))
-            self.scopes = dict_config.get("scopes",kwargs.get("scopes"))
+            if kwargs.get("sandbox") is None:
+                self.sandbox = str(dict_config.get("sandbox-name","prod"))
+            else:
+                self.sandbox = str(kwargs.get("sandbox","prod"))
+            self.secret = str(dict_config.get("secret",kwargs.get("secret")))
+            self.org_id = str(dict_config.get("org_id",kwargs.get("org_id")))
+            self.client_id = str(dict_config.get("client_id",kwargs.get("client_id")))
+            self.scopes = str(dict_config.get("scopes",kwargs.get("scopes")))
         else:
-            self.sandbox = kwargs.get("sandbox","prod")
-            self.secret = kwargs.get("secret")
-            self.org_id = kwargs.get("org_id")
-            self.client_id = kwargs.get("client_id")
-            self.scopes = kwargs.get("scopes")
+            self.sandbox = str(kwargs.get("sandbox","prod"))
+            self.secret = str(kwargs.get("secret"))
+            self.org_id = str(kwargs.get("org_id"))
+            self.client_id = str(kwargs.get("client_id"))
+            self.scopes = str(kwargs.get("scopes"))
         self.connectInstance = True
         if self.sandbox is not None and self.secret is not None and self.org_id is not None and self.client_id is not None and self.scopes is not None:
             print("Configuring connection...")
@@ -63,7 +71,7 @@ class ServiceShell(cmd.Cmd):
             self.prompt = f"{self.config.sandbox}> "
             console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
         
-    def do_createConfigFile(self, arg):
+    def do_createConfigFile(self, arg:Any) -> None:
         """Create a configuration file for future use"""
         parser = argparse.ArgumentParser(prog='createConfigFile', add_help=True)
         parser.add_argument("-f", "--file_name", help="file name for your config file", default="aepp_config.json")
@@ -76,7 +84,7 @@ class ServiceShell(cmd.Cmd):
 
 
     # # --- Commands ---
-    def do_config(self, arg):
+    def do_config(self, arg:Any) -> None:
         """connect to an AEP instance"""
         parser = argparse.ArgumentParser(prog='config', add_help=True)
         parser.add_argument("-sx", "--sandbox", help="Auto-login sandbox")
@@ -89,18 +97,18 @@ class ServiceShell(cmd.Cmd):
         if args.config_file:
             mypath = Path.cwd()
             dict_config = json.load(FileIO(mypath / Path(args.config_file)))
-            self.sandbox = args.sandbox if args.sandbox else dict_config.get("sandbox-name",args.sandbox)
-            self.secret = dict_config.get("secret",args.secret)
-            self.org_id = dict_config.get("org_id",args.org_id)
-            self.client_id = dict_config.get("client_id",args.client_id)
-            self.scopes = dict_config.get("scopes",args.scopes)
+            self.sandbox = str(args.sandbox) if args.sandbox else str(dict_config.get("sandbox-name",args.sandbox))
+            self.secret = str(dict_config.get("secret",args.secret))
+            self.org_id = str(dict_config.get("org_id",args.org_id))
+            self.client_id = str(dict_config.get("client_id",args.client_id))
+            self.scopes = str(dict_config.get("scopes",args.scopes))
             self.connectInstance = True
         else:
-            if args.sandbox: self.sandbox = args.sandbox
-            if args.secret: self.secret = args.secret
-            if args.org_id: self.org_id = args.org_id
-            if args.scopes: self.scopes = args.scopes
-            if args.client_id: self.client_id = args.client_id
+            if args.sandbox: self.sandbox = str(args.sandbox)
+            if args.secret: self.secret = str(args.secret)
+            if args.org_id: self.org_id = str(args.org_id)
+            if args.scopes: self.scopes = str(args.scopes)
+            if args.client_id: self.client_id = str(args.client_id)
         console.print("Configuring connection...", style="blue")
         self.config = aepp.configure(
             connectInstance=self.connectInstance,
@@ -114,15 +122,15 @@ class ServiceShell(cmd.Cmd):
         self.prompt = f"{self.config.sandbox}> "
         return 
 
-    def do_change_sandbox(self, args):
+    def do_change_sandbox(self, args:Any) -> None:
         """Change the current sandbox after configuration"""
         parser = argparse.ArgumentParser(prog='change sandbox', add_help=True)
         parser.add_argument("sandbox", help="sandbox name to switch to")
         args = parser.parse_args(shlex.split(args))
-        self.sandbox = args.sandbox if args.sandbox else console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
+        self.sandbox = str(args.sandbox) if args.sandbox else console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
         if self.config is not None:
             if args.sandbox:
-                self.config.setSandbox(args.sandbox)
+                self.config.setSandbox(str(args.sandbox))
                 self.prompt = f"{self.config.sandbox}> "
                 console.print(Panel(f"Sandbox changed to: [bold green]{self.config.sandbox}[/bold green]", style="blue"))
         else:
@@ -130,7 +138,7 @@ class ServiceShell(cmd.Cmd):
     
     
     @login_required
-    def do_get_schemas(self, args):
+    def do_get_schemas(self, args:Any) -> None:
         """List all schemas in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_schemas', add_help=True)
         parser.add_argument("-sv", "--save",help="Save schemas to CSV file")
@@ -162,7 +170,7 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
-    def do_get_ups_schemas(self, args):
+    def do_get_ups_schemas(self, args) -> None:
         """List all schemas enabled for Profile in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_schemas_enabled', add_help=True)
         parser.add_argument("-sv", "--save",help="Save enabled schemas to CSV file")
@@ -202,7 +210,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_ups_fieldgroups(self, args):
+    def do_get_ups_fieldgroups(self, args:Any) -> None:
         """List all field groups enabled for Profile in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_fieldgroups_enabled', add_help=True)
         parser.add_argument("-sv", "--save",help="Save enabled field groups to CSV file")
@@ -242,7 +250,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_profile_schemas(self,args):
+    def do_get_profile_schemas(self,args:Any) -> None:
         """Get the current profile schema"""
         parser = argparse.ArgumentParser(prog='get_schemas_enabled', add_help=True)
         try:
@@ -269,7 +277,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_union_profile_json(self,args):
+    def do_get_union_profile_json(self,args:Any) -> None:
         """Get the current Profile union schema"""
         parser = argparse.ArgumentParser(prog='get_union_profile', add_help=True)
         try:
@@ -285,7 +293,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_union_profile_csv(self,args):
+    def do_get_union_profile_csv(self,args:Any) -> None:
         """Get the current Profile union schema"""
         parser = argparse.ArgumentParser(prog='get_union_profile', add_help=True)
         parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
@@ -301,7 +309,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_union_event_json(self,args):
+    def do_get_union_event_json(self,args:Any) -> None:
         """Get the current Experience Event union schema"""
         parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
         try:
@@ -317,7 +325,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_union_event_csv(self,args):
+    def do_get_union_event_csv(self,args:Any) -> None:
         """Get the current Experience Event union schema"""
         parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
         parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
@@ -333,7 +341,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_event_schemas(self,args):
+    def do_get_event_schemas(self,args:Any) -> None:
         """Get the current Experience Event schemas"""
         parser = argparse.ArgumentParser(prog='get_event_schemas', add_help=True)
         parser.add_argument("-sv", "--save",help="Save event schemas to CSV file")
@@ -365,7 +373,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_union_event_json(self,args):
+    def do_get_union_event_json(self,args:Any) -> None:
         """Get the current Experience Event union schema"""
         parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
         try:
@@ -382,7 +390,7 @@ class ServiceShell(cmd.Cmd):
          
 
     @login_required
-    def do_get_schema_xdm(self, arg):
+    def do_get_schema_xdm(self, arg:Any) -> None:
         """Get schema JSON by name or ID"""
         parser = argparse.ArgumentParser(prog='get_schema_xdm', add_help=True)
         parser.add_argument("schema", help="Schema title, $id or alt:Id to retrieve")
@@ -415,7 +423,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_schema_csv(self, arg):
+    def do_get_schema_csv(self, arg:Any) -> None:
         """Get schema CSV by name or ID"""
         parser = argparse.ArgumentParser(prog='get_schema_csv', add_help=True)
         parser.add_argument("schema", help="Schema $id or alt:Id to retrieve")
@@ -445,7 +453,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_schema_json(self, args):
+    def do_get_schema_json(self, args:Any) -> None:
         """Get schema JSON by name or ID"""
         parser = argparse.ArgumentParser(prog='get_schema_json', add_help=True)
         parser.add_argument("schema", help="Schema $id or alt:Id to retrieve")
@@ -474,7 +482,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_fieldgroups(self, args):
+    def do_get_fieldgroups(self, args:Any) -> None:
         """List all field groups in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_fieldgroups', add_help=True)
         parser.add_argument("-sv", "--save",help="Save field groups to CSV file")
@@ -504,7 +512,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_fieldgroup_json(self, args):
+    def do_get_fieldgroup_json(self, args:Any) -> None:
         """Get field group JSON by name or ID"""
         parser = argparse.ArgumentParser(prog='get_fieldgroup_json', add_help=True)
         parser.add_argument("fieldgroup", help="Field Group name, $id or alt:Id to retrieve")
@@ -533,7 +541,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_fieldgroup_csv(self, args):
+    def do_get_fieldgroup_csv(self, args:Any) -> None:
         """Get field group CSV by name or ID"""
         parser = argparse.ArgumentParser(prog='get_fieldgroup_csv', add_help=True)
         parser.add_argument("fieldgroup", help="Field Group name, $id or alt:Id to retrieve")
@@ -562,7 +570,7 @@ class ServiceShell(cmd.Cmd):
             return
         
     @login_required
-    def do_get_datatypes(self, args):
+    def do_get_datatypes(self, args:Any) -> None:
         """List all data types in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_datatypes', add_help=True)
         try:
@@ -587,7 +595,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_datatype_csv(self, args):
+    def do_get_datatype_csv(self, args:Any) -> None:
         """Get data type CSV by name or ID"""
         parser = argparse.ArgumentParser(prog='get_datatype_csv', add_help=True)
         parser.add_argument("datatype", help="Data Type name, $id or alt:Id to retrieve")
@@ -616,7 +624,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_datatype_json(self, args):
+    def do_get_datatype_json(self, args:Any) -> None:
         """Get data type JSON by name or ID"""
         parser = argparse.ArgumentParser(prog='get_datatype_json', add_help=True)
         parser.add_argument("datatype", help="Data Type name, $id or alt:Id to retrieve")
@@ -646,7 +654,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_enable_schema_for_ups(self, args):
+    def do_enable_schema_for_ups(self, args:Any) -> None:
         """Enable a schema for Profile"""
         parser = argparse.ArgumentParser(prog='enable_schema_for_ups', add_help=True)
         parser.add_argument("schema_id", help="Schema ID to enable for Profile")
@@ -661,7 +669,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_upload_fieldgroup_definition_csv(self,args):
+    def do_upload_fieldgroup_definition_csv(self,args:Any) -> None:
         """Upload a field group definition from a CSV file"""
         parser = argparse.ArgumentParser(prog='upload_fieldgroup_definition_csv', add_help=True)
         parser.add_argument("csv_path", help="Path to the field group CSV file")
@@ -685,7 +693,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_upload_fieldgroup_definition_xdm(self,args):
+    def do_upload_fieldgroup_definition_xdm(self,args:Any) -> None:
         """Upload a field group definition from a JSON XDM file"""
         parser = argparse.ArgumentParser(prog='upload_fieldgroup_definition_xdm', add_help=True)
         parser.add_argument("xdm_path", help="Path to the field group JSON XDM file")
@@ -710,7 +718,7 @@ class ServiceShell(cmd.Cmd):
             return
         
     @login_required
-    def do_get_datasets(self, args):
+    def do_get_datasets(self, args:Any) -> None:
         """List all datasets in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_datasets', add_help=True)
         try:
@@ -741,7 +749,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_datasets_infos(self, args):
+    def do_get_datasets_infos(self, args:Any) -> None:
         """List all datasets in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_datasets_infos', add_help=True)
         try:
@@ -773,7 +781,7 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
-    def do_createDataset(self, args):
+    def do_createDataset(self, args:Any) -> None:
         """Create a new dataset in the current sandbox"""
         parser = argparse.ArgumentParser(prog='createDataset', add_help=True)
         parser.add_argument("dataset_name", help="Name of the dataset to create")
@@ -789,7 +797,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_enable_dataset_for_ups(self, args):
+    def do_enable_dataset_for_ups(self, args:Any) -> None:
         """Enable a dataset for Profile"""
         parser = argparse.ArgumentParser(prog='enable_dataset_for_ups', add_help=True)
         parser.add_argument("dataset", help="Dataset ID or Dataset Name to enable for Profile")
@@ -807,8 +815,8 @@ class ServiceShell(cmd.Cmd):
         except SystemExit:
             return
 
-    @login_required
-    def do_get_identities(self, args):
+    @login_required 
+    def do_get_identities(self, args:Any) -> None:
         """List all identities in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_identities', add_help=True)
         parser.add_argument("-r","--region", help="Region to get identities from: 'ndl2' (default), 'va7', 'aus5', 'can2', 'ind2'", default='ndl2')
@@ -839,7 +847,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_flows(self, args):
+    def do_get_flows(self, args:Any) -> None:
         """List flows in the current sandbox based on parameters provided. By default, list all sources and destinations."""
         parser = argparse.ArgumentParser(prog='get_flows', add_help=True)
         parser.add_argument("-i","--internal_flows",help="Get internal flows", default=False,type=bool)
@@ -1002,7 +1010,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_flow_errors(self,args):
+    def do_get_flow_errors(self,args:Any) -> None:
         """Get errors for a specific flow, saving it in a JSON file for specific timeframe, default last 24 hours."""
         parser = argparse.ArgumentParser(prog='get_flow_errors', add_help=True)
         parser.add_argument("flow_id", help="Flow ID to get errors for")
@@ -1026,7 +1034,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_create_dataset_http_source(self,args):
+    def do_create_dataset_http_source(self,args:Any) -> None:
         """Create an HTTP Source connection for a specific dataset, XDM compatible data only."""
         parser = argparse.ArgumentParser(prog='do_create_dataset_http_source', add_help=True)
         parser.add_argument("dataset", help="Name or ID of the Dataset Source connection to create")
@@ -1052,7 +1060,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_DLZ_credential(self,args):
+    def do_get_DLZ_credential(self,args:Any) -> None:
         """Get Data Lake Zone credential for the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_DLZ_credential', add_help=True)
         parser.add_argument("type",nargs='?',help="Type of credential to retrieve: 'user_drop_zone' or 'dlz_destination'",default="user_drop_zone")
@@ -1068,7 +1076,7 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
-    def do_get_queries(self, args):
+    def do_get_queries(self, args:Any)-> None:
         """List top 1000 queries in the current sandbox for the last 24 hours by default, optionally filtered by dataset ID"""
         parser = argparse.ArgumentParser(prog='get_queries', add_help=True)
         parser.add_argument("-ds","--dataset", help="Dataset ID to filter queries", default=None)
@@ -1130,7 +1138,7 @@ class ServiceShell(cmd.Cmd):
             return
         
     @login_required
-    def do_query(self,args):
+    def do_query(self,args:Any) -> None:
         """Execute a SQL query against the current sandbox"""
         parser = argparse.ArgumentParser(prog='query', add_help=True)
         parser.add_argument("sql_query", help="SQL query to execute",type=str)
@@ -1150,15 +1158,15 @@ class ServiceShell(cmd.Cmd):
 
 
     @login_required
-    def do_extractArtefacts(self,args):
-        """extractArtefacts localfolder"""
-        console.print("Extracting artefacts...", style="blue")
-        parser = argparse.ArgumentParser(prog='extractArtefacts', description='Extract artefacts from AEP')
-        parser.add_argument('-lf','--localfolder', help='Local folder to extract artefacts to', default='./extractions')
-        parser.add_argument('-rg','--region', help='Region to extract artefacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
+    def do_extractArtifacts(self,args:Any) -> None:
+        """extractArtifacts localfolder"""
+        console.print("Extracting artifacts...", style="blue")
+        parser = argparse.ArgumentParser(prog='extractArtifacts', description='Extract artifacts from AEP')
+        parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
+        parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         try:
             args = parser.parse_args(shlex.split(args))
-            aepp.extractSandboxArtefacts(
+            aepp.extractSandboxArtifacts(
                 sandbox=self.config,
                 localFolder=args.localfolder,
                 region=args.region
@@ -1168,20 +1176,20 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
-    def do_extractArtefact(self,args):
-        """extractArtefacts localfolder"""
-        console.print("Extracting artefact...", style="blue")
-        parser = argparse.ArgumentParser(prog='extractArtefact', description='Extract artefacts from AEP')
-        parser.add_argument('artefact', help='artefact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
-        parser.add_argument('-at','--artefactType', help='artefact type ')
-        parser.add_argument('-lf','--localfolder', help='Local folder to extract artefacts to',default='extractions')
-        parser.add_argument('-rg','--region', help='Region to extract artefacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
+    def do_extractArtifact(self,args:Any) -> None:
+        """extractArtifacts localfolder"""
+        console.print("Extracting artifact...", style="blue")
+        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP')
+        parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
+        parser.add_argument('-at','--artifactType', help='artifact type ')
+        parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions')
+        parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         
         try:
             args = parser.parse_args(shlex.split(args))
-            aepp.extractSandboxArtefact(
-                artefact=args.artefact,
-                artefactType=args.artefactType,
+            aepp.extractSandboxArtifact(
+                artifact=args.artifact,
+                artifactType=args.artifactType,
                 sandbox=self.config,
                 localFolder=args.localfolder
             )
@@ -1190,16 +1198,16 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
-    def do_sync(self,args):
-        """extractArtefacts localfolder"""
-        console.print("Syncing artefact...", style="blue")
-        parser = argparse.ArgumentParser(prog='extractArtefact', description='Extract artefacts from AEP')
-        parser.add_argument('artefact', help='artefact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
-        parser.add_argument('-at','--artefactType', help='artefact type ')
+    def do_sync(self,args:Any) -> None:
+        """extractArtifacts localfolder"""
+        console.print("Syncing artifact...", style="blue")
+        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP')
+        parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
+        parser.add_argument('-at','--artifactType', help='artifact type ')
         parser.add_argument('-t','--targets', help='target sandboxes')
-        parser.add_argument('-lf','--localfolder', help='Local folder to extract artefacts to',default='extractions')
+        parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions')
         parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization')
-        parser.add_argument('-rg','--region', help='Region to extract artefacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
+        parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         parser.add_argument('-v','--verbose', help='Enable verbose output',default=True)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -1224,21 +1232,20 @@ class ServiceShell(cmd.Cmd):
             )
             console.print("Starting Sync...", style="blue")
             synchronizor.syncComponent(
-                component=args.artefact,
-                componentType=args.artefactType,
+                component=args.artifact,
+                componentType=args.artifactType,
                 verbose=args.verbose
             )
             console.print("Sync completed!", style="green")
         except SystemExit:
             return
     
-    
-    def do_exit(self, args):
+    def do_exit(self, args:Any) -> None:
         """Exit the application"""
         console.print(Panel("Exiting...", style="blue"))
         return True  # Stops the loop
 
-    def do_EOF(self, args):
+    def do_EOF(self, args:Any) -> None:
         """Handle Ctrl+D"""
         console.print(Panel("Exiting...", style="blue"))
         return True

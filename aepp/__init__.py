@@ -165,7 +165,7 @@ def __titleSafe__(text: str) -> str:
     return text
 
 
-def extractSandboxArtefacts(
+def extractSandboxArtifacts(
     sandbox: 'ConnectObject' = None, 
     localFolder: Union[str, Path] = None,
     region: str = "nld2",
@@ -310,20 +310,20 @@ def extractSandboxArtefacts(
         with open(f"{audiencePath / safe_name}.json",'w') as f:
             json.dump(el,f,indent=2)
 
-def extractSandboxArtefact(
+def extractSandboxArtifact(
     sandbox: 'ConnectObject' = None,
     localFolder: Union[str, Path] = None,
-    artefact: str = None,
-    artefactType: str = None,
+    artifact: str = None,
+    artifactType: str = None,
     region: str = "nld2",
 ):
     """
-    Export a single artefact and its dependencies from the sandbox.
+    Export a single artifact and its dependencies from the sandbox.
     Arguments:
         sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
         localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the folder the name of the sandbox.
-        artefact: REQUIRED: the id or the name of the artefact to export.
-        artefactType: REQUIRED: the type of artefact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy',audience'
+        artifact: REQUIRED: the id or the name of the artifact to export.
+        artifactType: REQUIRED: the type of artifact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy',audience'
         region: OPTIONAL: the region of the sandbox (default: nld2). This is used to fetch the correct API endpoints for the identities. 
             Possible values: "va7","aus5", "can2", "ind2"
     """
@@ -348,24 +348,24 @@ def extractSandboxArtefact(
     from aepp import schema, catalog, identity
     sch = schema.Schema(config=sandbox)
     cat = catalog.Catalog(config=sandbox)
-    if artefactType == 'class':
-        __extractClass__(artefact,completePath,sandbox)
-    elif artefactType == 'schema':
-        __extractSchema__(artefact,completePath,sandbox,region)
-    elif artefactType == 'fieldgroup':
-        __extractFieldGroup__(artefact,completePath,sandbox)
-    elif artefactType == 'datatype':
-        __extractDataType__(artefact,completePath,sandbox)
-    elif artefactType == 'dataset':
-        __extractDataset__(artefact,completePath,sandbox,region)
-    elif artefactType == 'identity':
-        __extractIdentity__(artefact,region,completePath,sandbox)
-    elif artefactType == 'mergepolicy':
-        __extractMergePolicy__(artefact,completePath,sandbox)
-    elif artefactType == 'audience':
-        __extractAudience__(artefact,completePath,sandbox)
+    if artifactType == 'class':
+        __extractClass__(artifact,completePath,sandbox)
+    elif artifactType == 'schema':
+        __extractSchema__(artifact,completePath,sandbox,region)
+    elif artifactType == 'fieldgroup':
+        __extractFieldGroup__(artifact,completePath,sandbox)
+    elif artifactType == 'datatype':
+        __extractDataType__(artifact,completePath,sandbox)
+    elif artifactType == 'dataset':
+        __extractDataset__(artifact,completePath,sandbox,region)
+    elif artifactType == 'identity':
+        __extractIdentity__(artifact,region,completePath,sandbox)
+    elif artifactType == 'mergepolicy':
+        __extractMergePolicy__(artifact,completePath,sandbox)
+    elif artifactType == 'audience':
+        __extractAudience__(artifact,completePath,sandbox)
     else:
-        raise ValueError("artefactType not recognized")
+        raise ValueError("artifactType not recognized")
     
 def __extractClass__(classEl: str,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None):
     classPath = Path(folder) / 'class'

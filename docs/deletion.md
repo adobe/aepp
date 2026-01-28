@@ -3,7 +3,7 @@
 This documentation will provide you some explanation on how to use the `deletion` module and different methods supported by this module.\
 It will include some examples but be aware that not all methods will be documented here.\
 This module is NOT an existing module in Adobe Experience Platform.\
-It has been created as many customers do not know how to delete artefacts in Adobe Experience Platform. Also, it covers the deletion of dependencies if you want to delete more than the artefacts.\
+It has been created as many customers do not know how to delete artifacts in Adobe Experience Platform. Also, it covers the deletion of dependencies if you want to delete more than the artifacts.\
 Example: Deleting the Schema may not be enough, but you would like to also delete all the associated Field Groups and Data Types associated.  
 
 ## Menu
@@ -73,32 +73,32 @@ By using this method, this process is automated.
 
 
 #### deleteSchema
-Delete a schema and possibly all associated artefacts.\
+Delete a schema and possibly all associated artifacts.\
 Arguments:
 * schemaId : REQUIRED : The identifier of the schema to delete.
-* associatedArtefacts : OPTIONAL : If set to True, all associated artefacts (fieldGroup, datatype) will also be deleted (default False).\
-  **Note** : Deleting associated arterfacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.\
-  In case, it is not possible to delete artefacts, it will be silently ignored and returns in the output dictionary.
+* associatedArtifacts : OPTIONAL : If set to True, all associated artifacts (fieldGroup, datatype) will also be deleted (default False).\
+  **Note** : Deleting associated artifacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.\
+  In case, it is not possible to delete artifacts, it will be silently ignored and returns in the output dictionary.
 
 You may sometimes want to delete not only the schema but also all of their children (field groups and data type). This method provide the possibility to go down the different elements and try delete all of them.
 
 #### deleteDataFlow
-Delete a dataflow and possibly all associated artefacts.\
+Delete a dataflow and possibly all associated artifacts.\
 Arguments:
 * flowId : REQUIRED : The identifier of the dataflow to delete.
-* associatedArtefacts : OPTIONAL : If set to True, all associated artefacts (source and target) will also be deleted (default False).\
+* associatedArtifacts : OPTIONAL : If set to True, all associated artifacts (source and target) will also be deleted (default False).\
   **Note** : The base connection will be identified and returned but not deleted. It can contains other dataflows still actives."""
 
 The deletion of the datalflow can be generated and all associated source and target connection can also be deleted.\
 The base connection, that serves as an Account in the UI, will be identified but not deleted. You would still need to do that manually if you want to. 
 
 #### deleteDataset
-Delete a dataset and all associated artefacts (dataflows, schemas, data connections).\
+Delete a dataset and all associated artifacts (dataflows, schemas, data connections).\
 Arguments:
 * datasetId : REQUIRED : The identifier of the dataset to delete.
-* associatedArtefacts : OPTIONAL : If set to True, all associated artefacts (dataflows, schemas) will also be deleted (default False).\
-  **Note** : Deleting associated arterfacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.\
-  In case, it is not possible to delete artefacts, it will be silently ignored and returns in the output dictionary.
+* associatedArtifacts : OPTIONAL : If set to True, all associated artifacts (dataflows, schemas) will also be deleted (default False).\
+  **Note** : Deleting associated artifacts option will be pass down to other methods called within this method. So Field Groups, Data Type could be impacted.\
+  In case, it is not possible to delete artifacts, it will be silently ignored and returns in the output dictionary.
 
 This method for the dataset can also help deleting all associated elements to it, if possible. 
 It means that the associated elements can be deleted:

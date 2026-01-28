@@ -1,6 +1,6 @@
 # Local Storage usage in aepp
 
-As the usage of aepp expanded in customer site, the need to require a connection to leverage local storage for artefacts, instead of always connect to the sandbox, was becoming an important need.\
+As the usage of aepp expanded in customer site, the need to require a connection to leverage local storage for artifacts, instead of always connect to the sandbox, was becoming an important need.\
 The idea behind local Storage is to not get the resources directly from the sandbox API connection but be able to use a hard local copy.\
 This is especially true for the 2nd layer of aepp methods and class (`SchemaManager`, `FieldGroupManager`, etc...).\
 This element is also into consideration for building a continuous integration pipeline that does not rely on AEP state but on your local state.
@@ -9,16 +9,28 @@ This element is also into consideration for building a continuous integration pi
 - [Local Storage usage in aepp](#local-storage-usage-in-aepp)
   - [Menu](#menu)
   - [Local Storage Requirements](#local-storage-requirements)
-  - [Extracting the artefacts](#extracting-the-artefacts)
+    - [Config File](#config-file)
+  - [Extracting the artifacts](#extracting-the-artifacts)
+  - [Setting up your own extractor](#setting-up-your-own-extractor)
+    - [Behavior schema](#behavior-schema)
+    - [Class schema](#class-schema)
+    - [Schema schema](#schema-schema)
+    - [Field Group schema](#field-group-schema)
+    - [Data Types schema](#data-types-schema)
+    - [Descriptor schema](#descriptor-schema)
   - [Using the local storage](#using-the-local-storage)
+    - [SchemaManager](#schemamanager)
+    - [Field Group Manager](#field-group-manager)
+    - [DataType Manager](#datatype-manager)
+    - [Synchronizer](#synchronizer)
 
 
 ## Local Storage Requirements
 
 In order for `aepp` to be able to functions with all type of implementation, the need for standardization was important.\
-Each client has a different implementation, however, the different type of artefacts that are available from AEP are clearly defined.\
+Each client has a different implementation, however, the different type of artifacts that are available from AEP are clearly defined.\
 
-In that case, we have defined a clear structure for the artefacts that are supported in aepp for local storage.\
+In that case, we have defined a clear structure for the artifacts  that are supported in aepp for local storage.\
 The structure is as follow: 
 
 sandbox_folder\
@@ -39,7 +51,7 @@ The creation of clearly defined structure is making the dependency between eleme
 
 ### Config File
 
-In order to simplify the reading of the artefact when local folder is used, we are storing a `config.json` file in the main folder.\
+In order to simplify the reading of the artifact when local folder is used, we are storing a `config.json` file in the main folder.\
 This config is a dictionary that may evolve in the future, when more dependencies are built.\
 Check the page regularly if additional information are set as requirement.
 
@@ -53,13 +65,13 @@ Current config setup:
 ```
 
 
-## Extracting the artefacts
+## Extracting the artifacts
 
 As the structure of the folder is clearly defined, the file are also defined specifically for resolving dependencies.\
 In that sense, we could not let the user defined the structure of the schema or field group to be downloaded.
 For that purpose, we provided a capability in aepp to export the data. 
 
-`extractSandboxArtefacts`: This method will take all compatible and supported elements contain in your sandbox and extract that in a local folder defined.\
+`extractSandboxArtifacts`: This method will take all compatible and supported elements contain in your sandbox and extract that in a local folder defined.\
 It takes the following argument: 
 * sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
 * localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the    folder the name of the sandbox.
@@ -71,13 +83,13 @@ Example of usage:
 import aepp
 
 prod = aepp.importConfigFile('myconfig.json',sandbox='prod',connectInstance=True)
-aepp.extractSandboxArtefacts(prod,localFolder='prodFolder',region='va7')
+aepp.extractSandboxArtifacts(prod,localFolder='prodFolder',region='va7')
 ```
 
 ## Setting up your own extractor
 
-It may be that you have your own pipeline to work on the extraction of the artefact from AEP.\
-If that is the case, you can refer to the different schema definition of the artefacts needed for the synchronizer to work.
+It may be that you have your own pipeline to work on the extraction of the artifact from AEP.\
+If that is the case, you can refer to the different schema definition of the artifacts needed for the synchronizer to work.
 
 The schema definition provides the required fields and the format that you need to ensure having for the different tools define below to work.
 
@@ -154,9 +166,9 @@ myfieldgroup = daatatypemanager.DataTypeManager('my-data-type-id',localFolder='p
 
 ### Synchronizer
 
-In the synchronizer, you can also pass the folder that contains your artefact.\
-Following the structure built from the `extractSandboxArtefacts` method, the dependencies and the definition of the elements can be found.
-In order to use the local file setup, you cna do the following setup once you have ran the `extractSandboxArtefacts` method.
+In the synchronizer, you can also pass the folder that contains your artifact.\
+Following the structure built from the `extractSandboxArtifacts` method, the dependencies and the definition of the elements can be found.
+In order to use the local file setup, you cna do the following setup once you have ran the `extractSandboxArtifacts` method.
 
 ```py 
 import aepp

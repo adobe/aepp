@@ -248,26 +248,26 @@ Arguments:
 
 ## Tools & Migration
 
-### extractArtefacts
+### extractArtifacts
 Bulk extract sandbox components to a local folder.\
 Arguments:
 * `-lf`, `--localfolder` : Destination folder (default: ./extractions).
 * `-rg`, `--region` : Source region (default: 'ndl2').
 
-### extractArtefact
-Extract a single specific artefact.\
+### extractArtifact
+Extract a single specific artifact.\
 Arguments:
-* `artefact` : Name or ID of the artefact.
-* `-at`, `--artefactType` : Type (e.g., schema, dataset, etc.).
+* `artifact` : Name or ID of the artifact.
+* `-at`, `--artifactType` : Type (e.g., schema, dataset, etc.).
 * `-lf`, `--localfolder` : Destination folder.
 * `-rg`, `--region` : Source region.
 
 
 ### sync
-Synchronize or copy artefacts between sandboxes.\
+Synchronize or copy artifacts between sandboxes.\
 Arguments:
-* `artefact` : Name or ID of the component to sync.
-* `-at`, `--artefactType` : Type of component.
+* `artifact` : Name or ID of the component to sync.
+* `-at`, `--artifactType` : Type of component.
 * `-t`, `--targets` : Comma-separated list of target sandboxes.
 * `-lf`, `--localfolder` : Local staging folder.
 * `-b`, `--baseSandbox` : The source sandbox name.

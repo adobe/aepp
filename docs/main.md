@@ -137,9 +137,9 @@ Arguments:
 * prop : OPTIONAL : An array that contains one or more of a comma-separated list of properties (prop="action==create,assetType==Sandbox")
     If you want to filter results using multiple values for a single filter, pass in a comma-separated list of values. (prop="action==create,update")
 
-## extractSandboxArtefacts
+## extractSandboxArtifacts
 
-The `extractSandboxArtefacts` method is a way to extract the different artefacts that are available on your sandbox in a local folder.\
+The `extractSandboxArtifacts` method is a way to extract the different artifacts that are available on your sandbox in a local folder.\
 This method is taking 2 arguments:
 * sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
 * localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the    folder the name of the sandbox.
@@ -153,9 +153,9 @@ Example of usage:
 import aepp
 
 prod = aepp.importConfigFile('myconfig.json',sandbox='prod',connectInstance=True)
-aepp.extractSandboxArtefacts(prod,localFolder='prodFolder',region='va7')
+aepp.extractSandboxArtifacts(prod,localFolder='prodFolder',region='va7')
 ```
-as of today, the following artefacts are exported:
+as of today, the following artifacts are exported:
 * behavior
 * class
 * schema
@@ -167,16 +167,16 @@ as of today, the following artefacts are exported:
 * mergepolicies
 * audiences
 
-The reason to use that extractSandboxArtefacts methods is documented on [Local File Usage](./localfilesusage.md)
+The reason to use that extractSandboxArtifacts methods is documented on [Local File Usage](./localfilesusage.md)
 
-## extractSandboxArtefact
-Export a single artefact and its dependencies from the sandbox.\
+## extractSandboxArtifact
+Export a single artifact and its dependencies from the sandbox.\
 Arguments:
 * sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
 * localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the * folder the name of the sandbox.
-* artefact: REQUIRED: the id or the name of the artefact to export.
-* artefactType: REQUIRED: the type of artefact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','audience', 'mergepolicy'
+* artifact: REQUIRED: the id or the name of the artifact to export.
+* artifactType: REQUIRED: the type of artifact to export. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','audience', 'mergepolicy'
 * region: OPTIONAL: the region of the sandbox (default: nld2). This is used to fetch the correct API endpoints for the identities. 
     Possible values: "va7","aus5", "can2", "ind2"
 
-The reason to use that extractSandboxArtefacts methods is documented on [Local File Usage](./localfilesusage.md)
+The reason to use that extractSandboxArtifacts methods is documented on [Local File Usage](./localfilesusage.md)
