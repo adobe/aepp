@@ -1,7 +1,7 @@
 from ast import arg
 from matplotlib.pyplot import table
 import aepp
-from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice
+from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation
 import argparse, cmd, shlex, json
 from functools import wraps
 from rich.console import Console
@@ -134,6 +134,42 @@ class ServiceShell(cmd.Cmd):
         else:
             console.print(Panel("(!) You must configure the connection first using the 'config' command.", style="red"))
     
+    @login_required
+    def do_get_sandboxes(self, args:Any) -> None:
+        """List all sandboxes for the current organization"""
+        parser = argparse.ArgumentParser(prog='get_sandboxes', add_help=True)
+        parser.add_argument("-sv", "--save",help="Save sandboxes to CSV file")
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_sandboxes = sandboxes.Sandboxes(config=self.config)
+            sandboxes_list = aepp_sandboxes.getSandboxes()
+            if sandboxes_list:
+                table = Table(title=f"Sandboxes in Org: {self.config.org_id}")
+                table.add_column("Name", style="cyan")
+                table.add_column("Title", style="magenta")
+                table.add_column("Type", style="green")
+                table.add_column("Region", style="yellow")
+                table.add_column("Created", style="medium_violet_red")
+                for sb in sandboxes_list:
+                    table.add_row(
+                        sb.get("name","N/A"),
+                        sb.get("title","N/A"),
+                        sb.get("type","N/A"),
+                        sb.get("region","N/A"),
+                        sb.get("createdDate","N/A"),
+                    )
+                console.print(table)
+                if args.save:
+                    df_sandboxes = pd.DataFrame(sandboxes_list)
+                    df_sandboxes.to_csv(f"sandboxes_{self.config.org_id}.csv", index=False)
+                    console.print(f"Sandboxes exported to sandboxes_{self.config.org_id}.csv", style="green")
+            else:
+                console.print("(!) No sandboxes found.", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
     
     @login_required
     def do_get_schemas(self, args:Any) -> None:
@@ -738,9 +774,77 @@ class ServiceShell(cmd.Cmd):
                     ds.get("name","N/A"),
                     datetime.fromtimestamp(ds.get("created",1000)/1000).isoformat().split('T')[0],
                     str(ds.get("dataIngested",False)),
-                    ds.get("classification",{}).get("dataBehavior","unknown")
+                    ds.get('classification').get('dataBehavior','N/A'),
                 )
             console.print(table)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_datasets_tableName(self, args:Any) -> None:
+        parser = argparse.ArgumentParser(prog='get_datasets', add_help=True)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            table = Table(title=f"Datasets in Sandbox: {self.config.sandbox}")
+            table.add_column("Name", style="white")
+            table.add_column("Table Name", style="cyan",no_wrap=True)
+            table.add_column("Data Type", style="red")
+            for ds in datasets:
+                table.add_row(
+                    ds.get("name","N/A"),
+                    ds.get('tags',{}).get('adobe/pqs/table',["N/A"])[0],
+                    ds.get('classification').get('dataBehavior','N/A'),
+                )
+            console.print(table)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+        
+    @login_required
+    def do_get_observable_schema_json(self,args:Any) -> None:
+        """Get the observable schema for a dataset by name or ID"""
+        parser = argparse.ArgumentParser(prog='get_observable_schema', add_help=True)
+        parser.add_argument("dataset", help="Dataset ID or Dataset Name to retrieve observable schema for",type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            for ds in datasets:
+                if ds.get("name","") == args.dataset or ds.get("id","") == args.dataset:
+                    datasetId = ds.get("id")
+            schema_json = aepp_cat.getDataSetObservableSchema(datasetId=datasetId,appendDatasetInfo=True)
+            myObs = catalog.ObservableSchemaManager(schema_json,config=self.config)
+            data = myObs.to_dict()
+            with open(f"{args.dataset}_observable_schema.json", 'w') as f:
+                json.dump(data, f, indent=4)
+            console.print(f"Saved Observable schema to {args.dataset}_observable_schema.json.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
+    def do_get_observable_schema_csv(self,args:Any) -> None:
+        """Get the observable schema for a dataset by name or ID"""
+        parser = argparse.ArgumentParser(prog='get_observable_schema', add_help=True)
+        parser.add_argument("dataset", help="Dataset ID or Dataset Name to retrieve observable schema for",type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            for ds in datasets:
+                if ds.get("name","") == args.dataset or ds.get("id","") == args.dataset:
+                    datasetId = ds.get("id")
+            schema_json = aepp_cat.getDataSetObservableSchema(datasetId=datasetId,appendDatasetInfo=True)
+            myObs = catalog.ObservableSchemaManager(schema_json,config=self.config)
+            data = myObs.to_dataframe()
+            data.to_csv(f"{args.dataset}_observable_schema.csv", index=False)
+            console.print(f"Saved Observable schema to {args.dataset}_observable_schema.csv.", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -754,23 +858,58 @@ class ServiceShell(cmd.Cmd):
             args = parser.parse_args(shlex.split(args))
             aepp_cat = catalog.Catalog(config=self.config)
             datasets = aepp_cat.getDataSets()
+            aepp_cat.data.infos = aepp_cat.data.infos.sort_values(by=['ups_storageSize','datalake_storageSize'], ascending=False)
             aepp_cat.data.infos.to_csv(f"{aepp_cat.sandbox}_datasets_infos.csv",index=False)
             console.print(f"Datasets infos exported to {aepp_cat.sandbox}_datasets_infos.csv", style="green")
             table = Table(title=f"Datasets in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="white")
             table.add_column("Name", style="white",no_wrap=True)
-            table.add_column("Datalake_rows", style="blue")
-            table.add_column("Datalake_storage", style="blue")
-            table.add_column("UPS_rows", style="magenta")
-            table.add_column("UPS_storage", style="magenta")
+            table.add_column("UPS Rows", style="cyan")
+            table.add_column("UPS Storage Size", style="green")
+            table.add_column("Datalake Rows", style="magenta")
+            table.add_column("Datalake Storage Size", style="yellow")
             for _, ds in aepp_cat.data.infos.iterrows():
                 table.add_row(
                     ds.get("id","N/A"),
                     ds.get("name","N/A"),
+                    str(ds.get("ups_rows","N/A")),
+                    str(ds.get("ups_storageSize","N/A")),
                     str(ds.get("datalake_rows","N/A")),
                     str(ds.get("datalake_storageSize","N/A")),
-                    str(ds.get("ups_rows","N/A")),
-                    str(ds.get("ups_storageSize","N/A"))
+                )
+            console.print(table)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_snapshot_datasets(self,args:Any) -> None:
+        """List all snapshot datasets in the current sandbox"""
+        parser = argparse.ArgumentParser(prog='get_snapshot_datasets', add_help=True)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getProfileSnapshotDatasets(explicitMergePolicy=True)
+            list_ds = []
+            for key, ds in datasets.items():
+                obj = ds
+                obj['id'] = key
+                list_ds.append(obj)
+            df_datasets = pd.DataFrame(list_ds)
+            df_datasets.to_csv(f"{self.config.sandbox}_snapshot_datasets.csv",index=False)
+            console.print(f"Snapshot Datasets exported to {self.config.sandbox}_snapshot_datasets.csv", style="green")
+            table = Table(title=f"Snapshot Datasets in Sandbox: {self.config.sandbox}")
+            table.add_column("ID", style="white")
+            table.add_column("Table Name", style="white")
+            table.add_column("Merge Policy Name", style="yellow")
+            table.add_column("Merge Policy ID", style="green")
+            for ds in list_ds:
+                table.add_row(
+                    ds.get("id","N/A"),
+                    ds.get("tags",{}).get('adobe/pqs/table',["N/A"])[0],
+                    ds.get('mergePolicyName','N/A'),
+                    [el.split(':')[1] for el in ds.get('tags',{}).get('unifiedProfile',[]) if el.startswith('mergePolicyId')][0]
                 )
             console.print(table)
         except Exception as e:
@@ -837,6 +976,37 @@ class ServiceShell(cmd.Cmd):
                     iden.get("name","N/A"),
                     str(iden.get("id","N/A")),
                     iden.get("namespaceType","N/A"),
+                )
+            console.print(table)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_audiences(self, args:Any) -> None:
+        """List all audiences in the current sandbox"""
+        parser = argparse.ArgumentParser(prog='get_audiences', add_help=True)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_audience = segmentation.Segmentation(config=self.config)
+            audiences = aepp_audience.getAudiences()
+            df_audiences = pd.DataFrame(audiences)
+            df_audiences.to_csv(f"{self.config.sandbox}_audiences.csv",index=False)
+            console.print(f"Audiences exported to {self.config.sandbox}_audiences.csv", style="green")
+            table = Table(title=f"Audiences in Sandbox: {self.config.sandbox}")
+            table.add_column("ID", style="cyan")
+            table.add_column("Name", style="magenta")
+            table.add_column("Evaluation", style="yellow")
+            table.add_column("Total Profiles", style="green")
+            table.add_column("Evaluation Date", style="white")
+            for aud in audiences:
+                table.add_row(
+                    aud.get("id","N/A"),
+                    aud.get("name","N/A"),
+                    '[red3]Batch[/red3]' if aud.get("evaluationInfo",{}).get("batch",{}).get('enabled') else '[chartreuse1]Streaming[/chartreuse1]' if aud.get("evaluationInfo",{}).get("continuous",{}).get('enabled') else '[blue_violet]Edge[/blue_violet]' if aud.get("evaluationInfo",{}).get("synchronous",{}).get('enabled') else 'N/A',
+                    str(aud.get('metrics',{}).get('data',{}).get('totalProfiles','N/A')),
+                    datetime.fromtimestamp(aud.get('metrics',{}).get('updateEpoch',0)).isoformat(),
                 )
             console.print(table)
         except Exception as e:

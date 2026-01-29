@@ -11,7 +11,7 @@ This element is also into consideration for building a continuous integration pi
   - [Local Storage Requirements](#local-storage-requirements)
     - [Config File](#config-file)
   - [Extracting the artifacts](#extracting-the-artifacts)
-  - [Setting up your own extractor](#setting-up-your-own-extractor)
+  - [Setting up your own extractor \[WIP\]](#setting-up-your-own-extractor-wip)
     - [Behavior schema](#behavior-schema)
     - [Class schema](#class-schema)
     - [Schema schema](#schema-schema)
@@ -42,7 +42,9 @@ sandbox_folder\
     \global\ for OOTB data type
   \descriptor\
   \identity\
-  \dataset
+  \dataset\
+  \mergePolicy\
+  \audience
 
 
 You could technically mixed different sandbox in one folder and the elements will be just appended to folder as their type is definde (schema in schema), however, it is not a best practice approach as sandbox environment should be kept different.
@@ -59,8 +61,8 @@ Current config setup:
 ```JSON
 {
   "imsOrgId":"your IMS Org ID",
-  "tenantId":"your tenant ID starting with _"
-
+  "tenantId":"your tenant ID starting with _",
+  "sandbox":"your sandbox name used for extraction",
 }
 ```
 
@@ -86,12 +88,17 @@ prod = aepp.importConfigFile('myconfig.json',sandbox='prod',connectInstance=True
 aepp.extractSandboxArtifacts(prod,localFolder='prodFolder',region='va7')
 ```
 
-## Setting up your own extractor
+## Setting up your own extractor [WIP]
+
+**NOTE**: This section is still a work in progress and will evolve in the future.\
+Please use the extractArticfacts method for now to extract the different artifacts.
 
 It may be that you have your own pipeline to work on the extraction of the artifact from AEP.\
 If that is the case, you can refer to the different schema definition of the artifacts needed for the synchronizer to work.
 
 The schema definition provides the required fields and the format that you need to ensure having for the different tools define below to work.
+
+
 
 ### Behavior schema
 
@@ -128,6 +135,8 @@ The descriptors schema needed for the resolution of dependency are defined here:
 
 The local folder setup can be used in the following components of `aepp`:
 
+**Note**: The localFolder arguments can take more than one folder, it will search in the order of the folders provided for the artifacts.
+
 ### SchemaManager
 
 In SchemaManager, you can use the local file folder in this way: 
@@ -137,6 +146,10 @@ import aepp
 from aepp import schemamanager
 
 mySchema = schemamanager.SchemaManager('my-schema-id',localFolder='prodFolder')
+
+## or 
+
+mySchema = schemamanager.SchemaManager('my-schema-id',localFolder=['prodFolder','commonArtifactsFolder'])
 
 ```
 
@@ -149,6 +162,9 @@ import aepp
 from aepp import fieldgroupmanager
 
 myfieldgroup = fieldgroupmanager.FieldGroupManager('my-fieldgroup-id',localFolder='prodFolder')
+
+## or
+myfieldgroup = fieldgroupmanager.FieldGroupManager('my-fieldgroup-id',localFolder=['prodFolder','commonArtifactsFolder'])
 
 ```
 
@@ -166,7 +182,7 @@ myfieldgroup = daatatypemanager.DataTypeManager('my-data-type-id',localFolder='p
 
 ### Synchronizer
 
-In the synchronizer, you can also pass the folder that contains your artifact.\
+In the synchronizer, you can also pass the folders that contains your artifacts.\
 Following the structure built from the `extractSandboxArtifacts` method, the dependencies and the definition of the elements can be found.
 In order to use the local file setup, you cna do the following setup once you have ran the `extractSandboxArtifacts` method.
 
@@ -177,6 +193,8 @@ from aepp import synchronizer
 configSetup = aepp.importConfigFile('myconfig.json',sandbox='target-sandbox',connectInstance=True)
 
 synchronizor = synchronizer.Synchronizer(targets=['target-sandbox1'],config=configSetup,localFolder='my-folder')
+## or 
+synchronizor = synchronizer.Synchronizer(targets=['target-sandbox1'],config=configSetup,localFolder=['my-folder','commonArtifactsFolder'])
 
 synchronizor.syncComponent('my-schema',componentType='schema',verbose=True)
 

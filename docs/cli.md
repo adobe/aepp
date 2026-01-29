@@ -180,6 +180,23 @@ List all datasets in the current sandbox (Basic info).
 ### get_datasets_infos
 List all datasets with detailed storage and row count statistics.
 
+### do_get_datasets_tableName
+Get the table names associated with dataset names and ID.\
+
+
+### get_observable_schema_json
+Retrieve the observable schema JSON for a specific dataset.\
+Arguments:
+* `dataset` : The Dataset ID or Name.
+
+### get_observable_schema_csv
+Retrieve the observable schema CSV for a specific dataset.\
+Arguments:
+* `dataset` : The Dataset ID or Name.
+
+### _get_snapshot_datasets
+Get the list of snapshot datasets in the current sandbox.\
+
 ### createDataset
 Create a new dataset.\
 Arguments:
@@ -190,6 +207,11 @@ Arguments:
 ### enable_dataset_for_ups
 Enable a specific dataset for the Unified Profile Service. Arguments:
 dataset : The Dataset ID or Name.
+
+## Audience Methods
+
+### get_audiences
+List all audiences in the current sandbox.
 
 ## Flow Service
 
@@ -276,6 +298,9 @@ Arguments:
 
 
 ## Other methods
+
+### get_sandboxes
+List all sandboxes available in the current organization.
 
 ### exit
 Exit the CLI.

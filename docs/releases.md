@@ -5,7 +5,10 @@ This page list all of the changes that came during the different release of the 
 ## version 0.5.2
 * adding support for multiple values for localFolder in `SchemaManager`, `FieldGroupManager`, `DataTypeManager` and `ClassManager`
 * adding support for multiple values for localFolder in `Synchronizer` class
-* Fixing incorrect logging with CLI when `None` values were passed. 
+* Fixing incorrect logging with CLI when `None` values were passed.\
+  Patch:
+* adding methods in CLI (audiences, sandboxes, snapshots, observable schemas)
+* update documentation for local file usage
 
 ## version 0.5.1
 * changing the method name from `extractSandboxArtefacts` to `extractSandboxArtifacts` to follow the American English spelling.
