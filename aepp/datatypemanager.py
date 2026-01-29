@@ -36,7 +36,7 @@ class DataTypeManager:
                 schemaAPI:'Schema'=None,
                 config: Union[dict,ConnectObject] = aepp.config.config_object,
                 description:str="",
-                localFolder:str=None,
+                localFolder:str|list|None=None,
                 sandbox:str=None,
                 **kwargs
                 )->None:
@@ -65,10 +65,13 @@ class DataTypeManager:
         elif config is not None and localFolder is None:
             self.schemaAPI = Schema(config=config)
         elif localFolder is not None:
-            self.localfolder = Path(localFolder)
-            self.datatypeFolder = self.localfolder / 'datatype'
-            self.datatypeGlobalFolder = self.datatypeFolder / 'global'
-            if self.localfolder.exists() is False:
+            if isinstance(localFolder, str):
+                self.localfolder = [Path(localFolder)]
+            elif isinstance(localFolder, list):
+                self.localfolder = [Path(folder) for folder in localFolder]
+            self.datatypeFolder = [folder / 'datatype' for folder in self.localfolder]
+            self.datatypeGlobalFolder = [folder / 'global' for folder in self.datatypeFolder]
+            if any([folder.exists() is False for folder in self.localfolder]):
                 raise Exception(f"The local folder {self.localfolder} does not exist. Please create it and extract your sandbox before using it.")
             self.schemaAPI = None
         if self.schemaAPI is not None:
@@ -99,20 +102,32 @@ class DataTypeManager:
                     self.dataType = self.schemaAPI.getDataType(dataType['$id'],full=False)
                     self.EDITABLE = True
                 elif self.localfolder is not None:
-                    for dataTypeFile in self.datatypeFolder.glob(f"*.json"):
-                        tmp_def = json.load(FileIO(dataTypeFile))
-                        if tmp_def.get('$id') == dataType.get('$id') or tmp_def.get('meta:altId') == dataType.get('meta:altId'):
-                            self.dataType = tmp_def
+                    found = False
+                    for folder in self.datatypeFolder:
+                        for dataTypeFile in folder.glob(f"*.json"):
+                            tmp_def = json.load(FileIO(dataTypeFile))
+                            if tmp_def.get('$id') == dataType.get('$id') or tmp_def.get('meta:altId') == dataType.get('meta:altId'):
+                                self.dataType = tmp_def
+                                found = True
+                                break
+                        if found:
+                            break
                     self.EDITABLE = False
             else:
                 if self.schemaAPI is not None:
                     self.dataType = self.schemaAPI.getDataType(dataType['$id'],full=True)
                     self.EDITABLE = True
                 elif self.localfolder is not None:
-                    for dataTypeFile in self.datatypeGlobalFolder.glob("*.json"):
-                        tmp_def = json.load(FileIO(dataTypeFile))
-                        if tmp_def.get('$id') == dataType.get('$id') or tmp_def.get('meta:altId') == dataType.get('meta:altId') or tmp_def.get('title') == dataType.get('title'):   
-                            self.dataType = tmp_def
+                    found = False
+                    for folder in self.datatypeGlobalFolder:
+                        for dataTypeFile in folder.glob("*.json"):
+                            tmp_def = json.load(FileIO(dataTypeFile))
+                            if tmp_def.get('$id') == dataType.get('$id') or tmp_def.get('meta:altId') == dataType.get('meta:altId') or tmp_def.get('title') == dataType.get('title'):   
+                                self.dataType = tmp_def
+                                found = True
+                                break
+                        if found:
+                            break
                     self.EDITABLE = False
         elif type(dataType) == str:
             if self.tenantId[1:] in dataType:
@@ -122,10 +137,16 @@ class DataTypeManager:
                         raise ValueError(f"Cannot find the data type with id {dataType} in the schema API.")
                     self.EDITABLE = True
                 elif self.localfolder is not None:
-                    for dataTypeFile in self.datatypeFolder.glob("*.json"):
-                        tmp_def = json.load(FileIO(dataTypeFile))
-                        if tmp_def.get('$id') == dataType or tmp_def.get('meta:altId') == dataType or tmp_def.get('title') == dataType:
-                            self.dataType = tmp_def
+                    found = False
+                    for folder in self.datatypeFolder:
+                        for dataTypeFile in folder.glob("*.json"):
+                            tmp_def = json.load(FileIO(dataTypeFile))
+                            if tmp_def.get('$id') == dataType or tmp_def.get('meta:altId') == dataType or tmp_def.get('title') == dataType:
+                                self.dataType = tmp_def
+                                found = True
+                                break
+                        if found:
+                            break
                     self.EDITABLE = False
                 else:
                     raise Exception("You try to retrieve the datatype definition from the id, but no API or localFolder has been passed as a parameter.")
@@ -136,10 +157,16 @@ class DataTypeManager:
                         raise ValueError(f"Cannot find the data type with id {dataType} in the schema API.")
                     self.EDITABLE = True
                 elif self.localfolder is not None:
-                    for dataTypeFile in self.datatypeGlobalFolder.glob("*.json"):
-                        tmp_def = json.load(FileIO(dataTypeFile))
-                        if tmp_def.get('$id') == dataType or tmp_def.get('meta:altId') == dataType or tmp_def.get('title') == dataType:
-                            self.dataType = tmp_def
+                    found = False
+                    for folder in self.datatypeGlobalFolder:
+                        for dataTypeFile in folder.glob("*.json"):
+                            tmp_def = json.load(FileIO(dataTypeFile))
+                            if tmp_def.get('$id') == dataType or tmp_def.get('meta:altId') == dataType or tmp_def.get('title') == dataType:
+                                self.dataType = tmp_def
+                                found = True
+                                break
+                        if found:
+                            break
                     self.EDITABLE = False
                 else:
                     raise Exception("You try to retrieve the datatype definition from the id, but no API or localFolder has been passed as a parameter.")
@@ -181,12 +208,18 @@ class DataTypeManager:
                     self.dataTypeManagers[dt_manager.title] = dt_manager
             elif self.localfolder is not None:
                 for dt in dataTypes: ## today only searching custom data types in local folder
-                    for dataTypeFile in self.datatypeFolder.glob("*.json"):
-                        tmp_def = json.load(FileIO(dataTypeFile))
-                        if tmp_def.get('$id') == dt or tmp_def.get('meta:altId') == dt or tmp_def.get('title') == dt:
-                            dt_manager = DataTypeManager(dataType=tmp_def,localFolder=self.localfolder,tenantId=self.tenantId,sandbox=self.sandbox)
-                            self.dataTypes[dt_manager.id] = dt_manager.title
-                            self.dataTypeManagers[dt_manager.title] = dt_manager
+                    found = False
+                    for folder in self.datatypeFolder:
+                        for dataTypeFile in folder.glob("*.json"):
+                            tmp_def = json.load(FileIO(dataTypeFile))
+                            if tmp_def.get('$id') == dt or tmp_def.get('meta:altId') == dt or tmp_def.get('title') == dt:
+                                dt_manager = DataTypeManager(dataType=tmp_def,localFolder=self.localfolder,tenantId=self.tenantId,sandbox=self.sandbox)
+                                self.dataTypes[dt_manager.id] = dt_manager.title
+                                self.dataTypeManagers[dt_manager.title] = dt_manager
+                                found = True
+                                break
+                        if found:
+                            break
         if title is not None:
             self.dataType['title'] = title
             self.title = title

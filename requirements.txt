@@ -6,3 +6,4 @@ deprecation
 datamodel-code-generator
 pathlib
 rich
+matplotlib

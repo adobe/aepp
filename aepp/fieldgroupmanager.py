@@ -39,7 +39,7 @@ class FieldGroupManager:
                 config: Union[dict,ConnectObject] = aepp.config.config_object,
                 description:str="powered by aepp",
                 full:bool=None,
-                localFolder:str=None,
+                localFolder:str | list | None=None,
                 sandbox:str=None,
                 **kwargs
                 )->None:
@@ -71,13 +71,16 @@ class FieldGroupManager:
         elif config is not None and localFolder is None:
             self.schemaAPI = Schema(config=config)
         elif localFolder is not None:
-            self.localfolder = Path(localFolder)
-            self.datatypeFolder = self.localfolder / 'datatype'
-            self.datatypeGlobalFolder = self.datatypeFolder / 'global'
-            self.fieldgroupFolder = self.localfolder / 'fieldgroup'
-            self.fieldgroupGlobalFolder = self.fieldgroupFolder / 'global'
-            self.descriptorFolder = self.localfolder / 'descriptor'
-            if self.localfolder.exists() is False:
+            if isinstance(localFolder, str):
+                self.localfolder = [Path(localFolder)]
+            elif isinstance(localFolder, list):
+                self.localfolder = [Path(folder) for folder in localFolder]
+            self.datatypeFolder = [folder / 'datatype' for folder in self.localfolder]
+            self.datatypeGlobalFolder = [folder / 'global' for folder in self.datatypeFolder]
+            self.fieldgroupFolder = [folder / 'fieldgroup' for folder in self.localfolder]
+            self.fieldgroupGlobalFolder = [folder / 'global' for folder in self.fieldgroupFolder]
+            self.descriptorFolder = [folder / 'descriptor' for folder in self.localfolder]
+            if any([folder.exists() is False for folder in self.localfolder]):
                 raise Exception(f"The local folder {self.localfolder} does not exist. Please create it and extract your sandbox before using it.")
             self.schemaAPI = None
         if self.schemaAPI is not None:
@@ -95,9 +98,11 @@ class FieldGroupManager:
             if fieldGroup.get('meta:tenantNamespace') is not None:
                 self.tenantId = fieldGroup.get('meta:tenantNamespace')
         elif self.localfolder is not None:
-            config_json = json.load(FileIO(self.localfolder / 'config.json'))
-            if config_json.get('tenantId',None) is not None:
-                self.tenantId = config_json.get('tenantId')
+            for folder in self.localfolder:
+                config_json = json.load(FileIO(folder / 'config.json'))
+                if config_json.get('tenantId',None) is not None:
+                    self.tenantId = config_json.get('tenantId')
+                    break
         else:### Should not be a problem as the element without a tenantId are not supposed to change
             self.tenantId = "  "
         if fieldGroup is not None:
@@ -126,28 +131,40 @@ class FieldGroupManager:
                                 self.fieldGroup = tmp_def
                                 self.EDITABLE = False
                         elif self.localfolder is not None:
-                            for json_file in self.fieldgroupFolder.glob('*.json'):
-                                tmp_def = json.load(FileIO(json_file))
-                                if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
-                                    self.fieldGroup = tmp_def
-                                    if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
-                                        if '/datatypes/' in str(self.fieldGroup):
-                                            dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                            dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
-                                            for dt in dataTypes:
-                                                dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                                self.dataTypes[dt_manager.id] = dt_manager.title
-                                                self.dataTypeManagers[dt_manager.title] = dt_manager
-                                    else: ## OOTB field group
-                                        if 'properties' in self.fieldGroup.keys():
-                                            self.fieldGroup['definitions'] = self.fieldGroup['properties']
-                            if self.fieldGroup == {}:
-                                for json_file in self.fieldgroupGlobalFolder.glob('*.json'):
+                            found = False
+                            for folder in self.fieldgroupFolder:
+                                for json_file in folder.glob('*.json'):
                                     tmp_def = json.load(FileIO(json_file))
                                     if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
                                         self.fieldGroup = tmp_def
-                                        if 'properties' in self.fieldGroup.keys():
-                                            self.fieldGroup['definitions'] = self.fieldGroup['properties']
+                                        if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
+                                            if '/datatypes/' in str(self.fieldGroup):
+                                                dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
+                                                dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                                                for dt in dataTypes:
+                                                    dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
+                                                    self.dataTypes[dt_manager.id] = dt_manager.title
+                                                    self.dataTypeManagers[dt_manager.title] = dt_manager
+                                        else: ## OOTB field group
+                                            if 'properties' in self.fieldGroup.keys():
+                                                self.fieldGroup['definitions'] = self.fieldGroup['properties']
+                                        found = True
+                                        break
+                                if found:
+                                    break
+                            if self.fieldGroup == {}:
+                                found = False
+                                for folder in self.fieldgroupGlobalFolder:
+                                    for json_file in folder.glob('*.json'):
+                                        tmp_def = json.load(FileIO(json_file))
+                                        if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
+                                            self.fieldGroup = tmp_def
+                                            if 'properties' in self.fieldGroup.keys():
+                                                self.fieldGroup['definitions'] = self.fieldGroup['properties']
+                                            found = True
+                                            break
+                                    if found:
+                                        break
                             self.EDITABLE = False
                     else: ## if definitions key not present
                         if 'properties' in self.fieldGroup.keys():
@@ -166,19 +183,24 @@ class FieldGroupManager:
                                     self.fieldGroup = self.schemaAPI.getFieldGroup(self.fieldGroup['$id'],full=True)
                                 self.EDITABLE = True
                         elif self.localfolder is not None: ## looking into local folder
-                            for json_file in self.fieldgroupFolder.glob('*.json'): ## only custom Field groups: TO DO check for OOTB FG without definition
-                                tmp_def = json.load(FileIO(json_file))
-                                if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
-                                    self.fieldGroup = tmp_def
-                                    if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
-                                        if '/datatypes/' in str(self.fieldGroup):
-                                            dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                            dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
-                                            for dt in dataTypes:
-                                                dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                                self.dataTypes[dt_manager.id] = dt_manager.title
-                                                self.dataTypeManagers[dt_manager.title] = dt_manager
-                                    
+                            found = False
+                            for folder in self.fieldgroupFolder:
+                                for json_file in folder.glob('*.json'): ## only custom Field groups: TO DO check for OOTB FG without definition
+                                    tmp_def = json.load(FileIO(json_file))
+                                    if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
+                                        self.fieldGroup = tmp_def
+                                        if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
+                                            if '/datatypes/' in str(self.fieldGroup):
+                                                dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
+                                                dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                                                for dt in dataTypes:
+                                                    dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
+                                                    self.dataTypes[dt_manager.id] = dt_manager.title
+                                                    self.dataTypeManagers[dt_manager.title] = dt_manager
+                                        found = True
+                                        break
+                                if found:
+                                    break
                         else:
                             raise ValueError("The field group definition provided does not contains the 'definitions' key. Please check the field group.")
                 else:
@@ -208,26 +230,38 @@ class FieldGroupManager:
                         self.fieldGroup = tmp_def
                         self.EDITABLE = False
                 elif self.localfolder is not None:
-                    for json_file in self.fieldgroupFolder.glob('*.json'):
-                        tmp_def = json.load(FileIO(json_file))
-                        if tmp_def.get('$id') == fieldGroup or tmp_def.get('meta:altId') == fieldGroup or tmp_def.get('title') == fieldGroup:
-                            self.fieldGroup = tmp_def
-                            if tmp_def.get('meta:tenantNamespace',None) is not None:
-                                self.tenantId = tmp_def.get('meta:tenantNamespace')
-                                if '/datatypes/' in str(self.fieldGroup):
-                                    dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                    dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup.get('definitions')))
-                                    for file in self.datatypeFolder.glob('*.json'):
-                                        tmp_def = json.load(FileIO(file))
-                                        if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
-                                            dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                            self.dataTypes[dt_manager.id] = dt_manager.title
-                                            self.dataTypeManagers[dt_manager.title] = dt_manager
-                    if self.fieldGroup == {}: ## looking into the global folder
-                        for json_file in self.fieldgroupGlobalFolder.glob('*.json'):
+                    found = False
+                    for folder in self.fieldgroupFolder:
+                        for json_file in folder.glob('*.json'):
                             tmp_def = json.load(FileIO(json_file))
                             if tmp_def.get('$id') == fieldGroup or tmp_def.get('meta:altId') == fieldGroup or tmp_def.get('title') == fieldGroup:
-                                self.fieldGroup = tmp_def              
+                                self.fieldGroup = tmp_def
+                                if tmp_def.get('meta:tenantNamespace',None) is not None:
+                                    self.tenantId = tmp_def.get('meta:tenantNamespace')
+                                    if '/datatypes/' in str(self.fieldGroup):
+                                        dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
+                                        dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup.get('definitions')))
+                                        for file in self.datatypeFolder.glob('*.json'):
+                                            tmp_def = json.load(FileIO(file))
+                                            if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
+                                                dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
+                                                self.dataTypes[dt_manager.id] = dt_manager.title
+                                                self.dataTypeManagers[dt_manager.title] = dt_manager
+                                found = True
+                                break
+                        if found:
+                            break
+                        if self.fieldGroup == {}: ## looking into the global folder
+                            found = False
+                            for folder in self.fieldgroupGlobalFolder:
+                                for json_file in folder.glob('*.json'):
+                                    tmp_def = json.load(FileIO(json_file))
+                                    if tmp_def.get('$id') == fieldGroup or tmp_def.get('meta:altId') == fieldGroup or tmp_def.get('title') == fieldGroup:
+                                        self.fieldGroup = tmp_def            
+                                        found = True
+                                        break
+                                if found:
+                                    break  
             else:
                 raise ValueError("the element pass is not a field group definition")
         else:
@@ -1689,10 +1723,11 @@ class FieldGroupManager:
             res = self.schemaAPI.getDescriptors(prop=f"xdm:sourceSchema=={self.id}")
         elif self.localfolder is not None:
             res = []
-            for json_file in self.descriptorFolder.glob('*.json'):
-                tmp_def = json.load(FileIO(json_file))
-                if tmp_def.get('xdm:sourceSchema') == self.id:
-                    res.append(tmp_def)
+            for folder in self.descriptorFolder:
+                for json_file in folder.glob('*.json'):
+                    tmp_def = json.load(FileIO(json_file))
+                    if tmp_def.get('xdm:sourceSchema') == self.id:
+                        res.append(tmp_def)
         else:
             raise Exception("Require a schema API connection or local folder. Pass the instance of a Schema class or import a configuration file.")
         return res

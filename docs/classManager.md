@@ -22,6 +22,7 @@ The `ClassManager` is a class that can be instantiated with different parameters
 * schemaAPI : OPTIONAL : To connect to your sandbox, you can pass the instance of the `Schema` class you want.
 * config : OPTIONAL : Recommended to pass a [`ConnectObject` instance](./getting-started.md#the-connectinstance-parameter) if you did not pass the schemaAPI. That would ensure the usage of the correct sandbox.
 * description : OPTIONAL : If you want to add a description to your class
+* localFolder : OPTIONAL : If you want to use the local folders as your base environment. Default is None. Can be string or list of string.
 
 In the end these different parameters offer you different options to use the Field Group Manager.
 

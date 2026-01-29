@@ -20,7 +20,7 @@ from .configs import ConnectObject
 
 class Synchronizer:
     ## TO DO -> Add support for local environment
-    def __init__(self,targets:list=None,config:'ConnectObject'=None,baseSandbox:str=None,region:str='nld2',localFolder:str=None):
+    def __init__(self,targets:list=None,config:'ConnectObject'=None,baseSandbox:str=None,region:str='nld2',localFolder:str|list|None=None):
         """
         Setup the synchronizor object with the base sandbox and target sandbox.
         Arguments:
@@ -56,24 +56,30 @@ class Synchronizer:
             self.baseSandbox = baseSandbox
         elif localFolder is not None:
             self.baseConfig = None
-            self.localfolder = Path(localFolder)
-            self.classFolder = self.localfolder / 'class'
-            self.schemaFolder = self.localfolder / 'schema'
-            self.fieldgroupFolder = self.localfolder / 'fieldgroup'
-            self.fieldgroupGlobalFolder = self.fieldgroupFolder / 'global'
-            self.datatypeFolder = self.localfolder / 'datatype'
-            self.datatypeGlobalFolder = self.datatypeFolder / 'global'
-            self.identityFolder = self.localfolder / 'identity'
-            self.datasetFolder = self.localfolder / 'dataset'
-            self.descriptorFolder = self.localfolder / 'descriptor'
-            self.mergePolicyFolder = self.localfolder / 'mergepolicy'
-            self.audienceFolder = self.localfolder / 'audience'
+            if isinstance(localFolder, str):
+                self.localfolder = [Path(localFolder)]
+            else:
+                self.localfolder = [Path(folder) for folder in localFolder]
+            self.classFolder = [folder / 'class' for folder in self.localfolder]
+            self.schemaFolder = [folder / 'schema' for folder in self.localfolder]
+            self.fieldgroupFolder = [folder / 'fieldgroup' for folder in self.localfolder]
+            self.fieldgroupGlobalFolder = [folder / 'global' for folder in self.fieldgroupFolder]
+            self.datatypeFolder = [folder / 'datatype' for folder in self.localfolder]
+            self.datatypeGlobalFolder = [folder / 'global' for folder in self.datatypeFolder]
+            self.identityFolder = [folder / 'identity' for folder in self.localfolder]
+            self.datasetFolder = [folder / 'dataset' for folder in self.localfolder]
+            self.descriptorFolder = [folder / 'descriptor' for folder in self.localfolder]
+            self.mergePolicyFolder = [folder / 'mergepolicy' for folder in self.localfolder]
+            self.audienceFolder = [folder / 'audience' for folder in self.localfolder]
             if baseSandbox is not None:
                 self.baseSandbox = baseSandbox
             else:
-                with open(self.localfolder / 'config.json','r') as f:
-                    local_config = json.load(f)
-                    self.baseSandbox = local_config.get('sandbox',None)
+                for folder in self.localfolder:
+                    with open(folder / 'config.json','r') as f:
+                        local_config = json.load(f)
+                        if 'baseSandbox' in local_config.keys():
+                            self.baseSandbox = local_config['baseSandbox']
+                            break
         self.dict_targetsConfig = {target: aepp.configure(org_id=config_object['org_id'],client_id=config_object['client_id'],scopes=config_object['scopes'],secret=config_object['secret'],sandbox=target,connectInstance=True) for target in targets}
         self.region = region
         self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}}  
@@ -163,11 +169,12 @@ class Synchronizer:
                         if component in base_schema.data.schemas_altId.keys():## replacing name with altId
                             component = base_schema.data.schemas_altId[component]
                     if self.localfolder is not None:
-                        for file in self.schemaFolder.glob('*.json'):
-                            sc_file = json.load(FileIO(file))
-                            if sc_file['title'] == component or sc_file['$id'] == component or sc_file['meta:altId'] == component:
-                                component = sc_file
-                                break
+                        for folder in self.schemaFolder:
+                            for file in folder.glob('*.json'):
+                                sc_file = json.load(FileIO(file))
+                                if sc_file['title'] == component or sc_file['$id'] == component or sc_file['meta:altId'] == component:
+                                    component = sc_file
+                                    break
                     component = schemamanager.SchemaManager(component,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                 elif componentType == 'fieldgroup':
                     if base_schema is not None:
@@ -175,11 +182,12 @@ class Synchronizer:
                         if component in base_schema.data.fieldGroups_altId.keys():## replacing name with altId
                             component = base_schema.data.fieldGroups_altId[component]
                     if self.localfolder is not None:
-                        for file in self.fieldgroupFolder.glob('*.json'):
-                            fg_file = json.load(FileIO(file))
-                            if fg_file['title'] == component or fg_file['$id'] == component or fg_file['meta:altId'] == component:
-                                component = fg_file
-                                break
+                        for folder in self.fieldgroupFolder:
+                            for file in folder.glob('*.json'):
+                                fg_file = json.load(FileIO(file))
+                                if fg_file['title'] == component or fg_file['$id'] == component or fg_file['meta:altId'] == component:
+                                    component = fg_file
+                                    break
                     component = fieldgroupmanager.FieldGroupManager(component,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                 elif componentType == 'datatypes':
                     datatypes = base_schema.getDataTypes()
@@ -187,11 +195,12 @@ class Synchronizer:
                         if component in base_schema.data.dataTypes_altId.keys():## replacing name with altId
                             component = base_schema.data.dataTypes_altId[component]
                     if self.localfolder is not None:
-                        for file in self.datatypeFolder.glob('*.json'):
-                            dt_file = json.load(FileIO(file))
-                            if dt_file['title'] == component or dt_file['$id'] == component or dt_file['meta:altId'] == component:
-                                component = dt_file
-                                break
+                        for folder in self.datatypeFolder:
+                            for file in folder.glob('*.json'):
+                                dt_file = json.load(FileIO(file))
+                                if dt_file['title'] == component or dt_file['$id'] == component or dt_file['meta:altId'] == component:
+                                    component = dt_file
+                                    break
                     component = datatypemanager.DataTypeManager(component,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                 elif componentType == 'class':
                     classes = base_schema.getClasses()
@@ -204,9 +213,10 @@ class Synchronizer:
                     identities:list = id_base.getIdentities()
                 elif self.localfolder is not None:
                     identities = []
-                    for file in self.identityFolder.glob('*.json'):
-                        id_file = json.load(FileIO(file))
-                        identities.append(id_file)
+                    for folder in self.identityFolder:
+                        for file in folder.glob('*.json'):
+                            id_file = json.load(FileIO(file))
+                            identities.append(id_file)
                 if component in [el['code'] for el in identities]:
                     component = [el for el in identities if el['code'] == component][0]
                 elif component in [el['name'] for el in identities]:
@@ -221,11 +231,12 @@ class Synchronizer:
                         component = cat_base.data.ids[component]
                     component = cat_base.getDataSet(component)
                 elif self.localfolder is not None:
-                    for file in self.datasetFolder.glob('*.json'):
-                        ds_file = json.load(FileIO(file))
-                        if ds_file['id'] == component or ds_file['name'] == component:
-                            component = ds_file
-                            break
+                    for folder in self.datasetFolder:
+                        for file in folder.glob('*.json'):
+                            ds_file = json.load(FileIO(file))
+                            if ds_file['id'] == component or ds_file['name'] == component:
+                                component = ds_file
+                                break
                 if len(component) == 1: ## if the component is the catalog API response {'key': {dataset definition}}
                     component = component[list(component.keys())[0]] ## accessing the real dataset definition
             elif componentType == "mergepolicy":
@@ -235,11 +246,12 @@ class Synchronizer:
                     if component in [el.get('id','') for el in base_mergePolicies] or component in [el.get('name','') for el in base_mergePolicies]:
                         component = [el for el in base_mergePolicies if el.get('id','') == component or el.get('name','') == component][0]
                 elif self.localfolder is not None:
-                    for file in self.mergePolicyFolder.glob('*.json'):
-                        mp_file = json.load(FileIO(file))
-                        if mp_file.get('id','') == component or mp_file.get('name','') == component:
-                            component = mp_file
-                            break
+                    for folder in self.mergePolicyFolder:
+                        for file in folder.glob('*.json'):
+                            mp_file = json.load(FileIO(file))
+                            if mp_file.get('id','') == component or mp_file.get('name','') == component:
+                                component = mp_file
+                                break
             elif componentType == 'audience':
                 if self.baseConfig is not None:
                     seg_base = segmentation.Segmentation(config=self.baseConfig)
@@ -247,11 +259,12 @@ class Synchronizer:
                     if component in [el.get('id','') for el in base_audiences] or component in [el.get('name','') for el in base_audiences]:
                         component = [el for el in base_audiences if el.get('id','') == component or el.get('name','') == component][0]
                 elif self.localfolder is not None:
-                    for file in self.audienceFolder.glob('*.json'):
-                        au_file = json.load(FileIO(file))
-                        if au_file.get('id','') == component or au_file.get('name','') == component:
-                            component = au_file
-                            break
+                    for folder in self.audienceFolder:
+                        for file in folder.glob('*.json'):
+                            au_file = json.load(FileIO(file))
+                            if au_file.get('id','') == component or au_file.get('name','') == component:
+                                component = au_file
+                                break
         elif type(component) == dict:
             if 'meta:resourceType' in component.keys():
                 componentType = component['meta:resourceType']
@@ -708,8 +721,9 @@ class Synchronizer:
             myschemas = baseSchemaAPI.getSchemas() ## to populate the data object
         elif self.localfolder is not None:
             myschemas = []
-            for json_file in self.schemaFolder.glob('*.json'):
-                myschemas.append(json.load(FileIO(json_file)))
+            for folder in self.schemaFolder:
+                for json_file in folder.glob('*.json'):
+                    myschemas.append(json.load(FileIO(json_file)))
         target_descriptors = targetSchemaManager.getDescriptors()
         list_descriptors = []
         for baseDescriptor in base_descriptors:
@@ -761,10 +775,15 @@ class Synchronizer:
                         if self.baseConfig is not None and self.localfolder is None:
                             base_targetSchemaManager = schemamanager.SchemaManager(base_targetSchemaId,config=self.baseConfig)
                         elif self.localfolder is not None:
-                            for file in self.schemaFolder.glob('*.json'):
-                                base_targetSchema = json.load(FileIO(file))
-                                if base_targetSchema['$id'] == base_targetSchemaId:
-                                    base_targetSchemaManager = schemamanager.SchemaManager(base_targetSchema,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
+                            found = False
+                            for folder in self.schemaFolder:
+                                for file in folder.glob('*.json'):
+                                    base_targetSchema = json.load(FileIO(file))
+                                    if base_targetSchema['$id'] == base_targetSchemaId:
+                                        base_targetSchemaManager = schemamanager.SchemaManager(base_targetSchema,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
+                                        found = True
+                                        break
+                                if found:
                                     break
                         self.__syncSchema__(base_targetSchemaManager,verbose=verbose)
                         target_targetSchemaId = self.dict_targetComponents[targetSchemaManager.sandbox]['schema'][base_targetSchemaName].id
@@ -903,8 +922,9 @@ class Synchronizer:
             base_dataset_related_schemaName = [schemaName for schemaName,schemaId in baseSchemaAPI.data.schemas_id.items() if schemaId == base_dataset_related_schemaId][0]
         elif self.localfolder is not None:
             base_schemas = []
-            for json_file in self.schemaFolder.glob('*.json'):
-                base_schemas.append(json.load(FileIO(json_file)))
+            for folder in self.schemaFolder:
+                for json_file in folder.glob('*.json'):
+                    base_schemas.append(json.load(FileIO(json_file)))
             base_dataset_related_schemaName = [sc['title'] for sc in base_schemas if sc['$id'] == base_dataset_related_schemaId][0]
         for target in self.dict_targetsConfig.keys():
             targetCatalog = catalog.Catalog(config=self.dict_targetsConfig[target])

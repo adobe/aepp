@@ -25,6 +25,7 @@ The SchemaManager is a class that can be instantiated with different parameters:
   * `https://ns.adobe.com/xdm/context/experienceevent` Experience Event class
 * schemaAPI : OPTIONAL : To connect to your sandbox, you can pass the instance of the `Schema` class you want.
 * config : OPTIONAL : Recommended to pass a [`ConnectObject` instance](./getting-started.md#the-connectinstance-parameter) if you did not pass the schemaAPI. That would ensure the usage of the correct sandbox.
+* localFolder : OPTIONAL : If you want to use the local folders as your base environment. Default is None. It can be a string or a list of strings.
 
 In the end these different parameters offer you different options to use the schemaManager.
 

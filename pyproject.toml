@@ -28,7 +28,8 @@ dependencies = [
     "tenacity",
     "deprecation",
     "datamodel-code-generator",
-    "rich"
+    "rich",
+    "matplotlib"
 ]
 
 [project.urls]

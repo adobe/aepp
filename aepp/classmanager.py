@@ -23,7 +23,7 @@ class ClassManager:
             schemaAPI:'Schema'=None,
             config: Union[dict,ConnectObject] = aepp.config.config_object,
             description: str = 'power by aepp',
-            localFolder:str=None,
+            localFolder:str | list | None = None,
             sandbox:str=None,
             **kwargs
             )->None:
@@ -48,13 +48,16 @@ class ClassManager:
         elif config is not None and localFolder is None:
             self.schemaAPI = Schema(config=config)
         elif localFolder is not None:
-            self.localfolder = Path(localFolder)
-            if self.localfolder.exists() is False:
+            if isinstance(localFolder, str):
+                self.localfolder = [Path(localFolder)]
+            elif isinstance(localFolder, list):
+                self.localfolder = [Path(lf) for lf in localFolder]
+            if any([folder.exists() is False for folder in self.localfolder]):
                 raise Exception(f"The local folder {self.localfolder} does not exist. Please create it and extract your sandbox before using it.")
             self.schemaAPI = None
-            self.classFolder = self.localfolder / 'class'
-            self.behavFolder = self.localfolder / 'behaviour'
-            if self.classFolder.exists() is False:
+            self.classFolder = [folder / 'class' for folder in self.localfolder]
+            self.behavFolder = [folder / 'behaviour' for folder in self.localfolder]
+            if any([folder.exists() is False for folder in self.classFolder]):
                 raise Exception(f"The local folder {self.classFolder} does not exist. Please create it and extract your sandbox before using it.")
         else:
             raise Exception("You need to provide a schemaAPI instance or a config object to connect to the API or a local folder to use the local storage")
@@ -71,9 +74,11 @@ class ClassManager:
         elif type(aepclass) == dict:
             self.tenantId = aepclass.get('meta:tenantNamespace',"  ")
         elif self.localfolder is not None:
-            config_json = json.load(FileIO(self.localfolder / 'config.json'))
-            if config_json.get('tenantId',None) is not None:
-                self.tenantId = config_json.get('tenantId')
+            for folder in self.localfolder:
+                config_json = json.load(FileIO(folder / 'config.json'))
+                if config_json.get('tenantId',None) is not None:
+                    self.tenantId = config_json.get('tenantId')
+                    break
         else:
             self.tenantId = "  "
         if type(aepclass) == dict:
@@ -82,10 +87,15 @@ class ClassManager:
                     self.aepclass = self.schemaAPI.getClass(aepclass['$id'],full=False,xtype='xed')
                     self.EDITABLE = True
                 elif self.localfolder is not None:
-                    for json_file in self.classFolder.glob('*.json'):
-                        tmp_def = json.load(FileIO(json_file))
-                        if tmp_def.get('$id') == aepclass['$id']:
-                            self.aepclass = tmp_def
+                    found = False
+                    for folder in self.classFolder:
+                        for json_file in folder.glob('*.json'):
+                            tmp_def = json.load(FileIO(json_file))
+                            if tmp_def.get('$id') == aepclass['$id']:
+                                self.aepclass = tmp_def
+                                found = True
+                                break
+                        if found:
                             break
                     self.EDITABLE = False
             elif self.tenantId[1:] not in aepclass['$id']:
@@ -93,10 +103,15 @@ class ClassManager:
                     self.aepclass = self.schemaAPI.getClass(aepclass['$id'],full=True,xtype='xed')
                     self.EDITABLE = False
                 elif self.localfolder is not None:
-                    for json_file in self.classFolder.glob('*.json'):
-                        tmp_def = json.load(FileIO(json_file))
-                        if tmp_def.get('$id') == aepclass['$id']:
-                            self.aepclass = tmp_def
+                    found = False
+                    for folder in self.classFolder:
+                        for json_file in folder.glob('*.json'):
+                            tmp_def = json.load(FileIO(json_file))
+                            if tmp_def.get('$id') == aepclass['$id']:
+                                self.aepclass = tmp_def
+                                found = True
+                                break
+                        if found:
                             break
                     self.EDITABLE = False
             self.__setAttributes__(self.aepclass)
@@ -106,20 +121,30 @@ class ClassManager:
                     self.aepclass = self.schemaAPI.getClass(aepclass,full=False,xtype='xed')
                     self.EDITABLE = True
                 elif self.localfolder is not None:
-                    for json_file in self.classFolder.glob('*.json'):
-                        tmp_def = json.load(FileIO(json_file))
-                        if tmp_def.get('$id') == aepclass or tmp_def.get('meta:altId') == aepclass:
-                            self.aepclass = tmp_def
+                    found = False
+                    for folder in self.classFolder:
+                        for json_file in folder.glob('*.json'):
+                            tmp_def = json.load(FileIO(json_file))
+                            if tmp_def.get('$id') == aepclass or tmp_def.get('meta:altId') == aepclass:
+                                self.aepclass = tmp_def
+                                found = True
+                                break
+                        if found:
                             break
                     self.EDITABLE = False
             else:
                 if self.schemaAPI is not None:
                     self.aepclass = self.schemaAPI.getClass(aepclass,full=True,xtype='xed')
                 elif self.localfolder is not None:
-                    for json_file in self.classFolder.glob('*.json'):
-                        tmp_def = json.load(FileIO(json_file))
-                        if tmp_def.get('$id') == aepclass or tmp_def.get('meta:altId') == aepclass:
-                            self.aepclass = tmp_def
+                    found = False
+                    for folder in self.classFolder:
+                        for json_file in folder.glob('*.json'):
+                            tmp_def = json.load(FileIO(json_file))
+                            if tmp_def.get('$id') == aepclass or tmp_def.get('meta:altId') == aepclass:
+                                self.aepclass = tmp_def
+                                found = True
+                                break
+                        if found:
                             break
                 self.EDITABLE = False
             self.__setAttributes__(self.aepclass)
@@ -168,10 +193,15 @@ class ClassManager:
         if self.schemaAPI is not None:
             self.behaviorDefinition = self.schemaAPI.getBehavior(behavId,full=True,xtype='xed')
         elif self.localfolder is not None:
-            for json_file in self.behavFolder.glob('*.json'):
-                tmp_def = json.load(FileIO(json_file))
-                if tmp_def.get('$id') == behavId:
-                    self.behaviorDefinition = tmp_def
+            found = False
+            for folder in self.behavFolder:
+                for json_file in folder.glob('*.json'):
+                    tmp_def = json.load(FileIO(json_file))
+                    if tmp_def.get('$id') == behavId:
+                        self.behaviorDefinition = tmp_def
+                        found = True
+                        break
+                if found:
                     break
         self.requiredFields = set()
     

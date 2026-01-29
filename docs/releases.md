@@ -2,6 +2,11 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.5.2
+* adding support for multiple values for localFolder in `SchemaManager`, `FieldGroupManager`, `DataTypeManager` and `ClassManager`
+* adding support for multiple values for localFolder in `Synchronizer` class
+* Fixing incorrect logging with CLI when `None` values were passed. 
+
 ## version 0.5.1
 * changing the method name from `extractSandboxArtefacts` to `extractSandboxArtifacts` to follow the American English spelling.
 * updating all references to the new method name in the documentation and code base.

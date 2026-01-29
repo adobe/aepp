@@ -37,10 +37,14 @@ Arguments:
 * dataType : OPTIONAL : Either a data type id ($id or altId) or the data type dictionary itself.
     If dataType Id is passed, you need to provide the schemaAPI connection as well.
 * title : OPTIONAL : to set or override the title (default None, use the existing title or do not set one for new data type) 
-* schemaAPI : OPTIONAL : It is required if $id or altId are used. It is the instance of the `Schema` class.
-* config : OPTIONAL : The config object in case you want to override the last configuration loaded.
+* schemaAPI : OPTIONAL : It is required if $id or altId are used and do not use localFolder. It is the instance of the `Schema` class.
+* config : OPTIONAL : The config object in case you want to override the last configuration loaded. Alternative to passing the schemaAPI.
+* localFolder : OPTIONAL : If you want to use the local folders as your base environment. Default is None. It can be a string or a list of strings.
+* sandbox : OPTIONAL : If you use localFolder, you can specific the sandbox.
+
 
 code example:
+
 
 ```python
 import aepp

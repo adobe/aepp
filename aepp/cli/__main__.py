@@ -47,26 +47,25 @@ class ServiceShell(cmd.Cmd):
                 self.sandbox = str(dict_config.get("sandbox-name","prod"))
             else:
                 self.sandbox = str(kwargs.get("sandbox","prod"))
-            self.secret = str(dict_config.get("secret",kwargs.get("secret")))
-            self.org_id = str(dict_config.get("org_id",kwargs.get("org_id")))
-            self.client_id = str(dict_config.get("client_id",kwargs.get("client_id")))
-            self.scopes = str(dict_config.get("scopes",kwargs.get("scopes")))
+            self.secret = dict_config.get("secret",kwargs.get("secret"))
+            self.org_id = dict_config.get("org_id",kwargs.get("org_id"))
+            self.client_id = dict_config.get("client_id",kwargs.get("client_id"))
+            self.scopes = dict_config.get("scopes",kwargs.get("scopes"))
         else:
-            self.sandbox = str(kwargs.get("sandbox","prod"))
-            self.secret = str(kwargs.get("secret"))
-            self.org_id = str(kwargs.get("org_id"))
-            self.client_id = str(kwargs.get("client_id"))
-            self.scopes = str(kwargs.get("scopes"))
-        self.connectInstance = True
+            self.sandbox:str|None = kwargs.get("sandbox","prod")
+            self.secret:str|None = kwargs.get("secret")
+            self.org_id:str|None = kwargs.get("org_id")
+            self.client_id:str|None = kwargs.get("client_id")
+            self.scopes:str|None = kwargs.get("scopes")
         if self.sandbox is not None and self.secret is not None and self.org_id is not None and self.client_id is not None and self.scopes is not None:
             print("Configuring connection...")
             self.config = aepp.configure(
-                connectInstance=self.connectInstance,
                 sandbox=self.sandbox,
                 secret=self.secret,
                 org_id=self.org_id,
                 client_id=self.client_id,
-                scopes=self.scopes
+                scopes=self.scopes,
+                connectInstance=self.connectInstance
             )
             self.prompt = f"{self.config.sandbox}> "
             console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
@@ -82,7 +81,6 @@ class ServiceShell(cmd.Cmd):
         console.print(f"Configuration file created at {Path.cwd() / Path(filename_json)}", style="green")
         return
 
-
     # # --- Commands ---
     def do_config(self, arg:Any) -> None:
         """connect to an AEP instance"""
@@ -94,14 +92,14 @@ class ServiceShell(cmd.Cmd):
         parser.add_argument("-cid", "--client_id", help="Auto-login client ID")
         parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
         args = parser.parse_args(shlex.split(arg))
-        if args.config_file:
+        if args.config_file is not None:
             mypath = Path.cwd()
             dict_config = json.load(FileIO(mypath / Path(args.config_file)))
-            self.sandbox = str(args.sandbox) if args.sandbox else str(dict_config.get("sandbox-name",args.sandbox))
-            self.secret = str(dict_config.get("secret",args.secret))
-            self.org_id = str(dict_config.get("org_id",args.org_id))
-            self.client_id = str(dict_config.get("client_id",args.client_id))
-            self.scopes = str(dict_config.get("scopes",args.scopes))
+            self.sandbox:str|None = args.sandbox if args.sandbox else dict_config.get("sandbox-name",args.sandbox)
+            self.secret:str|None = dict_config.get("secret",args.secret)
+            self.org_id:str|None = dict_config.get("org_id",args.org_id)
+            self.client_id:str|None = dict_config.get("client_id",args.client_id)
+            self.scopes:str|None = dict_config.get("scopes",args.scopes)
             self.connectInstance = True
         else:
             if args.sandbox: self.sandbox = str(args.sandbox)
@@ -1203,18 +1201,14 @@ class ServiceShell(cmd.Cmd):
         console.print("Syncing artifact...", style="blue")
         parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP')
         parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
-        parser.add_argument('-at','--artifactType', help='artifact type ')
-        parser.add_argument('-t','--targets', help='target sandboxes')
-        parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions')
+        parser.add_argument('-at','--artifactType', help='artifact type ',type=str)
+        parser.add_argument('-t','--targets', help='target sandboxes',nargs='+',type=str)
+        parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions',nargs='+',type=str)
         parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization')
         parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         parser.add_argument('-v','--verbose', help='Enable verbose output',default=True)
         try:
             args = parser.parse_args(shlex.split(args))
-            if ',' in args.targets:
-                args.targets = args.targets.split(',')
-            else:
-                args.targets = [args.targets]
             console.print("Initializing Synchronizor...", style="blue")
             if args.baseSandbox:
                 synchronizor = synchronizer.Synchronizer(

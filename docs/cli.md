@@ -268,8 +268,8 @@ Synchronize or copy artifacts between sandboxes.\
 Arguments:
 * `artifact` : Name or ID of the component to sync.
 * `-at`, `--artifactType` : Type of component.
-* `-t`, `--targets` : Comma-separated list of target sandboxes.
-* `-lf`, `--localfolder` : Local staging folder.
+* `-t`, `--targets` : list of target sandboxes.
+* `-lf`, `--localfolder` : Local staging folders.
 * `-b`, `--baseSandbox` : The source sandbox name.
 * `-rg`, `--region` : Region.
 * `-v`, `--verbose` : Enable verbose logging (default: True).
