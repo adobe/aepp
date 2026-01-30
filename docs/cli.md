@@ -302,6 +302,28 @@ Arguments:
 ### get_sandboxes
 List all sandboxes available in the current organization.
 
+### get_profile_paths_info
+Get usage details for all Profile paths.\
+No arguments.\
+This will take a long time.
+
+
+### get_event_paths_info
+Get the information details for all Experience Event paths.\
+No arguments. 
+This will take a long time.
+
+
+### get_profile_path_info
+Get usage details for a specific Profile path.\
+Arguments:
+* `path` : The Profile path to analyze.
+
+### get_event_path_info
+Get usage details for a specific Experience Event path.\
+Arguments:
+* `path` : The Experience Event path to analyze.
+
 ### exit
 Exit the CLI.
 

@@ -2,6 +2,7 @@ from ast import arg
 from matplotlib.pyplot import table
 import aepp
 from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation
+from aepp.cli.upsfieldsanalyzer import UpsFieldsAnalyzer
 import argparse, cmd, shlex, json
 from functools import wraps
 from rich.console import Console
@@ -37,6 +38,7 @@ class ServiceShell(cmd.Cmd):
         super().__init__()
         self.config = None
         self.connectInstance = True
+        self.ups_profile_analyzer:UpsFieldsAnalyzer|None = None
         if kwargs.get("config_file") is not None:
             config_path = Path(kwargs.get("config_file"))
             if not config_path.is_absolute():
@@ -69,7 +71,7 @@ class ServiceShell(cmd.Cmd):
             )
             self.prompt = f"{self.config.sandbox}> "
             console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
-        
+
     def do_createConfigFile(self, arg:Any) -> None:
         """Create a configuration file for future use"""
         parser = argparse.ArgumentParser(prog='createConfigFile', add_help=True)
@@ -169,7 +171,112 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
-
+        
+    @login_required
+    def do_get_profile_paths_info(self,args:Any)->None:
+        """Get usage information for all Profile paths"""
+        parser = argparse.ArgumentParser(prog='get_profile_paths_info', add_help=True)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.ups_profile_analyzer is None:
+                console.print("Initializing Profile UPS Fields Analyzer. This will take few minutes...", style="blue")
+                self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config)
+            else:
+                if self.config.sandbox != self.ups_profile_analyzer.sandbox:
+                    console.print("Re-initializing Profile UPS Fields Analyzer for the new sandbox. This will take few minutes...", style="blue")
+                    self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config)
+            console.print("Analyzing all Profile paths information. This will take few minutes...", style="blue")
+            df_analysis:pd.DataFrame = self.ups_profile_analyzer.analyzePaths(output='df')
+            if df_analysis is not None:
+                console.print(df_analysis)
+                df_analysis.to_csv(f"profile_all_paths_info.csv", index=False)
+                console.print(f"Profile all paths information data exported to profile_all_paths_info.csv", style="green")
+            else:
+                console.print("(!) No profile paths information data found.", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+        
+    @login_required
+    def do_get_profile_path_info(self, args:Any) -> None:
+        """Get path information on Profile"""
+        parser = argparse.ArgumentParser(prog='get_profile_path_info', add_help=True)
+        parser.add_argument("path", help="Dot notation of the path to analyze in Profile Storage", default=None,type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.ups_profile_analyzer is None:
+                console.print("Initializing Profile UPS Fields Analyzer. This will take few minutes...", style="blue")
+                self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config)
+            else:
+                if self.config.sandbox != self.ups_profile_analyzer.sandbox:
+                    console.print("Re-initializing Profile UPS Fields Analyzer for the new sandbox. This will take few minutes...", style="blue")
+                    self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config)
+            analysis = self.ups_profile_analyzer.analyzePath(args.path)
+            if analysis:
+                console.print_json(data=analysis)
+                with open(f"profile_path_info_{args.path.replace('/','_')}.json", 'w') as f:
+                    json.dump(analysis, f, indent=4)
+                console.print(f"Profile path information data exported to profile_path_info_{args.path.replace('/','_')}.json", style="green")
+            else:
+                console.print("(!) No profile path information data found.", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_event_paths_info(self,args:Any)->None:
+        """Get information for all Experience Event paths"""
+        parser = argparse.ArgumentParser(prog='get_event_paths_info', add_help=True)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.ups_profile_analyzer is None:
+                console.print("Initializing Event UPS Fields Analyzer. This will take few minutes...", style="blue")
+                self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config,union='https://ns.adobe.com/xdm/context/experienceevent__union')
+            else:
+                if self.config.sandbox != self.ups_profile_analyzer.sandbox:
+                    console.print("Re-initializing Event UPS Fields Analyzer for the new sandbox. This will take few minutes...", style="blue")
+                    self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config,union='https://ns.adobe.com/xdm/context/experienceevent__union')
+            console.print("Analyzing all Event paths information. This will take few minutes...", style="blue")
+            df_analysis:pd.DataFrame = self.ups_profile_analyzer.analyzePaths(output='df')
+            if df_analysis is not None:
+                console.print(df_analysis)
+                df_analysis.to_csv(f"event_all_paths_info.csv", index=False)
+                console.print(f"Event all paths information data exported to event_all_paths_info.csv", style="green")
+            else:
+                console.print("(!) No event paths information data found.", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_event_path_info(self, args:Any) -> None:
+        """Get path information on Experience Event"""
+        parser = argparse.ArgumentParser(prog='get_event_path_info', add_help=True)
+        parser.add_argument("path", help="Dot notation of the path to analyze in Experience Event Storage", default=None,type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.ups_profile_analyzer is None:
+                console.print("Initializing Event UPS Fields Analyzer. This will take few minutes...", style="blue")
+                self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config,union='https://ns.adobe.com/xdm/context/experienceevent__union')
+            else:
+                if self.config.sandbox != self.ups_profile_analyzer.sandbox:
+                    console.print("Re-initializing Event UPS Fields Analyzer for the new sandbox. This will take few minutes...", style="blue")
+                    self.ups_profile_analyzer = UpsFieldsAnalyzer(config=self.config,union='https://ns.adobe.com/xdm/context/experienceevent__union')
+            analysis = self.ups_profile_analyzer.analyzePath(args.path)
+            if analysis:
+                console.print_json(data=analysis)
+                with open(f"event_path_info_{args.path.replace('/','_')}.json", 'w') as f:
+                    json.dump(analysis, f, indent=4)
+                console.print(f"Event path information data exported to event_path_info_{args.path.replace('/','_')}.json", style="green")
+            else:
+                console.print("(!) No event path information data found.", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
     
     @login_required
     def do_get_schemas(self, args:Any) -> None:
@@ -991,6 +1098,23 @@ class ServiceShell(cmd.Cmd):
             args = parser.parse_args(shlex.split(args))
             aepp_audience = segmentation.Segmentation(config=self.config)
             audiences = aepp_audience.getAudiences()
+            flw = flowservice.FlowService(config=self.config)
+            destinations = flw.getFlows(onlyDestinations=True)
+            segments_shared = []
+            for tmpFlow in destinations:
+                if len(tmpFlow['transformations'])>0:
+                    tmpSegmentShared = tmpFlow['transformations'][0].get('params',{}).get('segmentSelectors',{}).get('selectors',[])
+                    for s in tmpSegmentShared:
+                        s['flowId'] = tmpFlow['id']
+                    segments_shared += tmpSegmentShared
+            segment_shared_dict = {seg.get('value',{}).get('id'):{
+                "exportMode" : seg.get('value',{}).get('exportMode'),
+                "scheduleFrequency": seg.get('value',{}).get("schedule",{}).get('frequency',''),
+                "flowId" : seg["flowId"]
+            } for seg in segments_shared}
+            for aud in audiences:
+                aud['usedInFlow'] = True if segment_shared_dict.get(aud.get("id","N/A"),{}) != {} else False
+                aud['sharedInfo'] = segment_shared_dict.get(aud.get("id","N/A"),{})    
             df_audiences = pd.DataFrame(audiences)
             df_audiences.to_csv(f"{self.config.sandbox}_audiences.csv",index=False)
             console.print(f"Audiences exported to {self.config.sandbox}_audiences.csv", style="green")
@@ -999,14 +1123,14 @@ class ServiceShell(cmd.Cmd):
             table.add_column("Name", style="magenta")
             table.add_column("Evaluation", style="yellow")
             table.add_column("Total Profiles", style="green")
-            table.add_column("Evaluation Date", style="white")
+            table.add_column("Shared", style="white")
             for aud in audiences:
                 table.add_row(
                     aud.get("id","N/A"),
                     aud.get("name","N/A"),
-                    '[red3]Batch[/red3]' if aud.get("evaluationInfo",{}).get("batch",{}).get('enabled') else '[chartreuse1]Streaming[/chartreuse1]' if aud.get("evaluationInfo",{}).get("continuous",{}).get('enabled') else '[blue_violet]Edge[/blue_violet]' if aud.get("evaluationInfo",{}).get("synchronous",{}).get('enabled') else 'N/A',
+                    '[bright_blue]Batch[/bright_blue]' if aud.get("evaluationInfo",{}).get("batch",{}).get('enabled') else '[chartreuse1]Streaming[/chartreuse1]' if aud.get("evaluationInfo",{}).get("continuous",{}).get('enabled') else '[purple]Edge[/purple]' if aud.get("evaluationInfo",{}).get("synchronous",{}).get('enabled') else 'N/A',
                     str(aud.get('metrics',{}).get('data',{}).get('totalProfiles','N/A')),
-                    datetime.fromtimestamp(aud.get('metrics',{}).get('updateEpoch',0)).isoformat(),
+                    '[green3]True[/green3]' if aud.get("usedInFlow",False) else '[red3]False[/red3]',
                 )
             console.print(table)
         except Exception as e:
