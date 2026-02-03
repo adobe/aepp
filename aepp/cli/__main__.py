@@ -3,7 +3,7 @@ from matplotlib.pyplot import table
 import aepp
 from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation
 from aepp.cli.upsfieldsanalyzer import UpsFieldsAnalyzer
-import argparse, cmd, shlex, json
+import argparse, cmd, shlex, json, os
 from functools import wraps
 from rich.console import Console
 from rich.table import Table
@@ -16,6 +16,8 @@ from datetime import datetime
 import urllib.parse
 from typing import Any, Concatenate, ParamSpec, ParamSpecKwargs
 from collections.abc import Callable
+from openai import OpenAI
+
 
 P = ParamSpec("P")
 
@@ -39,6 +41,24 @@ class ServiceShell(cmd.Cmd):
         self.config = None
         self.connectInstance = True
         self.ups_profile_analyzer:UpsFieldsAnalyzer|None = None
+        
+        # Initialize OpenAI client for natural language commands
+        self.openai_client = None
+        self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4")
+
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        openai_base_url = os.getenv("OPENAI_API_ENDPOINT") or os.getenv("OPENAI_BASE_URL")
+        
+        if openai_api_key:
+            try:
+                self.openai_client = OpenAI(
+                    api_key=openai_api_key,
+                    base_url=openai_base_url if openai_base_url else None
+                )
+                console.print("[dim]Natural language mode enabled[/dim]", style="blue")
+            except Exception as e:
+                console.print(f"[dim]Could not initialize OpenAI client: {e}[/dim]", style="yellow")
+        
         if kwargs.get("config_file") is not None:
             config_path = Path(kwargs.get("config_file"))
             if not config_path.is_absolute():
@@ -1527,6 +1547,98 @@ class ServiceShell(cmd.Cmd):
             console.print("Sync completed!", style="green")
         except SystemExit:
             return
+    
+    def do_ask(self, arg: Any) -> None:
+        """Ask a question in natural language and get the appropriate CLI command executed"""
+        
+        if not arg:
+            console.print("(!) Please provide a question or request.", style="yellow")
+            console.print("[dim]Example: ask show me all schemas[/dim]", style="blue")
+            return
+        
+        try:
+            console.print(f"[dim]Interpreting: {arg}[/dim]", style="blue")
+            
+            # Get all available commands and their descriptions
+            commands_info = self._get_available_commands()
+            
+            # Call OpenAI to translate natural language to command
+            command_to_execute = self._translate_nl_to_command(arg, commands_info)
+            
+            if command_to_execute:
+                console.print(f"[dim]Executing: {command_to_execute}[/dim]", style="green")
+                self.onecmd(command_to_execute)
+            else:
+                console.print("(!) Could not determine the appropriate command.", style="red")
+        
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+
+    def _get_available_commands(self) -> str:
+        """Extract all available commands and their docstrings"""
+        commands = []
+        for name in dir(self):
+            if name.startswith('do_') and name not in ['do_EOF', 'do_ask']:
+                method = getattr(self, name)
+                doc = method.__doc__ or "No description"
+                cmd_name = name[3:]  # Remove 'do_' prefix
+                commands.append(f"- {cmd_name}: {doc}")
+        return "\n".join(commands)
+
+    def _translate_nl_to_command(self, user_input: str, commands_info: str) -> str:
+        """Use OpenAI to translate natural language to CLI command"""
+        system_prompt = f"""You are a CLI command translator for the Adobe AEP (Adobe Experience Platform) CLI tool.
+        
+Available commands:
+{commands_info}
+
+Your task is to translate the user's natural language request into the appropriate CLI command with the correct parameters.
+
+Rules:
+1. Return ONLY the command string, nothing else (no explanations, no markdown, no quotes around the command)
+2. The command should be ready to execute as-is
+3. If the request is ambiguous, make reasonable assumptions
+4. If you cannot determine the command, return an empty string
+5. Use proper argument formatting (e.g., -sv for --save, quoted strings for names with spaces)
+6. Do NOT include the prompt symbol or any prefix
+
+Examples:
+User: "Show me all schemas"
+Output: get_schemas
+
+User: "List all datasets and save to file"
+Output: get_datasets
+
+User: "Get schema details for MySchema"
+Output: get_schema_json MySchema
+
+User: "What audiences do we have?"
+Output: get_audiences
+
+User: "Show me all sandboxes"
+Output: get_sandboxes
+
+User: "List identities"
+Output: get_identities
+"""
+        
+        try:
+            response = self.openai_client.chat.completions.create(
+                model=self.openai_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_input}
+                ],
+                temperature=0.3,
+                max_tokens=200
+            )
+            
+            command = response.choices[0].message.content.strip()
+            return command if command else None
+            
+        except Exception as e:
+            console.print(f"(!) OpenAI API error: {str(e)}", style="red")
+            return None
     
     def do_exit(self, args:Any) -> None:
         """Exit the application"""
