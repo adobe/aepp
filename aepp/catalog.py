@@ -489,6 +489,7 @@ class Catalog:
                 identityEnabled:bool=False,
                 upsert:bool=False,
                 tags:dict=None,
+                unifiedTags:list[str]=None,
                 systemLabels:list[str]=None,
                 **kwargs)-> dict:
         """
@@ -503,6 +504,7 @@ class Catalog:
             upsert : OPTIONAL : If the dataset to be created with profile enbaled and Upsert capability.
             tags : OPTIONAL : set of attribute to add as tags.
             systemLabels : OPTIONAL : A list of string to attribute system based label on creation.
+            unifiedTags : OPTIONAL : a list of tags to be added to the dataset
         possible kwargs
             requestDataSource : Set to true if you want Catalog to create a dataSource on your behalf; otherwise, pass a dataSourceId in the body.
         """
@@ -533,6 +535,8 @@ class Catalog:
                 data['tags']["unifiedIdentity"] = ["enabled:true"]
             if upsert:
                 data['tags']['unifiedProfile'] = ["enabled: true","isUpsert: true"]
+            if unifiedTags is not None and type(unifiedTags) == list:
+                data["unifiedTags"] = unifiedTags
             if tags is not None and type(tags) == dict:
                 for key in tags:
                     data['tags'][key] = tags[key]
