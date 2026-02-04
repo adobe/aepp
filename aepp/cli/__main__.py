@@ -1,4 +1,3 @@
-from ast import arg
 from matplotlib.pyplot import table
 import aepp
 from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation
@@ -126,15 +125,20 @@ class ServiceShell(cmd.Cmd):
         """Change the current sandbox after configuration"""
         parser = argparse.ArgumentParser(prog='change sandbox', add_help=True)
         parser.add_argument("sandbox", help="sandbox name to switch to")
-        args = parser.parse_args(shlex.split(args))
-        self.sandbox = str(args.sandbox) if args.sandbox else console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
-        if self.config is not None:
-            if args.sandbox:
-                self.config.setSandbox(str(args.sandbox))
-                self.prompt = f"{self.config.sandbox}> "
-                console.print(Panel(f"Sandbox changed to: [bold green]{self.config.sandbox}[/bold green]", style="blue"))
-        else:
-            console.print(Panel("(!) You must configure the connection first using the 'config' command.", style="red"))
+        try:
+            args = parser.parse_args(shlex.split(args))
+            self.sandbox = str(args.sandbox) if args.sandbox else console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
+            if self.config is not None:
+                if args.sandbox:
+                    self.config.setSandbox(str(args.sandbox))
+                    self.prompt = f"{self.config.sandbox}> "
+                    console.print(Panel(f"Sandbox changed to: [bold green]{self.config.sandbox}[/bold green]", style="blue"))
+            else:
+                console.print(Panel("(!) You must configure the connection first using the 'config' command.", style="red"))
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
     
     @login_required
     def do_get_sandboxes(self, args:Any) -> None:
@@ -890,8 +894,9 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_datasets_tableName(self, args:Any) -> None:
-        parser = argparse.ArgumentParser(prog='get_datasets', add_help=True)
+    def do_get_datasets_tableNames(self, args:Any) -> None:
+        """List all datasets with their table names in the current sandbox"""
+        parser = argparse.ArgumentParser(prog='get_datasets_tableNames', add_help=True)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_cat = catalog.Catalog(config=self.config)
@@ -1063,10 +1068,11 @@ class ServiceShell(cmd.Cmd):
     def do_get_identities(self, args:Any) -> None:
         """List all identities in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_identities', add_help=True)
-        parser.add_argument("-r","--region", help="Region to get identities from: 'ndl2' (default), 'va7', 'aus5', 'can2', 'ind2'", default='ndl2')
+        parser.add_argument("-r","--region", help="Region to get identities from: 'ndl2' (default), 'va7', 'aus5', 'can2', 'ind2'", default='ndl2',type=str)
         parser.add_argument("-co","--custom_only",help="Get only custom identities", default=False,type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
+            region = args.region if args.region else 'ndl2'
             aepp_identity = identity.Identity(config=self.config,region=args.region)
             identities = aepp_identity.getIdentities(only_custom=args.custom_only)
             df_identites = pd.DataFrame(identities)
@@ -1123,7 +1129,7 @@ class ServiceShell(cmd.Cmd):
             table.add_column("Name", style="magenta")
             table.add_column("Evaluation", style="yellow")
             table.add_column("Total Profiles", style="green")
-            table.add_column("Shared", style="white")
+            table.add_column("In Flow", style="white")
             for aud in audiences:
                 table.add_row(
                     aud.get("id","N/A"),
@@ -1131,6 +1137,36 @@ class ServiceShell(cmd.Cmd):
                     '[bright_blue]Batch[/bright_blue]' if aud.get("evaluationInfo",{}).get("batch",{}).get('enabled') else '[chartreuse1]Streaming[/chartreuse1]' if aud.get("evaluationInfo",{}).get("continuous",{}).get('enabled') else '[purple]Edge[/purple]' if aud.get("evaluationInfo",{}).get("synchronous",{}).get('enabled') else 'N/A',
                     str(aud.get('metrics',{}).get('data',{}).get('totalProfiles','N/A')),
                     '[green3]True[/green3]' if aud.get("usedInFlow",False) else '[red3]False[/red3]',
+                )
+            console.print(table)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_tags(self,args)->None:
+        """
+        Provide the list of tags defined in the current organization
+        """
+        parser = argparse.ArgumentParser(prog='get_tags', add_help=True)
+        try:
+            from aepp import tags
+            args = parser.parse_args(shlex.split(args))
+            aepp_tag = tags.Tags(config=self.config)
+            tags = aepp_tag.getTags()
+            df_tags = pd.DataFrame(tags)
+            df_tags.to_csv(f"tags.csv",index=False)
+            console.print(f"Tags exported to tags.csv", style="green")
+            table = Table(title=f"Tags in Organization: {self.config.org_id}")
+            table.add_column("ID", style="cyan")
+            table.add_column("Name", style="magenta")
+            table.add_column("Category Name", style="white")
+            for _, tg in df_tags.iterrows():
+                table.add_row(
+                    str(tg.get("id","N/A")),
+                    tg.get("name","N/A"),
+                    tg.get("tagCategoryName","N/A"),
                 )
             console.print(table)
         except Exception as e:
@@ -1440,7 +1476,7 @@ class ServiceShell(cmd.Cmd):
             conn = aepp_query.connection()
             iqs2 = queryservice.InteractiveQuery2(conn)
             result:pd.DataFrame = iqs2.query(sql=args.sql_query)
-            result.to_csv(f"query_result_{int(datetime.now().timestamp())}.csv", index=False)
+            result.sample(5).to_csv(f"query_result_{int(datetime.now().timestamp())}.csv", index=False)
             console.print(f"Query result exported to query_result_{int(datetime.now().timestamp())}.csv", style="green")
             console.print(result)
         except Exception as e:
@@ -1452,11 +1488,11 @@ class ServiceShell(cmd.Cmd):
     @login_required
     def do_extractArtifacts(self,args:Any) -> None:
         """extractArtifacts localfolder"""
-        console.print("Extracting artifacts...", style="blue")
-        parser = argparse.ArgumentParser(prog='extractArtifacts', description='Extract artifacts from AEP')
+        parser = argparse.ArgumentParser(prog='extractArtifacts', description='Extract artifacts from AEP',add_help=True)
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
         parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         try:
+            console.print("Extracting artifacts...", style="blue")
             args = parser.parse_args(shlex.split(args))
             aepp.extractSandboxArtifacts(
                 sandbox=self.config,
@@ -1466,18 +1502,19 @@ class ServiceShell(cmd.Cmd):
             console.print(Panel("Extraction completed!", style="green"))
         except SystemExit:
             return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
 
     @login_required
     def do_extractArtifact(self,args:Any) -> None:
         """extractArtifacts localfolder"""
-        console.print("Extracting artifact...", style="blue")
-        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP')
+        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP',add_help=True)
         parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
         parser.add_argument('-at','--artifactType', help='artifact type ')
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions')
         parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
-        
         try:
+            console.print("Extracting artifact...", style="blue")
             args = parser.parse_args(shlex.split(args))
             aepp.extractSandboxArtifact(
                 artifact=args.artifact,
@@ -1488,12 +1525,13 @@ class ServiceShell(cmd.Cmd):
             console.print("Extraction completed!", style="green")
         except SystemExit:
             return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
 
     @login_required
     def do_sync(self,args:Any) -> None:
         """extractArtifacts localfolder"""
-        console.print("Syncing artifact...", style="blue")
-        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP')
+        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP',add_help=True)
         parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
         parser.add_argument('-at','--artifactType', help='artifact type ',type=str)
         parser.add_argument('-t','--targets', help='target sandboxes',nargs='+',type=str)
@@ -1504,18 +1542,22 @@ class ServiceShell(cmd.Cmd):
         try:
             args = parser.parse_args(shlex.split(args))
             console.print("Initializing Synchronizor...", style="blue")
+            if args.region:
+                region=args.region
+            else:
+                region='ndl2'
             if args.baseSandbox:
                 synchronizor = synchronizer.Synchronizer(
                     config=self.config,
                     targets=args.targets,
-                    region=args.region,
+                    region=region,
                     baseSandbox=args.baseSandbox,
                 )
             elif args.localfolder:
                 synchronizor = synchronizer.Synchronizer(
                     config=self.config,
                     targets=args.targets,
-                    region=args.region,
+                    region=region,
                     localFolder=args.localfolder,
             )
             console.print("Starting Sync...", style="blue")

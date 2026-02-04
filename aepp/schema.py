@@ -74,8 +74,8 @@ class Schema:
 
     def __init__(
         self,
-        containerId: str = "tenant",
         config: Union[dict,ConnectObject] = aepp.config.config_object,
+        containerId: str = "tenant",
         header=aepp.config.header,
         loggingObject: dict = None,
         **kwargs,
@@ -83,12 +83,10 @@ class Schema:
         """
         Copy the token and header and initiate the object to retrieve schema elements.
         Arguments:
-            containerId : OPTIONAL : "tenant"(default) or "global"
-            loggingObject : OPTIONAL : logging object to log messages.
             config : OPTIONAL : config object in the config module.
+            containerId : OPTIONAL : "tenant"(default) or "global"
             header : OPTIONAL : header object  in the config module.
-        possible kwargs:
-            x-sandbox-name : name of the sandbox you want to use (default : "prod").
+            loggingObject : OPTIONAL : logging object to log messages.
         """
         if loggingObject is not None and sorted(
             ["level", "stream", "format", "filename", "file"]

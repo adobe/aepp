@@ -20,7 +20,12 @@ from .configs import ConnectObject
 
 class Synchronizer:
     ## TO DO -> Add support for local environment
-    def __init__(self,targets:list=None,config:'ConnectObject'=None,baseSandbox:str=None,region:str='nld2',localFolder:str|list|None=None):
+    def __init__(self,
+                 targets:list|None=None,
+                 config:ConnectObject|None=None,
+                 baseSandbox:str|None=None,
+                 region:str='nld2',
+                 localFolder:str|list|None=None):
         """
         Setup the synchronizor object with the base sandbox and target sandbox.
         Arguments:
@@ -71,6 +76,19 @@ class Synchronizer:
             self.descriptorFolder = [folder / 'descriptor' for folder in self.localfolder]
             self.mergePolicyFolder = [folder / 'mergepolicy' for folder in self.localfolder]
             self.audienceFolder = [folder / 'audience' for folder in self.localfolder]
+            self.tagFolder = [folder / 'tag' for folder in self.localfolder]
+            self.dict_tag_name_id = {}
+            for folder in self.tagFolder:
+                try:
+                    if folder.exists():
+                        with open(folder / 'tags.json','r') as f:
+                            tags_file = json.load(f)
+                        for tag in tags_file:
+                            self.dict_tag_name_id[tag['name']] = tag['id']
+                    pass
+                except Exception as e:
+                    print(f"could not load tags from folder {folder} : {e}")
+                    pass
             if baseSandbox is not None:
                 self.baseSandbox = baseSandbox
             else:
@@ -85,7 +103,7 @@ class Synchronizer:
         self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}}  
         self.dict_targetComponents = {target:{'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}} for target in targets}
 
-    def getSyncFieldGroupManager(self,fieldgroup:str,sandbox:str=None)-> dict:
+    def getSyncFieldGroupManager(self,fieldgroup:str,sandbox:str|None=None)-> dict:
         """
         Get a field group Manager from the synchronizer.
         It searches through the component cache to see if the FieldGroupManager for the target sandbox is already instantiated.
@@ -119,7 +137,7 @@ class Synchronizer:
             else:
                 raise ValueError(f"the field group '{fieldgroup}' has not been synchronized to the sandbox '{sandbox}'")
     
-    def getDatasetName(self,datasetId:str,sandbox:str=None)-> str:
+    def getDatasetName(self,datasetId:str,sandbox:str|None=None)-> str:
         """
         Get a dataset name from the synchronizer base on the ID of the dataset.
         Arguments:
@@ -139,7 +157,7 @@ class Synchronizer:
             else:
                 raise ValueError(f"the dataset '{datasetId}' has not been synchronized to the sandbox '{sandbox}'")
 
-    def syncComponent(self,component:Union[str,dict],componentType:str=None,force:bool=False,verbose:bool=False)-> dict:
+    def syncComponent(self,component:Union[str,dict],componentType:str|None=None,force:bool=False,verbose:bool=False)-> dict:
         """
         Synchronize a component to the target sandbox.
         The component could be a string (name or id of the component in the base sandbox) or a dictionary with the definition of the component.
@@ -235,6 +253,8 @@ class Synchronizer:
                         for file in folder.glob('*.json'):
                             ds_file = json.load(FileIO(file))
                             if ds_file['id'] == component or ds_file['name'] == component:
+                                if ds_file.get('UnifiedTags',[]) != [] and self.dict_tag_name_id is not None:
+                                    ds_file['unifiedTags'] = [self.dict_tag_name_id[tag_name] for tag_name in ds_file.get('UnifiedTags',[]) if tag_name in self.dict_tag_name_id.keys()]
                                 component = ds_file
                                 break
                 if len(component) == 1: ## if the component is the catalog API response {'key': {dataset definition}}
@@ -263,6 +283,8 @@ class Synchronizer:
                         for file in folder.glob('*.json'):
                             au_file = json.load(FileIO(file))
                             if au_file.get('id','') == component or au_file.get('name','') == component:
+                                if au_file.get('tags',[]) != [] and self.dict_tag_name_id is not None:
+                                    au_file['tags'] = [self.dict_tag_name_id[tag_name] for tag_name in au_file.get('tags',[]) if tag_name in self.dict_tag_name_id.keys()]
                                 component = au_file
                                 break
         elif type(component) == dict:
@@ -345,6 +367,7 @@ class Synchronizer:
             raise TypeError("the baseDataType must be a DataTypeManager object")
         self.dict_baseComponents['datatype'][baseDataType.title] = baseDataType
         name_base_datatype = baseDataType.title
+        description_base_datatype = baseDataType.description
         for target in self.dict_targetsConfig.keys():
             targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
             t_datatype = None
@@ -362,7 +385,7 @@ class Synchronizer:
                 base_paths = df_base['path'].tolist()
                 target_paths = df_target['path'].tolist()
                 diff_paths = list(set(base_paths) - set(target_paths))
-                if len(diff_paths) > 0 or force==True: ## there are differences
+                if len(diff_paths) > 0 or description_base_datatype != t_datatype.description or force==True: ## there are differences
                     base_datatypes_paths = baseDataType.getDataTypePaths()
                     df_base_limited = df_base[df_base['origin'] == 'self'].copy() ## exclude field group native fields
                     df_base_limited = df_base_limited[~df_base_limited['path'].isin(list(base_datatypes_paths.keys()))] ## exclude base of datatype rows
@@ -394,6 +417,7 @@ class Synchronizer:
                     print(f"datatype '{name_base_datatype}' does not exist in target {target}, creating it")
                 df_base = baseDataType.to_dataframe(full=True)
                 new_datatype = datatypemanager.DataTypeManager(title=name_base_datatype,config=self.dict_targetsConfig[target],sandbox=target)
+                new_datatype.setDescription(description_base_datatype)
                 base_datatypes_paths = baseDataType.getDataTypePaths()
                 df_base_limited = df_base[df_base['origin'] == 'self'].copy() ## exclude field group native fields
                 df_base_limited = df_base_limited[~df_base_limited['path'].isin(list(base_datatypes_paths.keys()))] ## exclude base of datatype rows
@@ -413,7 +437,7 @@ class Synchronizer:
                         arrayBool = True
                         path = path[:-4] ## removing the [] from the path
                     new_datatype.addField(path=path,dataType='dataType',ref=tmp_t_dt.id,array=arrayBool)
-                new_datatype.setDescription(baseDataType.description)
+                new_datatype.setDescription(description_base_datatype)
                 res = new_datatype.createDataType()
                 if '$id' in res.keys():
                     t_datatype = datatypemanager.DataTypeManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
@@ -434,6 +458,7 @@ class Synchronizer:
         self.dict_baseComponents['fieldgroup'][baseFieldGroup.title] = baseFieldGroup
         name_base_fieldgroup = baseFieldGroup.title
         base_fg_classIds = baseFieldGroup.classIds
+        base_fg_description = baseFieldGroup.description
         for target in self.dict_targetsConfig.keys():
             t_fieldgroup = None
             targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
@@ -465,7 +490,9 @@ class Synchronizer:
                 base_paths = df_base['path'].tolist()
                 target_paths = df_target['path'].tolist()
                 diff_paths = [path for path in base_paths if path not in target_paths]
-                if len(diff_paths) > 0 or force==True:
+                if len(diff_paths) > 0 or base_fg_description != t_fieldgroup.description or force==True:
+                    if verbose:
+                        print(f"updating field group '{name_base_fieldgroup}' in target {target}")
                     base_datatypes_paths = baseFieldGroup.getDataTypePaths()
                     ## handling fieldgroup native fields
                     df_base_limited = df_base[df_base['origin'] == 'fieldGroup'].copy() ## exclude datatypes
@@ -500,6 +527,8 @@ class Synchronizer:
                             t_fieldgroup.addField(path=path,dataType='dataType',ref=tmp_t_dt.id,array=arrayBool)
                     if len(t_fieldgroup.classIds) != len(fg_class_ids):
                         t_fieldgroup.updateClassSupported(fg_class_ids)
+                    if base_fg_description != t_fieldgroup.description:
+                        t_fieldgroup.setDescription(base_fg_description)
                     res = t_fieldgroup.updateFieldGroup()
                     if '$id' not in res.keys():
                         raise Exception(res)
@@ -547,7 +576,7 @@ class Synchronizer:
                         arrayBool = True
                         path = path[:-4] ## removing the [] from the path
                     new_fieldgroup.addField(path=path,dataType='dataType',ref=tmp_t_dt.id,array=arrayBool)
-                new_fieldgroup.setDescription(baseFieldGroup.description)
+                new_fieldgroup.setDescription(base_fg_description)
                 res = new_fieldgroup.createFieldGroup()
                 if '$id' in res.keys():
                     t_fieldgroup = fieldgroupmanager.FieldGroupManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
@@ -571,6 +600,7 @@ class Synchronizer:
         self.dict_baseComponents['schema'][name_base_schema] = baseSchema
         descriptors = baseSchema.getDescriptors()
         base_field_groups_names = list(baseSchema.fieldGroups.values())
+        base_schema_description = baseSchema.description
         dict_base_fg_name_id = {name:fg_id for fg_id,name in baseSchema.fieldGroups.items()}
         for target in self.dict_targetsConfig.keys():
             targetSchemaAPI = schema.Schema(config=self.dict_targetsConfig[target])
@@ -582,9 +612,13 @@ class Synchronizer:
                 t_schema = schemamanager.SchemaManager(targetSchemaAPI.data.schemas_altId[name_base_schema],config=self.dict_targetsConfig[target],sandbox=target)
                 new_fieldgroups = [fg for fg in base_field_groups_names if fg not in t_schema.fieldGroups.values()]
                 existing_fieldgroups = [fg for fg in base_field_groups_names if fg in t_schema.fieldGroups.values()]
-                if len(new_fieldgroups) > 0 or force==True: ## if new field groups
+                if len(new_fieldgroups) > 0 or base_schema_description != t_schema.description or force==True: ## if new field groups
                     if verbose:
-                        print('found new field groups to add to the schema')
+                        if force == False:
+                            print('found difference in the schema, updating it')
+                        else:
+                            print('force flag is set to True, updating the schema')
+                    ## handling field groups
                     for new_fieldgroup in new_fieldgroups:
                         if baseSchema.tenantId[1:] not in dict_base_fg_name_id[new_fieldgroup]: ## ootb field group
                             if verbose:
@@ -598,7 +632,7 @@ class Synchronizer:
                             print(f"Creating new custom field group '{tmp_FieldGroup.title}'")
                             self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose,force=force)
                             t_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup].id)
-                    t_schema.setDescription(baseSchema.description)
+                    t_schema.setDescription(base_schema_description)
                     res = t_schema.updateSchema()
                     if '$id' not in res.keys():
                         raise Exception(res)
@@ -652,6 +686,7 @@ class Synchronizer:
                 else:
                     classId_toUse = baseClassId
                 new_schema = schemamanager.SchemaManager(title=name_base_schema,config=self.dict_targetsConfig[target],schemaClass=classId_toUse,sandbox=target)
+                new_schema.setDescription(base_schema_description)
                 for fg_name in base_field_groups_names:
                     if baseSchema.tenantId[1:] not in dict_base_fg_name_id[fg_name]: ## ootb field group
                         new_schema.addFieldGroup(dict_base_fg_name_id[fg_name])
@@ -665,7 +700,6 @@ class Synchronizer:
                         tmp_FieldGroup = baseSchema.getFieldGroupManager(fg_name)
                         self.__syncFieldGroup__(tmp_FieldGroup,force=force,verbose=verbose)
                         new_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][fg_name].id)
-                new_schema.setDescription(baseSchema.description)
                 res = new_schema.createSchema()
                 if '$id' in res.keys():
                     t_schema = schemamanager.SchemaManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
@@ -739,9 +773,10 @@ class Synchronizer:
                         baseIdentities = identityConn.getIdentities()
                     elif self.localfolder is not None:
                         baseIdentities = []
-                        for file in self.identityFolder.glob('*.json'):
-                            id_file = json.load(FileIO(file))
-                            baseIdentities.append(id_file)
+                        for folder in self.identityFolder:
+                            for file in folder.glob('*.json'):
+                                id_file = json.load(FileIO(file))
+                                baseIdentities.append(id_file)
                     if baseIdentityNS not in [el['xdm:namespace'].lower() for el in target_identitiesDecs]: ## identity descriptor does not exists in target schema
                         def_identity = [el for el in baseIdentities if el['code'].lower() == baseIdentityNS][0]
                         self.__syncIdentity__(def_identity,verbose=verbose)
@@ -852,9 +887,10 @@ class Synchronizer:
                         baseIdentities = identityConn.getIdentities()
                     elif self.localfolder is not None:
                         baseIdentities = []
-                        for file in self.identityFolder.glob('*.json'):
-                            id_file = json.load(FileIO(file))
-                            baseIdentities.append(id_file)
+                        for folder in self.identityFolder:
+                            for file in folder.glob('*.json'):
+                                id_file = json.load(FileIO(file))
+                                baseIdentities.append(id_file)
                     def_identity = [el for el in baseIdentities if el['code'] == baseIdentityNS][0]
                     self.__syncIdentity__(def_identity,verbose=verbose)
                     target_referenceIdentity = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorReferenceIdentity']
@@ -916,6 +952,7 @@ class Synchronizer:
         self.dict_baseComponents['datasets'][baseDataset['name']] = baseDataset
         base_datasetName = baseDataset['name']
         base_dataset_related_schemaId = baseDataset['schemaRef']['id']
+        base_dataset_unifiedTagIds = baseDataset.get('unifiedTags',[])
         if self.baseConfig is not None:
             baseSchemaAPI = schema.Schema(config=self.baseConfig)
             base_schemas = baseSchemaAPI.getSchemas()
@@ -929,7 +966,7 @@ class Synchronizer:
         for target in self.dict_targetsConfig.keys():
             targetCatalog = catalog.Catalog(config=self.dict_targetsConfig[target])
             t_datasets = targetCatalog.getDataSets()
-            if base_datasetName not in targetCatalog.data.ids.keys(): ## only taking care if dataset does not exist
+            if base_datasetName not in targetCatalog.data.ids.keys(): ## if dataset does not exist
                 if verbose:
                     print(f"dataset '{base_datasetName}' does not exist in target {target}, creating it")
                 targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
@@ -940,15 +977,18 @@ class Synchronizer:
                     baseSchemaManager = schemamanager.SchemaManager(base_dataset_related_schemaId,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                     self.__syncSchema__(baseSchemaManager,verbose=verbose)
                     targetSchemaId = self.dict_targetComponents[target]['schema'][base_dataset_related_schemaName].id
-                    res = targetCatalog.createDataSet(name=base_datasetName,schemaId=targetSchemaId)
+                    res = targetCatalog.createDataSet(name=base_datasetName,schemaId=targetSchemaId,unifiedTags=base_dataset_unifiedTagIds)
                     self.dict_targetComponents[target]['datasets'][base_datasetName] = res
                 else: ## schema already exists in target
                     if verbose:
                         print(f"related schema '{base_dataset_related_schemaName}' does exist in target {target}, checking it")
                     baseSchemaManager = schemamanager.SchemaManager(base_dataset_related_schemaId,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                     self.__syncSchema__(baseSchemaManager,verbose=verbose)
-                    targetSchemaId = targetSchema.data.schemas_id[base_dataset_related_schemaName]
-                    res = targetCatalog.createDataSet(name=base_datasetName,schemaId=targetSchemaId)
+                    target_schema = self.dict_targetComponents[target]['schema'][base_dataset_related_schemaName]
+                    targetSchemaId = target_schema.id
+                    print(f"Target Schema ID: {targetSchemaId}")
+                    print(f"unified Tags: {base_dataset_unifiedTagIds}")
+                    res = targetCatalog.createDataSet(name=base_datasetName,schemaId=targetSchemaId,unifiedTags=base_dataset_unifiedTagIds)
                     self.dict_targetComponents[target]['datasets'][base_datasetName] = res
             else: ## dataset already exists in target
                 if verbose:
@@ -958,6 +998,16 @@ class Synchronizer:
                 t_schemas = targetSchema.getSchemas()
                 baseSchemaManager = schemamanager.SchemaManager(base_dataset_related_schemaId,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
                 self.__syncSchema__(baseSchemaManager,verbose=verbose)
+                if verbose:
+                    print(f"dataset '{base_datasetName}' schema synchronized, checking unified tags")
+                if len(base_dataset_unifiedTagIds) > 0:
+                    t_dataset_unifiedTagIds = t_dataset.get('unifiedTags',[])
+                    tags_toAdd = [tagId for tagId in base_dataset_unifiedTagIds if tagId not in t_dataset_unifiedTagIds]
+                    if len(tags_toAdd) > 0:
+                        if verbose:
+                            print(f"adding unified tags to dataset '{base_datasetName}' in target {target}")
+                        t_dataset['unifiedTags'] = t_dataset_unifiedTagIds + tags_toAdd
+                        res = targetCatalog.putDataset(t_dataset['id'],t_dataset)
                 self.dict_targetComponents[target]['datasets'][base_datasetName] = t_dataset
 
     def __syncMergePolicy__(self,mergePolicy:dict,verbose:bool=False)->None:
@@ -1036,7 +1086,8 @@ class Synchronizer:
                     "expression":baseAudience.get('expression',[]),
                     "ansibleDataModel":baseAudience.get('ansibleDataModel',{}),
                     "profileInstanceId":baseAudience.get('profileInstanceId',''),
-                    "evaluationInfo":baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}})
+                    "evaluationInfo":baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}}),
+                    "tags":baseAudience.get('tags',[])
                 }
                 res = targetAudiences.createAudience(audienceDef)
                 if 'id' in res.keys():
@@ -1052,6 +1103,7 @@ class Synchronizer:
                 t_audience['expression'] = baseAudience.get('expression',[])
                 t_audience['ansibleDataModel'] = baseAudience.get('ansibleDataModel',{})
                 t_audience['evaluationInfo'] = baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}})
+                t_audience['tags'] = baseAudience.get('tags',[])
                 res = targetAudiences.putAudience(t_audience['id'],t_audience)
                 self.dict_targetComponents[target]['audience'][audience_name] = res
 

@@ -180,7 +180,7 @@ List all datasets in the current sandbox (Basic info).
 ### get_datasets_infos
 List all datasets with detailed storage and row count statistics.
 
-### do_get_datasets_tableName
+### do_get_datasets_tableNames
 Get the table names associated with dataset names and ID.\
 
 
@@ -194,7 +194,7 @@ Retrieve the observable schema CSV for a specific dataset.\
 Arguments:
 * `dataset` : The Dataset ID or Name.
 
-### _get_snapshot_datasets
+### get_snapshot_datasets
 Get the list of snapshot datasets in the current sandbox.\
 
 ### createDataset
@@ -266,6 +266,7 @@ Arguments:
 Execute a raw SQL query against the Data Lake.\
 Arguments:
 * `sql_query` : The SQL string to execute.
+* `-sv`, `--save` : Path to save the query results as a CSV file.
 
 
 ## Tools & Migration
@@ -302,16 +303,19 @@ Arguments:
 ### get_sandboxes
 List all sandboxes available in the current organization.
 
+### get_tags
+Get the tag associated with your organization.
+
 ### get_profile_paths_info
 Get usage details for all Profile paths.\
 No arguments.\
-This will take a long time.
+**This will take a long time.**
 
 
 ### get_event_paths_info
 Get the information details for all Experience Event paths.\
 No arguments. 
-This will take a long time.
+**This will take a long time.**
 
 
 ### get_profile_path_info

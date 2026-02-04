@@ -167,8 +167,10 @@ class SchemaManager:
                     fgM = FieldGroupManager(fieldGroup=definition,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
                 self.fieldGroupsManagers[fgM.title] = fgM
             for clas in self.classIds:
+                clsM = None
                 clsM = ClassManager(clas,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
-                self.classManagers[clsM.title] = clsM
+                if clsM is not None:
+                    self.classManagers[clsM.title] = clsM
         elif type(schema) == str:
             if self.schemaAPI is not None:
                 self.schema = self.schemaAPI.getSchema(schema,full=False,schema_type='xed')
@@ -254,6 +256,7 @@ class SchemaManager:
                 fgM = FieldGroupManager(fieldGroup=definition,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
                 self.fieldGroupsManagers[fgM.title] = fgM
             for clas in self.classIds:
+                clsM = None
                 if self.localfolder is not None:
                     found = False
                     for folder in self.classFolder:
@@ -269,7 +272,8 @@ class SchemaManager:
                             break
                 elif self.schemaAPI is not None:
                     clsM = ClassManager(clas,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
-                self.classManagers[clsM.title] = clsM
+                if clsM is not None:
+                    self.classManagers[clsM.title] = clsM
         elif schema is None:
             self.STATE = "NEW"
             self.classId = schemaClass
@@ -284,8 +288,10 @@ class SchemaManager:
                         ]
                     }
             for clas in self.classIds:
+                clsM = None
                 clsM = ClassManager(clas,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
-                self.classManagers[clsM.title] = clsM
+                if clsM is not None:
+                    self.classManagers[clsM.title] = clsM
         if fieldGroups is not None and type(fieldGroups) == list:
             if fieldGroups[0] == str:
                 for fgId in fieldGroups:
@@ -322,9 +328,11 @@ class SchemaManager:
                     self.fieldGroupsManagers[fgM.title] = fgM
             elif fieldGroups[0] == dict:
                 for fg in fieldGroups:
+                    fgM = None
                     self.fieldGroupIds.append(fg.get('$id'))
                     fgM = FieldGroupManager(fg,schemaAPI=self.schemaAPI, localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
-                    self.fieldGroupsManagers[fgM.title] = fgM
+                    if fgM is not None:
+                        self.fieldGroupsManagers[fgM.title] = fgM
         self.fieldGroupTitles= tuple(fg.title for fg in list(self.fieldGroupsManagers.values()))
         self.fieldGroups = {fg.id:fg.title for fg in list(self.fieldGroupsManagers.values())}
         self.fieldGroupIds = tuple(fg.id for fg in list(self.fieldGroupsManagers.values()))

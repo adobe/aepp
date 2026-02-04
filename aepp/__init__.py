@@ -159,9 +159,8 @@ def __titleSafe__(text: str) -> str:
     Arguments:
         text : REQUIRED : the text to be converted
     """
-    invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*', ' ']
-    for char in invalid_chars:
-        text = text.replace(char, '_')
+    valid_chars = "[^a-zA-Z0-9_\n\\.]"
+    text = re.sub(valid_chars, "_", text)
     return text
 
 
@@ -187,7 +186,7 @@ def extractSandboxArtifacts(
         completePath = mypath / f'{sandbox.sandbox}'
     else:
         completePath = Path(localFolder)
-    from aepp import schema, catalog, identity,customerprofile, segmentation
+    from aepp import schema, catalog, identity,customerprofile, segmentation, tags
     sch = schema.Schema(config=sandbox)
     cat = catalog.Catalog(config=sandbox)
     ide = identity.Identity(config=sandbox,region=region)
@@ -223,6 +222,16 @@ def extractSandboxArtifacts(
     mergePolicyPath.mkdir(exist_ok=True)
     audiencePath = completePath / 'audience'
     audiencePath.mkdir(exist_ok=True)
+    tagPath = completePath / 'tag'
+    tagPath.mkdir(exist_ok=True)
+    ## handling tags
+    tag_manager = tags.Tags(config=sandbox)
+    all_tags = tag_manager.getTags()
+    dict_id_name = {tag['id']:tag['name'] for tag in all_tags}
+    for tag in all_tags:
+        safe_name = __titleSafe__(tag.get('name','unknown'))
+        with open(f"{tagPath / safe_name}.json",'w') as f:
+            json.dump(tag,f,indent=2)
     myclasses = sch.getClasses()
     classesGlobal = sch.getClassesGlobal()
     behaviors = sch.getBehaviors()
@@ -290,6 +299,9 @@ def extractSandboxArtifacts(
     datasets = cat.getDataSets()
     for key,value in datasets.items():
         value['id'] = key
+        if len(value.get('unifiedTags',[])) > 0:
+            tag_names = [dict_id_name.get(tag_id) for tag_id in value.get('unifiedTags',[])]
+            value['unifiedTags'] = tag_names
         with open(f"{datasetPath / value.get('tags',{}).get('adobe/pqs/table',[key])[0]}.json",'w') as f:
             json.dump(value,f,indent=2)
     identities = ide.getIdentities()
@@ -307,6 +319,9 @@ def extractSandboxArtifacts(
     audiences = mysegmentation.getAudiences()
     for el in audiences:
         safe_name = __titleSafe__(el.get('name','unknown'))
+        if len(el.get('tags',[])) > 0:
+            tag_names = [dict_id_name.get(tag_id) for tag_id in el.get('tags',[])]
+            el['tags'] = tag_names
         with open(f"{audiencePath / safe_name}.json",'w') as f:
             json.dump(el,f,indent=2)
 
@@ -345,9 +360,17 @@ def extractSandboxArtifact(
     with open(f'{completePath}/config.json','w') as f:
         json.dump(globalConfig,f,indent=2)
     
-    from aepp import schema, catalog, identity
+    from aepp import schema, catalog, tags
     sch = schema.Schema(config=sandbox)
     cat = catalog.Catalog(config=sandbox)
+    ### taking care of tas
+    tagPath = completePath / 'tag'
+    tagPath.mkdir(exist_ok=True)
+    tag_manager = tags.Tags(config=sandbox)
+    all_tags = tag_manager.getTags()
+    dict_tag_id_name = {tag['id']:tag['name'] for tag in all_tags}
+    with open(f'{tagPath}/tags.json','w') as f:
+        json.dump(all_tags,f,indent=2)
     if artifactType == 'class':
         __extractClass__(artifact,completePath,sandbox)
     elif artifactType == 'schema':
@@ -357,16 +380,16 @@ def extractSandboxArtifact(
     elif artifactType == 'datatype':
         __extractDataType__(artifact,completePath,sandbox)
     elif artifactType == 'dataset':
-        __extractDataset__(artifact,completePath,sandbox,region)
+        __extractDataset__(artifact,completePath,sandbox,region,dict_tag_id_name)
     elif artifactType == 'identity':
         __extractIdentity__(artifact,region,completePath,sandbox)
     elif artifactType == 'mergepolicy':
-        __extractMergePolicy__(artifact,completePath,sandbox)
+        __extractMergePolicy__(artifact,completePath,sandbox,dict_tag_id_name=dict_tag_id_name)
     elif artifactType == 'audience':
-        __extractAudience__(artifact,completePath,sandbox)
+        __extractAudience__(artifact,completePath,sandbox,dict_tag_id_name)
     else:
         raise ValueError("artifactType not recognized")
-    
+
 def __extractClass__(classEl: str,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None):
     classPath = Path(folder) / 'class'
     classPath.mkdir(exist_ok=True)
@@ -511,7 +534,7 @@ def __extractIdentity__(identityStr: str,region:str=None,folder: Union[str, Path
     with open(f"{identityPath / file_name}.json",'w') as f:
         json.dump(myIdentity,f,indent=2)
 
-def __extractDataset__(dataset: str,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None, region:str=None):
+def __extractDataset__(dataset: str,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None, region:str=None,dict_tag_id_name: dict = None,**kwargs):
     from aepp import catalog
     cat = catalog.Catalog(config=sandbox)
     datasets = cat.getDataSets()
@@ -520,6 +543,9 @@ def __extractDataset__(dataset: str,folder: Union[str, Path] = None,sandbox: 'Co
         if key == dataset or value.get('tags',{}).get('adobe/pqs/table',[''])[0] == dataset or value.get('name','') == dataset:
             myDataset = value
             myDataset['id'] = key
+            if dict_tag_id_name is not None and len(myDataset.get('unifiedTags',[])) > 0:
+                tag_names = [dict_tag_id_name.get(tag_id) for tag_id in myDataset.get('unifiedTags',[])]
+                myDataset['unifiedTags'] = tag_names
     if myDataset is None:
         raise ValueError("Dataset not found")
     datasetPath = Path(folder) / 'dataset'
@@ -531,7 +557,7 @@ def __extractDataset__(dataset: str,folder: Union[str, Path] = None,sandbox: 'Co
     if schema is not None:
         __extractSchema__(schema,folder,sandbox,region)
 
-def __extractMergePolicy__(mergePolicy: str = None,folder:Union[str, Path]=None, sandbox: 'ConnectObject' = None,region:str=None):
+def __extractMergePolicy__(mergePolicy: str = None,folder:Union[str, Path]=None, sandbox: 'ConnectObject' = None,region:str=None,dict_tag_id_name: dict = None,**kwargs):
     from aepp import customerprofile
     ups = customerprofile.Profile(config=sandbox)
     mymergePolicies = ups.getMergePolicies()
@@ -539,13 +565,13 @@ def __extractMergePolicy__(mergePolicy: str = None,folder:Union[str, Path]=None,
     if mymergePolicy['attributeMerge'].get('type','timestampOrdered') == 'dataSetPrecedence':
         list_ds = mymergePolicy['attributeMerge'].get('order',[])
         for ds in list_ds:
-            __extractDataset__(ds,folder,sandbox,region)
+            __extractDataset__(ds,folder,sandbox,region,dict_tag_id_name=dict_tag_id_name)
     mergePolicyPath = Path(folder) / 'mergePolicy'
     mergePolicyPath.mkdir(exist_ok=True)
     with open(f"{mergePolicyPath / mymergePolicy.get('id','unknown')}.json",'w') as f:
         json.dump(mymergePolicy,f,indent=2)
 
-def __extractAudience__(audienceName: str = None,folder:Union[str, Path]=None, sandbox: 'ConnectObject' = None):
+def __extractAudience__(audienceName: str = None,folder:Union[str, Path]=None, sandbox: 'ConnectObject' = None,dict_tag_id_name: dict = None,**kwargs):
     from aepp import segmentation
     mysegmentation = segmentation.Segmentation(config=sandbox) 
     audiences = mysegmentation.getAudiences()
@@ -553,5 +579,8 @@ def __extractAudience__(audienceName: str = None,folder:Union[str, Path]=None, s
     audiencePath = Path(folder) / 'audience'
     audiencePath.mkdir(exist_ok=True)
     safe_name = __titleSafe__(myaudience.get('name','unknown'))
+    if len(myaudience.get('tags',[])) > 0 and dict_tag_id_name is not None:
+        tag_names = [dict_tag_id_name.get(tag_id) for tag_id in myaudience.get('tags',[])]
+        myaudience['tags'] = tag_names
     with open(f"{audiencePath / safe_name}.json",'w') as f:
         json.dump(myaudience,f,indent=2)

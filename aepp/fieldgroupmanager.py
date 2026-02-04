@@ -241,7 +241,7 @@ class FieldGroupManager:
                                     if '/datatypes/' in str(self.fieldGroup):
                                         dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
                                         dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup.get('definitions')))
-                                        for file in self.datatypeFolder.glob('*.json'):
+                                        for file in folder.glob('*.json'):
                                             tmp_def = json.load(FileIO(file))
                                             if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
                                                 dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
