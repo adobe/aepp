@@ -86,8 +86,8 @@ class Identity:
             self.sandbox = self.connector.config["sandbox"]
 
         environment = config["environment"]
-        base_url = f"https://platform-{region}.adobe.io"
-
+        #base_url = f"https://platform-{region}.adobe.io"
+        base_url = f"https://platform.adobe.io"
         if environment != "prod":
             base_url = f"https://platform-{environment}-{region}.adobe.io"
 
