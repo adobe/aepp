@@ -16,7 +16,7 @@ from typing import Union
 from pathlib import Path
 from io import FileIO
 from .configs import ConnectObject
-
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 class Synchronizer:
     ## TO DO -> Add support for local environment
@@ -46,6 +46,9 @@ class Synchronizer:
         """
         self.baseSandbox = None
         self.localfolder = None
+        self.baseConfig = None
+        self.baseSandbox = None
+        self.dict_tag_name_id = {}
         if targets is None:
             raise ValueError("a list of target sandboxes must be provided - at least one")
         if config is None or type(config) != ConnectObject:
@@ -60,7 +63,6 @@ class Synchronizer:
                                             connectInstance=True)
             self.baseSandbox = baseSandbox
         elif localFolder is not None:
-            self.baseConfig = None
             if isinstance(localFolder, str):
                 self.localfolder = [Path(localFolder)]
             else:
@@ -77,7 +79,6 @@ class Synchronizer:
             self.mergePolicyFolder = [folder / 'mergepolicy' for folder in self.localfolder]
             self.audienceFolder = [folder / 'audience' for folder in self.localfolder]
             self.tagFolder = [folder / 'tag' for folder in self.localfolder]
-            self.dict_tag_name_id = {}
             for folder in self.tagFolder:
                 try:
                     if folder.exists():
@@ -253,8 +254,8 @@ class Synchronizer:
                         for file in folder.glob('*.json'):
                             ds_file = json.load(FileIO(file))
                             if ds_file['id'] == component or ds_file['name'] == component:
-                                if ds_file.get('UnifiedTags',[]) != [] and self.dict_tag_name_id is not None:
-                                    ds_file['unifiedTags'] = [self.dict_tag_name_id[tag_name] for tag_name in ds_file.get('UnifiedTags',[]) if tag_name in self.dict_tag_name_id.keys()]
+                                if len(ds_file.get('unifiedTags',[])) > 0 and self.dict_tag_name_id is not None:
+                                    ds_file['unifiedTags'] = [self.dict_tag_name_id[tag_name] for tag_name in ds_file.get('unifiedTags',[]) if tag_name in self.dict_tag_name_id.keys()]
                                 component = ds_file
                                 break
                 if len(component) == 1: ## if the component is the catalog API response {'key': {dataset definition}}
@@ -302,6 +303,8 @@ class Synchronizer:
                 componentType = 'identity'
             elif 'files' in component.keys():
                 componentType = 'dataset'
+                if len(component.get('unifiedTags',[])) > 0 and self.dict_tag_name_id is not None:
+                    component['unifiedTags'] = [self.dict_tag_name_id[tag_name] for tag_name in component.get('UnifiedTags',[]) if tag_name in self.dict_tag_name_id.keys()]
             elif 'attributeMerge' in component.keys():
                 componentType = 'mergepolicy'
             elif 'expression' in component.keys():
@@ -324,7 +327,124 @@ class Synchronizer:
         if componentType == 'mergepolicy':
             self.__syncMergePolicy__(component,verbose=verbose)
         if componentType == 'audience':
-            self.__syncAudience__(component,verbose=verbose)
+            self.__syncAudience__(component,verbose=verbose,force=force)
+
+    
+    # def syncAll(self,force:bool=False,verbose:bool=False)-> None:
+    #     """
+    #     Synchronize all the components to the target sandboxes.
+    #     It will synchronize the components in the following order: 
+    #     1. Identities
+    #     2. Data Types
+    #     3. Classes
+    #     4. Field Groups
+    #     5. Schemas
+    #     6. Datasets
+    #     Because the Merge Policies and Audiences needs the dataset and schema to be enabled in the target sandbox, and the synchronizer does not currently support enabling them for UPS.
+    #     They will not sync with that method.
+    #     Arguments:
+    #         force : OPTIONAL : if True, it will force the synchronization of the components even if they already exist in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
+    #         verbose : OPTIONAL : if True, it will print the details of the synchronization process
+    #     """
+    #     if self.baseConfig is not None:
+    #         baseSchemaAPI = schema.Schema(config=self.baseConfig)
+    #         baseCatalog = catalog.Catalog(config=self.baseConfig)
+    #         baseIdentity = identity.Identity(config=self.baseConfig)
+    #         base_identities = baseIdentity.getIdentities(only_custom=True)
+    #         base_classes = baseSchemaAPI.getClasses()
+    #         base_datatypes = baseSchemaAPI.getDataTypes()
+    #         base_fieldgroups = baseSchemaAPI.getFieldGroups()
+    #         base_schemas = baseSchemaAPI.getSchemas()
+    #         base_datasets = baseCatalog.getDataSets(output='list')
+    #     elif self.localfolder is not None:
+    #         base_identities = []
+    #         for folder in self.identityFolder:
+    #             for file in folder.glob('*.json'):
+    #                 id_file = json.load(FileIO(file))
+    #                 base_identities.append(id_file)
+    #         base_classes = []
+    #         for folder in self.classFolder:
+    #             for file in folder.glob('*.json'):
+    #                 class_file = json.load(FileIO(file))
+    #                 base_classes.append(class_file)
+    #         base_datatypes = []
+    #         for folder in self.datatypeFolder:
+    #             for file in folder.glob('*.json'):
+    #                 dt_file = json.load(FileIO(file))
+    #                 base_datatypes.append(dt_file)
+    #         base_fieldgroups = []
+    #         for folder in self.fieldgroupFolder:
+    #             for file in folder.glob('*.json'):
+    #                 fg_file = json.load(FileIO(file))
+    #                 base_fieldgroups.append(fg_file)
+    #         base_schemas = []
+    #         for folder in self.schemaFolder:
+    #             for file in folder.glob('*.json'):
+    #                 sc_file = json.load(FileIO(file))
+    #                 base_schemas.append(sc_file)
+    #         base_datasets = []
+    #         for folder in self.datasetFolder:
+    #             for file in folder.glob('*.json'):
+    #                 ds_file = json.load(FileIO(file))
+    #                 if len(ds_file.get('unifiedTags',[])) > 0 and self.dict_tag_name_id is not None:
+    #                     ds_file['unifiedTags'] = [self.dict_tag_name_id[tag_name] for tag_name in ds_file.get('unifiedTags',[]) if tag_name in self.dict_tag_name_id.keys()]
+    #                 base_datasets.append(ds_file)
+    #     else:
+    #         raise ValueError("a base sandbox or a local folder must be provided to synchronize the components")
+    #     with ThreadPoolExecutor(thread_name_prefix = 'idenity_creation') as thread_pool:
+    #         results = thread_pool.map(self.__syncIdentity__, base_identities, [verbose]*len(base_identities))
+    #     ### Base Schema Part
+    #     shared_manager_kwargs = {
+    #         'config': self.baseConfig,
+    #         'localFolder': self.localfolder,
+    #         'sandbox': self.baseSandbox
+    #         }
+    #     #base_fieldgroups_ids = [fg["$id"] for fg in base_fieldgroups]
+    #     base_schemas_ids = [sc["$id"] for sc in base_schemas]
+    #     with ThreadPoolExecutor(thread_name_prefix = 'Managers',max_workers=10) as executor:
+    #         futures = [executor.submit(datatypemanager.DataTypeManager, dt, **shared_manager_kwargs) for dt in base_datatypes]
+    #         base_dt_managers = [f.result() for f in futures]
+    #         if verbose:
+    #             print("Base DataType Managers created")
+    #         futures = [executor.submit(classmanager.ClassManager, cl, **shared_manager_kwargs) for cl in base_classes]
+    #         base_class_managers = [f.result() for f in futures]
+    #         if verbose:
+    #             print("Base Class Managers created")
+    #         futures = [executor.submit(fieldgroupmanager.FieldGroupManager, fg, **shared_manager_kwargs) for fg in base_fieldgroups]
+    #         base_fg_managers = [f.result() for f in futures]
+    #         if verbose:
+    #             print("Base FieldGroup Managers created")
+    #         futures = [executor.submit(schemamanager.SchemaManager, sc, **shared_manager_kwargs) for sc in base_schemas_ids]
+    #         base_schema_managers = [f.result() for f in futures]
+    #         if verbose:
+    #             print("Base Schema Managers created")
+
+            
+    #     ### Syncing schema components
+    #     if verbose:
+    #         print("Syncing Data Types...")
+    #     with ThreadPoolExecutor(thread_name_prefix = 'DataTypeSync') as executor:
+    #         futures = [executor.submit(self.__syncDataType__, dt_manager, force=force, verbose=verbose) for dt_manager in base_dt_managers]
+    #         _ = [f.result() for f in futures]
+    #     if verbose:
+    #         print("Syncing Classes...")
+    #     with ThreadPoolExecutor(thread_name_prefix = 'ClassSync') as executor:
+    #         futures = [executor.submit(self.__syncClass__, cl_manager, force=force, verbose=verbose) for cl_manager in base_class_managers]
+    #         _ = [f.result() for f in futures]
+    #     if verbose:
+    #         print("Syncing FieldGroups...")
+    #     with ThreadPoolExecutor(thread_name_prefix = 'FieldGroupSync') as executor:
+    #         futures = [executor.submit(self.__syncFieldGroup__, fg_manager, force=force, verbose=verbose) for fg_manager in base_fg_managers]
+    #         _ = [f.result() for f in futures]
+    #     if verbose:
+    #         print("Syncing Schemas...")
+    #     with ThreadPoolExecutor(thread_name_prefix = 'SchemaSync') as executor:
+    #         futures = [executor.submit(self.__syncSchema__, sc_manager, force=force, verbose=verbose) for sc_manager in base_schema_managers]
+    #         _ = [f.result() for f in futures]
+    #     ### Syncing datasets
+    #     with ThreadPoolExecutor(thread_name_prefix = 'DatasetSync') as executor:
+    #         futures = [executor.submit(self.__syncDataset__, ds, force=force, verbose=verbose) for ds in base_datasets]
+    #         _ = [f.result() for f in futures]
 
             
     def __syncClass__(self,baseClass:'ClassManager',force:bool=False,verbose:bool=False)-> dict:
@@ -965,8 +1085,8 @@ class Synchronizer:
             base_dataset_related_schemaName = [sc['title'] for sc in base_schemas if sc['$id'] == base_dataset_related_schemaId][0]
         for target in self.dict_targetsConfig.keys():
             targetCatalog = catalog.Catalog(config=self.dict_targetsConfig[target])
-            t_datasets = targetCatalog.getDataSets()
-            if base_datasetName not in targetCatalog.data.ids.keys(): ## if dataset does not exist
+            t_datasets = targetCatalog.getDataSets(output='list')
+            if base_datasetName not in [tds['name'] for tds in t_datasets]: ## if dataset does not exist
                 if verbose:
                     print(f"dataset '{base_datasetName}' does not exist in target {target}, creating it")
                 targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
@@ -978,7 +1098,9 @@ class Synchronizer:
                     self.__syncSchema__(baseSchemaManager,verbose=verbose)
                     targetSchemaId = self.dict_targetComponents[target]['schema'][base_dataset_related_schemaName].id
                     res = targetCatalog.createDataSet(name=base_datasetName,schemaId=targetSchemaId,unifiedTags=base_dataset_unifiedTagIds)
-                    self.dict_targetComponents[target]['datasets'][base_datasetName] = res
+                    t_datasets = targetCatalog.getDataSets(output='list')
+                    t_dataset = [tds for tds in t_datasets if tds['name'] == base_datasetName][0]
+                    self.dict_targetComponents[target]['datasets'][base_datasetName] = {t_dataset['id']:t_dataset}
                 else: ## schema already exists in target
                     if verbose:
                         print(f"related schema '{base_dataset_related_schemaName}' does exist in target {target}, checking it")
@@ -986,14 +1108,16 @@ class Synchronizer:
                     self.__syncSchema__(baseSchemaManager,verbose=verbose)
                     target_schema = self.dict_targetComponents[target]['schema'][base_dataset_related_schemaName]
                     targetSchemaId = target_schema.id
-                    print(f"Target Schema ID: {targetSchemaId}")
-                    print(f"unified Tags: {base_dataset_unifiedTagIds}")
                     res = targetCatalog.createDataSet(name=base_datasetName,schemaId=targetSchemaId,unifiedTags=base_dataset_unifiedTagIds)
-                    self.dict_targetComponents[target]['datasets'][base_datasetName] = res
+                    t_datasets = targetCatalog.getDataSets(output='list')
+                    t_dataset = [tds for tds in t_datasets if tds['name'] == base_datasetName][0]
+                    self.dict_targetComponents[target]['datasets'][base_datasetName] = {t_dataset['id']:t_dataset}
             else: ## dataset already exists in target
                 if verbose:
                     print(f"dataset '{base_datasetName}' already exists in target {target}, checking its schema")
                 t_dataset = targetCatalog.getDataSet(targetCatalog.data.ids[base_datasetName])
+                t_dataset_def = t_dataset[list(t_dataset.keys())[0]]
+                t_dataset_def['id'] = list(t_dataset.keys())[0]
                 targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
                 t_schemas = targetSchema.getSchemas()
                 baseSchemaManager = schemamanager.SchemaManager(base_dataset_related_schemaId,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
@@ -1001,14 +1125,14 @@ class Synchronizer:
                 if verbose:
                     print(f"dataset '{base_datasetName}' schema synchronized, checking unified tags")
                 if len(base_dataset_unifiedTagIds) > 0:
-                    t_dataset_unifiedTagIds = t_dataset.get('unifiedTags',[])
-                    tags_toAdd = [tagId for tagId in base_dataset_unifiedTagIds if tagId not in t_dataset_unifiedTagIds]
+                    t_dataset_unifiedTagIds = t_dataset_def.get('unifiedTags',[])
+                    tags_toAdd = list(set(base_dataset_unifiedTagIds).difference(t_dataset_unifiedTagIds))
                     if len(tags_toAdd) > 0:
                         if verbose:
                             print(f"adding unified tags to dataset '{base_datasetName}' in target {target}")
-                        t_dataset['unifiedTags'] = t_dataset_unifiedTagIds + tags_toAdd
-                        res = targetCatalog.putDataset(t_dataset['id'],t_dataset)
-                self.dict_targetComponents[target]['datasets'][base_datasetName] = t_dataset
+                        t_dataset_def['unifiedTags'] = tags_toAdd
+                        res = targetCatalog.putDataset(t_dataset_def['id'],t_dataset_def)
+                self.dict_targetComponents[target]['datasets'][base_datasetName] = {t_dataset['id'] : t_dataset}
 
     def __syncMergePolicy__(self,mergePolicy:dict,verbose:bool=False)->None:
         """
@@ -1062,11 +1186,12 @@ class Synchronizer:
                     print(f"merge policy '{mergePolicy_name}' already exists in target {target}, saving it")
                 self.dict_targetComponents[target]['mergePolicy'][mergePolicy_name] = [el for el in t_mergePolicies if el.get('name','') == mergePolicy_name][0]
 
-    def __syncAudience__(self,baseAudience:dict,verbose:bool=False)-> None:
+    def __syncAudience__(self,baseAudience:dict,verbose:bool=False,force:bool=False)-> None:
         """
         Synchronize an audience to the target sandboxes.
         Arguments:
             baseAudience : REQUIRED : dictionary with the audience definition
+            force : OPTIONAL : boolean to force the update of the audience in the target sandbox even if it already exists (default is False)
         """
         if not isinstance(baseAudience,dict):
             raise TypeError("the baseAudience must be a dictionary")
@@ -1097,13 +1222,18 @@ class Synchronizer:
                     raise Exception("the audience could not be created in the target sandbox")
             else: ## audience already exists in target
                 if verbose:
-                    print(f"audience '{audience_name}' already exists in target {target}, updating it")
-                t_audience = [el for el in t_audiences if el['name'] == audience_name][0]
-                t_audience['description'] = baseAudience.get('description','')
-                t_audience['expression'] = baseAudience.get('expression',[])
-                t_audience['ansibleDataModel'] = baseAudience.get('ansibleDataModel',{})
-                t_audience['evaluationInfo'] = baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}})
-                t_audience['tags'] = baseAudience.get('tags',[])
-                res = targetAudiences.putAudience(t_audience['id'],t_audience)
-                self.dict_targetComponents[target]['audience'][audience_name] = res
+                    print(f"audience '{audience_name}' already exists in target {target}, checking it")
+                if str(t_audience['expression']) != str(baseAudience.get('expression',[])) or len(baseAudience.get('tags',[])).difference(set(t_audience.get('tags',[])))>0 or force == True:
+                    if verbose:
+                        print(f"Updating '{audience_name}' in target {target}")
+                    t_audience = [el for el in t_audiences if el['name'] == audience_name][0]
+                    t_audience['description'] = baseAudience.get('description','')
+                    t_audience['expression'] = baseAudience.get('expression',[])
+                    t_audience['ansibleDataModel'] = baseAudience.get('ansibleDataModel',{})
+                    t_audience['evaluationInfo'] = baseAudience.get('evaluationInfo',{'batch': {'enabled': True}, 'continuous': {'enabled': False},'synchronous': {'enabled': False}})
+                    t_audience['tags'] = baseAudience.get('tags',[])
+                    res = targetAudiences.putAudience(t_audience['id'],t_audience)
+                    self.dict_targetComponents[target]['audience'][audience_name] = res
+                else: 
+                    self.dict_targetComponents[target]['audience'][audience_name] = [el for el in t_audiences if el['name'] == audience_name][0]
 

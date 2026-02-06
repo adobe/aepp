@@ -269,15 +269,30 @@ Arguments:
 * `-sv`, `--save` : Path to save the query results as a CSV file.
 
 
+## Profile API 
+
+### get_profile_attributes
+Retrieve the profile attributes for a specific user, saving it in a JSON file.\
+Arguments:
+* `-uid`,`--user_id` : User ID of the user.
+* `-ns`,`--namespace` : Namespace of the user.
+
+### get_profile_events
+Retrieve all UPS events for a specific user, saving it in a JSON file.\
+Arguments:
+* `-uid`,`--user_id` : User ID of the user.
+* `-ns`,`--namespace` : Namespace of the user.
+
+
 ## Tools & Migration
 
-### extractArtifacts
+### extract_artifacts
 Bulk extract sandbox components to a local folder.\
 Arguments:
 * `-lf`, `--localfolder` : Destination folder (default: ./extractions).
 * `-rg`, `--region` : Source region (default: 'ndl2').
 
-### extractArtifact
+### extract_artifact
 Extract a single specific artifact.\
 Arguments:
 * `artifact` : Name or ID of the artifact.
@@ -306,24 +321,24 @@ List all sandboxes available in the current organization.
 ### get_tags
 Get the tag associated with your organization.
 
-### get_profile_paths_info
+### get_profile_attributes_lineage
 Get usage details for all Profile paths.\
 No arguments.\
 **This will take a long time.**
 
 
-### get_event_paths_info
+### get_event_attributes_lineage
 Get the information details for all Experience Event paths.\
 No arguments. 
 **This will take a long time.**
 
 
-### get_profile_path_info
+### get_profile_attribute_lineage
 Get usage details for a specific Profile path.\
 Arguments:
 * `path` : The Profile path to analyze.
 
-### get_event_path_info
+### get_event_attribute_lineage
 Get usage details for a specific Experience Event path.\
 Arguments:
 * `path` : The Experience Event path to analyze.

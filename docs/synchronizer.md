@@ -84,11 +84,11 @@ It means that the **name** of the schema, class, field group, data type, dataset
 
 As of today, the synchronization will realize the following operation for the different artifacts: 
 
-Operation |Schema | Class | Field Groups | Data Type | Descriptors | Dataset | Identity | Merge Policy | Audiences
---| -- | -- | -- | -- | -- | -- | -- | -- | -- |
-Create | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
-Update | Supported | Supported | Supported | Supported | Suppported | - | - | - | Supported |
-Delete | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported |
+Operation |Schema | Class | Field Groups | Data Type | Descriptors | Dataset | Identity | Merge Policy | Audiences | Tags
+--| -- | -- | -- | -- | -- | -- | -- | -- | -- | -- |
+Create | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported | Supported |
+Update | Supported | Supported | Supported | Supported | Suppported | Supported | - | - | Supported | Supported |
+Delete | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Not supported | Supported |
 
 It is not supported to delete an artifact or delete a field in an Field Group or Data Type via the Synchronizer.\
 The synchronizer only supports additive operations 
@@ -131,10 +131,16 @@ When creating an audience, the synchronizer will simply copy the audience defini
 For the audience to be created properly, the fields used in the audience definition must exist in the target sandbox and the schema should have been enabled for Profile.\
 If the fields or schema do not exist in the target sandbox, the audience creation will fail.
 
+### Notes on Tag synchronization
+The tag by themselves would not need to be synchronized as they are automatically created at Organization level.\
+What is supported is the synchronization of the tags association to the different artifacts that support them: 
+* datasets
+* audiences
+
+When the sync happen, if the base has less tags than the target, the target component will be updated to have the same tags as the base. If the base has more tags than the target, the new tags will be added to the target component.\
 
 ## Incoming features
 
-* Tags (dataset)
 * Profile enabling capabilities
 * Data Prep Mappings
 

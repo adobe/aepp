@@ -1,6 +1,6 @@
 from matplotlib.pyplot import table
 import aepp
-from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation
+from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation, customerprofile
 from aepp.cli.upsfieldsanalyzer import UpsFieldsAnalyzer
 import argparse, cmd, shlex, json
 from functools import wraps
@@ -177,7 +177,7 @@ class ServiceShell(cmd.Cmd):
             return
         
     @login_required
-    def do_get_profile_paths_info(self,args:Any)->None:
+    def do_get_profile_attributes_lineage(self,args:Any)->None:
         """Get usage information for all Profile paths"""
         parser = argparse.ArgumentParser(prog='get_profile_paths_info', add_help=True)
         try:
@@ -203,7 +203,7 @@ class ServiceShell(cmd.Cmd):
             return
         
     @login_required
-    def do_get_profile_path_info(self, args:Any) -> None:
+    def do_get_profile_attribute_lineage(self, args:Any) -> None:
         """Get path information on Profile"""
         parser = argparse.ArgumentParser(prog='get_profile_path_info', add_help=True)
         parser.add_argument("path", help="Dot notation of the path to analyze in Profile Storage", default=None,type=str)
@@ -230,7 +230,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_event_paths_info(self,args:Any)->None:
+    def do_get_event_attributes_lineage(self,args:Any)->None:
         """Get information for all Experience Event paths"""
         parser = argparse.ArgumentParser(prog='get_event_paths_info', add_help=True)
         try:
@@ -256,7 +256,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_event_path_info(self, args:Any) -> None:
+    def do_get_event_attribute_lineage(self, args:Any) -> None:
         """Get path information on Experience Event"""
         parser = argparse.ArgumentParser(prog='get_event_path_info', add_help=True)
         parser.add_argument("path", help="Dot notation of the path to analyze in Experience Event Storage", default=None,type=str)
@@ -872,7 +872,6 @@ class ServiceShell(cmd.Cmd):
             datasets = aepp_cat.getDataSets(output='list')
             df_datasets = pd.DataFrame(datasets)
             df_datasets.to_csv(f"{self.config.sandbox}_datasets.csv",index=False)
-            console.print(f"Datasets exported to {self.config.sandbox}_datasets.csv", style="green")
             table = Table(title=f"Datasets in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="white")
             table.add_column("Name", style="white",no_wrap=True)
@@ -888,6 +887,7 @@ class ServiceShell(cmd.Cmd):
                     ds.get('classification').get('dataBehavior','N/A'),
                 )
             console.print(table)
+            console.print(f"Datasets exported to {self.config.sandbox}_datasets.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -972,7 +972,6 @@ class ServiceShell(cmd.Cmd):
             datasets = aepp_cat.getDataSets()
             aepp_cat.data.infos = aepp_cat.data.infos.sort_values(by=['ups_storageSize','datalake_storageSize'], ascending=False)
             aepp_cat.data.infos.to_csv(f"{aepp_cat.sandbox}_datasets_infos.csv",index=False)
-            console.print(f"Datasets infos exported to {aepp_cat.sandbox}_datasets_infos.csv", style="green")
             table = Table(title=f"Datasets in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="white")
             table.add_column("Name", style="white",no_wrap=True)
@@ -990,6 +989,7 @@ class ServiceShell(cmd.Cmd):
                     str(ds.get("datalake_storageSize","N/A")),
                 )
             console.print(table)
+            console.print(f"Datasets infos exported to {aepp_cat.sandbox}_datasets_infos.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1010,7 +1010,6 @@ class ServiceShell(cmd.Cmd):
                 list_ds.append(obj)
             df_datasets = pd.DataFrame(list_ds)
             df_datasets.to_csv(f"{self.config.sandbox}_snapshot_datasets.csv",index=False)
-            console.print(f"Snapshot Datasets exported to {self.config.sandbox}_snapshot_datasets.csv", style="green")
             table = Table(title=f"Snapshot Datasets in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="white")
             table.add_column("Table Name", style="white")
@@ -1024,6 +1023,7 @@ class ServiceShell(cmd.Cmd):
                     [el.split(':')[1] for el in ds.get('tags',{}).get('unifiedProfile',[]) if el.startswith('mergePolicyId')][0]
                 )
             console.print(table)
+            console.print(f"Snapshot Datasets exported to {self.config.sandbox}_snapshot_datasets.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1077,7 +1077,6 @@ class ServiceShell(cmd.Cmd):
             identities = aepp_identity.getIdentities(only_custom=args.custom_only)
             df_identites = pd.DataFrame(identities)
             df_identites.to_csv(f"{self.config.sandbox}_identities.csv",index=False)
-            console.print(f"Identities exported to {self.config.sandbox}_identities.csv", style="green")
             table = Table(title=f"Identities in Sandbox: {self.config.sandbox}")
             table.add_column("Code", style="cyan")
             table.add_column("Name", style="magenta")
@@ -1091,6 +1090,7 @@ class ServiceShell(cmd.Cmd):
                     iden.get("namespaceType","N/A"),
                 )
             console.print(table)
+            console.print(f"Identities exported to {self.config.sandbox}_identities.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1122,8 +1122,7 @@ class ServiceShell(cmd.Cmd):
                 aud['usedInFlow'] = True if segment_shared_dict.get(aud.get("id","N/A"),{}) != {} else False
                 aud['sharedInfo'] = segment_shared_dict.get(aud.get("id","N/A"),{})    
             df_audiences = pd.DataFrame(audiences)
-            df_audiences.to_csv(f"{self.config.sandbox}_audiences.csv",index=False)
-            console.print(f"Audiences exported to {self.config.sandbox}_audiences.csv", style="green")
+            df_audiences.to_csv(f"{self.config.sandbox}_audiences.csv",index=False)   
             table = Table(title=f"Audiences in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="cyan")
             table.add_column("Name", style="magenta")
@@ -1139,6 +1138,7 @@ class ServiceShell(cmd.Cmd):
                     '[green3]True[/green3]' if aud.get("usedInFlow",False) else '[red3]False[/red3]',
                 )
             console.print(table)
+            console.print(f"Audiences exported to {self.config.sandbox}_audiences.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1157,7 +1157,6 @@ class ServiceShell(cmd.Cmd):
             tags = aepp_tag.getTags()
             df_tags = pd.DataFrame(tags)
             df_tags.to_csv(f"tags.csv",index=False)
-            console.print(f"Tags exported to tags.csv", style="green")
             table = Table(title=f"Tags in Organization: {self.config.org_id}")
             table.add_column("ID", style="cyan")
             table.add_column("Name", style="magenta")
@@ -1169,6 +1168,7 @@ class ServiceShell(cmd.Cmd):
                     tg.get("tagCategoryName","N/A"),
                 )
             console.print(table)
+            console.print(f"Tags exported to tags.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1265,7 +1265,6 @@ class ServiceShell(cmd.Cmd):
             if args.internal_flows:
                 filename = f"{filename}_internal"
             df_flows.to_csv(f"{filename}.csv",index=False)
-            console.print(f"Flows exported to {filename}.csv", style="green")
             table = Table(title=f"Flows in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="cyan")
             table.add_column("Name", style="magenta")
@@ -1332,6 +1331,7 @@ class ServiceShell(cmd.Cmd):
                     ])
                 table.add_row(*row_data)
             console.print(table)
+            console.print(f"Flows exported to {filename}.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1446,7 +1446,6 @@ class ServiceShell(cmd.Cmd):
                 list_queries.append(obj)
             df_queries = pd.DataFrame(list_queries)
             df_queries.to_csv(f"{self.config.sandbox}_queries.csv",index=False)
-            console.print(f"Queries exported to {self.config.sandbox}_queries.csv", style="green")
             table = Table(title=f"Queries in Sandbox: {self.config.sandbox}")
             table.add_column("ID", style="cyan")
             table.add_column("Created", style="yellow")
@@ -1460,6 +1459,7 @@ class ServiceShell(cmd.Cmd):
                     str(q.get("elapsedTime","N/A"))
                 )
             console.print(table)
+            console.print(f"Queries exported to {self.config.sandbox}_queries.csv", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1467,26 +1467,99 @@ class ServiceShell(cmd.Cmd):
         
     @login_required
     def do_query(self,args:Any) -> None:
-        """Execute a SQL query against the current sandbox"""
+        """Execute a SQL query against the current sandbox, save the result to a CSV file and display a sample."""
         parser = argparse.ArgumentParser(prog='query', add_help=True)
         parser.add_argument("sql_query", help="SQL query to execute",type=str)
+        parser.add_argument("-fn", help="if you want to save it to a specific filename",type=str)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_query = queryservice.QueryService(config=self.config)
             conn = aepp_query.connection()
             iqs2 = queryservice.InteractiveQuery2(conn)
             result:pd.DataFrame = iqs2.query(sql=args.sql_query)
-            result.sample(5).to_csv(f"query_result_{int(datetime.now().timestamp())}.csv", index=False)
-            console.print(f"Query result exported to query_result_{int(datetime.now().timestamp())}.csv", style="green")
-            console.print(result)
+            if args.fn:
+                if args.fn.endswith('.csv'):
+                    filename=args.fn
+                else:
+                    filename=f"{args.fn}.csv"
+            else:
+                filename=f"query_result_{int(datetime.now().timestamp())}.csv"
+            result.to_csv(filename, index=False)
+            sample = result.sample(5)
+            console.print(sample)
+            console.print(f"Query result exported to {filename}", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_get_profile_attributes(self,args:Any) -> None:
+        """Use Profile API to get the UPS Profile storage attributes for a specific user, saving it in a JSON file"""
+        parser = argparse.ArgumentParser(prog='get_profile_attributes', add_help=True)
+        parser.add_argument("-uid","--user_id", help="User ID of the user", default=None,type=str)
+        parser.add_argument("-ns","--namespace", help="Namespace of the user", default=None,type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_profile = customerprofile.Profile(config=self.config)
+            attributes = aepp_profile.getEntity(entityId=args.user_id,namespace=args.namespace)
+            with open(f"{self.config.sandbox}_{args.user_id}_profile_attributes.json", 'w') as f:
+                json.dump(attributes, f, indent=4)
+            dataXDM = attributes[list(attributes.keys())[0]].get("entity")
+            if 'segmentMembership' in dataXDM:
+                del dataXDM['segmentMembership']
+            console.print_json(data=dataXDM)
+            console.print(f"Profile attributes exported to {self.config.sandbox}_{args.user_id}_profile_attributes.json", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
 
+    @login_required
+    def do_get_profile_events(self,args:Any) -> None:
+        """Retrieve all UPS events for a specific user, saving it in a JSON file"""
+        parser = argparse.ArgumentParser(prog='get_profile_events', add_help=True)
+        parser.add_argument("-uid","--user_id", help="User ID of the user", default=None,type=str)
+        parser.add_argument("-ns","--namespace", help="Namespace of the user", default=None,type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_profile = customerprofile.Profile(config=self.config)
+            events = aepp_profile.getEntityEvents(entityId=args.user_id,namespace=args.namespace)
+            with open(f"{self.config.sandbox}_{args.user_id}_profile_events.json", 'w') as f:
+                json.dump(events, f, indent=4)
+            summary_data = {
+                "eventTypes":{},
+                "primaryIdentities":{},
+                "totalEvents":0,
+                "firstEventTimestamp":"",
+                "lastEventTimestamp":"",
+            }
+            for ev in events:
+                summary_data["totalEvents"] += 1
+                eventType = ev.get("entity",{}).get("eventType","unknown")
+                if eventType not in summary_data["eventTypes"]:
+                    summary_data["eventTypes"][eventType] = 0
+                else:
+                    summary_data["eventTypes"][eventType] += 1
+                timestamp = ev.get("entity",{}).get("timestamp","")
+                if summary_data["firstEventTimestamp"] == "" or timestamp < summary_data["firstEventTimestamp"]:
+                    summary_data["firstEventTimestamp"] = timestamp
+                if summary_data["lastEventTimestamp"] == "" or timestamp > summary_data["lastEventTimestamp"]:
+                    summary_data["lastEventTimestamp"] = timestamp
+                primaryIdentity = ev.get("primaryIdentity",{}).get("namespaceCode","")
+                if primaryIdentity not in summary_data["primaryIdentities"].keys():
+                    summary_data["primaryIdentities"][primaryIdentity] = 0
+                else:
+                    summary_data["primaryIdentities"][primaryIdentity] += 1
+            console.print_json(data=summary_data)
+            console.print(f"Profile attributes exported to {self.config.sandbox}_{args.user_id}_profile_attributes.json", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
 
     @login_required
-    def do_extractArtifacts(self,args:Any) -> None:
+    def do_extract_artifacts(self,args:Any) -> None:
         """extractArtifacts localfolder"""
         parser = argparse.ArgumentParser(prog='extractArtifacts', description='Extract artifacts from AEP',add_help=True)
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
@@ -1506,7 +1579,7 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
 
     @login_required
-    def do_extractArtifact(self,args:Any) -> None:
+    def do_extract_artifact(self,args:Any) -> None:
         """extractArtifacts localfolder"""
         parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP',add_help=True)
         parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
@@ -1526,19 +1599,22 @@ class ServiceShell(cmd.Cmd):
         except SystemExit:
             return
         except Exception as e:
-            console.print(f"(!) Error: {str(e)}", style="red")
+            if str(e) == "list index out of range":
+                console.print(f"(!) Error: Artifact [blue]'{args.artifact}'[/blue] of type [blue]'{args.artifactType}'[/blue] not found in sandbox '{self.config.sandbox}'", style="red")
+            else:        
+                console.print(f"(!) Error: {str(e)}", style="red")
 
     @login_required
     def do_sync(self,args:Any) -> None:
-        """extractArtifacts localfolder"""
-        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP',add_help=True)
-        parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
-        parser.add_argument('-at','--artifactType', help='artifact type ',type=str)
+        """sync localfolder"""
+        parser = argparse.ArgumentParser(prog='sync', description='Synchronizing artifacts to an AEP Sandbox, either from sandbox or from local storage',add_help=True)
+        parser.add_argument('artifact', help='artifact to sync (name or id)')
+        parser.add_argument('-at','--artifactType', help='artifact type that has been passed, these type are supported: "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience" ',type=str)
         parser.add_argument('-t','--targets', help='target sandboxes',nargs='+',type=str)
-        parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions',nargs='+',type=str)
-        parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization')
+        parser.add_argument('-lf','--localfolder', help='Local folder(s) to use for sync',default='extractions',nargs='+',type=str)
+        parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization (if not using local folder)',type=str)
         parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
-        parser.add_argument('-v','--verbose', help='Enable verbose output',default=True)
+        parser.add_argument('-v','--verbose', help='Enable verbose output (default True)',default=True,type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             console.print("Initializing Synchronizor...", style="blue")
@@ -1569,6 +1645,11 @@ class ServiceShell(cmd.Cmd):
             console.print("Sync completed!", style="green")
         except SystemExit:
             return
+        except Exception as e:
+            if str(e) == "list index out of range":
+                console.print(f"(!) Error: Artifact [blue]'{args.artifact}'[/blue] of type [blue]'{args.artifactType}'[/blue] not found", style="red")
+            else:
+                console.print(f"(!) Error: {str(e)}", style="red")
     
     def do_exit(self, args:Any) -> None:
         """Exit the application"""

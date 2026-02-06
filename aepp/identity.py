@@ -171,11 +171,11 @@ class Identity:
 
     def createIdentity(
         self,
-        name: str = None,
-        code: str = None,
-        idType: str = None,
-        description: str = None,
-        dict_identity: dict = None,
+        name: str | None = None,
+        code: str | None = None,
+        idType: str| None = None,
+        description: str| None = None,
+        dict_identity: dict | None = None,
     ) -> dict:
         """
         List details of a specific identity namespace by its ID.
