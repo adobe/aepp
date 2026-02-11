@@ -151,7 +151,7 @@ class SchemaManager:
                 else:
                     if self.localfolder is not None:
                         found = False
-                        for folder in self.fieldgroupFolder:
+                        for folder in self.fieldgroupGlobalFolder:
                             for json_file in folder.glob('*.json'):
                                 tmp_def = json.load(FileIO(json_file))
                                 if tmp_def.get('$id') == ref:
