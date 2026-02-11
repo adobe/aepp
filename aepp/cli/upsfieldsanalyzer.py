@@ -154,10 +154,24 @@ class UpsFieldsAnalyzer:
                     if 'profileSelectors' in transformationParams.keys():
                         for selector in transformationParams['profileSelectors'].get('selectors',[]):
                             selectors.add(selector.get('value',{}).get('path'))
-                    self.destinationsPath[destination['id']]={
-                        'name':name,
-                        "paths":list(selectors)
-                    }
+                    if 'attributeMapping' in transformationParams.keys() and len(transformationParams.get('attributeMapping',[])) > 0:
+                        from aepp import dataprep
+                        dp = dataprep.DataPrep(config=self.config)
+                        for mapping in transformationParams['attributeMapping']:
+                            mapping = dp.getMappingSet(mapping.get('mappingId'))
+                            for map in mapping.get('mappings',[]):
+                                selectors.add(map.get('source','unknown'))
+                    if 'identityMapping' in transformationParams.keys() and len(transformationParams.get('identityMapping',[])) > 0:
+                        for mapping in transformationParams['identityMapping'].get('mappings',[{}]):
+                            identitySource = mapping.get('source','unknown')
+                            if identitySource != 'unknown':
+                                identitySource = identitySource.split('(').pop().split(')')[0]
+                                selectors.add(identitySource)
+                self.destinationsPath[destination['id']]={
+                            'name':name,
+                            "paths":list(selectors)
+                        }
+
     
     def __flowserviceInfoSource__(self)->dict:
         """

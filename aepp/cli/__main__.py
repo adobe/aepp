@@ -124,10 +124,17 @@ class ServiceShell(cmd.Cmd):
     def do_change_sandbox(self, args:Any) -> None:
         """Change the current sandbox after configuration"""
         parser = argparse.ArgumentParser(prog='change sandbox', add_help=True)
-        parser.add_argument("sandbox", help="sandbox name to switch to")
+        parser.add_argument("sandbox", help="sandbox name to switch to",type=str)
         try:
             args = parser.parse_args(shlex.split(args))
-            self.sandbox = str(args.sandbox) if args.sandbox else console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
+            if args.sandbox is None:
+                 console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
+                 return
+            config_sandbox = sandboxes.Sandboxes(config=self.config)
+            list_sandboxes = config_sandbox.getSandboxes()
+            if args.sandbox not in [sb.get("name") for sb in list_sandboxes]:
+                console.print(Panel(f"(!) Sandbox '{args.sandbox}' not found in your org. Please provide a valid sandbox name.", style="red"))
+                return
             if self.config is not None:
                 if args.sandbox:
                     self.config.setSandbox(str(args.sandbox))
@@ -813,6 +820,31 @@ class ServiceShell(cmd.Cmd):
         except SystemExit:
             return
     
+    @login_required
+    def do_create_fieldgroup_definition_template(self, args:Any) -> None:
+        """Create a field group definition template CSV file"""
+        parser = argparse.ArgumentParser(prog='create_fieldgroup_definition_template', add_help=True)
+        parser.add_argument("-tl", "--title", help="Name of the field group",default="MyFieldGroup",type=str)
+        parser.add_argument("-d","--description", help="Description of the field group", default="",type=str)
+        parser.add_argument("-fn","--file_name", help="Name of the output CSV file", default=None,type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            myfg = fieldgroupmanager.FieldGroupManager(config=self.config,title=args.title,description=args.description,file_name=args.file_name)
+            df_template = myfg.createFieldGroupTemplate()
+            if args.file_name:
+                if 'csv' not in args.file_name:
+                    filename = f"{args.file_name}.csv"
+                else:
+                    filename = args.file_name
+            else:
+                filename = f"{myfg.title}_template.csv"
+            df_template.to_csv(filename, index=False)
+            console.print(f"Field Group definition template CSV created: {filename}", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
     @login_required
     def do_upload_fieldgroup_definition_csv(self,args:Any) -> None:
         """Upload a field group definition from a CSV file"""
@@ -1502,7 +1534,7 @@ class ServiceShell(cmd.Cmd):
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_profile = customerprofile.Profile(config=self.config)
-            attributes = aepp_profile.getEntity(entityId=args.user_id,namespace=args.namespace)
+            attributes = aepp_profile.getEntity(entityId=args.user_id,entityIdNS=args.namespace)
             with open(f"{self.config.sandbox}_{args.user_id}_profile_attributes.json", 'w') as f:
                 json.dump(attributes, f, indent=4)
             dataXDM = attributes[list(attributes.keys())[0]].get("entity")
@@ -1524,7 +1556,7 @@ class ServiceShell(cmd.Cmd):
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_profile = customerprofile.Profile(config=self.config)
-            events = aepp_profile.getEntityEvents(entityId=args.user_id,namespace=args.namespace)
+            events = aepp_profile.getEntityEvents(entityId=args.user_id,entityIdNS=args.namespace)
             with open(f"{self.config.sandbox}_{args.user_id}_profile_events.json", 'w') as f:
                 json.dump(events, f, indent=4)
             summary_data = {
@@ -1538,7 +1570,7 @@ class ServiceShell(cmd.Cmd):
                 summary_data["totalEvents"] += 1
                 eventType = ev.get("entity",{}).get("eventType","unknown")
                 if eventType not in summary_data["eventTypes"]:
-                    summary_data["eventTypes"][eventType] = 0
+                    summary_data["eventTypes"][eventType] = 1
                 else:
                     summary_data["eventTypes"][eventType] += 1
                 timestamp = ev.get("entity",{}).get("timestamp","")
@@ -1548,7 +1580,7 @@ class ServiceShell(cmd.Cmd):
                     summary_data["lastEventTimestamp"] = timestamp
                 primaryIdentity = ev.get("primaryIdentity",{}).get("namespaceCode","")
                 if primaryIdentity not in summary_data["primaryIdentities"].keys():
-                    summary_data["primaryIdentities"][primaryIdentity] = 0
+                    summary_data["primaryIdentities"][primaryIdentity] = 1
                 else:
                     summary_data["primaryIdentities"][primaryIdentity] += 1
             console.print_json(data=summary_data)
@@ -1560,8 +1592,8 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_extract_artifacts(self,args:Any) -> None:
-        """extractArtifacts localfolder"""
-        parser = argparse.ArgumentParser(prog='extractArtifacts', description='Extract artifacts from AEP',add_help=True)
+        """extract_artifacts to a localfolder"""
+        parser = argparse.ArgumentParser(prog='extract_artifacts', description='Extract artifacts from AEP to a local folder',add_help=True)
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
         parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         try:
@@ -1580,8 +1612,8 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_extract_artifact(self,args:Any) -> None:
-        """extractArtifacts localfolder"""
-        parser = argparse.ArgumentParser(prog='extractArtifact', description='Extract artifacts from AEP',add_help=True)
+        """extract_artifact to a localfolder"""
+        parser = argparse.ArgumentParser(prog='extract_artifact', description='Extract a specific artifact from AEP to a local folder',add_help=True)
         parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
         parser.add_argument('-at','--artifactType', help='artifact type ')
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to',default='extractions')
