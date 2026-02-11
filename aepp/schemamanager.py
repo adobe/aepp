@@ -112,7 +112,6 @@ class SchemaManager:
         if type(schema) == dict:
             self.schema = schema
             self.requiredFields = set([el.replace('@','_').replace('xdm:','') for el in self.schema.get('required',[])])
-            self.__setAttributes__(self.schema)
             allOf = self.schema.get("allOf",[])
             if len(allOf) == 0:
                 if self.schemaAPI is not None:
@@ -130,6 +129,7 @@ class SchemaManager:
                                 break
                         if found:
                             break
+            self.__setAttributes__(self.schema)
             self.fieldGroupIds = [obj['$ref'] for obj in allOf if ('/mixins/' in obj['$ref'] or '/experience/' in obj['$ref'] or '/context/' in obj['$ref']) and obj['$ref'] != self.classId]
             self.classIds = [self.classId]
             for ref in self.fieldGroupIds:
@@ -263,7 +263,7 @@ class SchemaManager:
                         for json_file in folder.glob('*.json'):
                             tmp_def = json.load(FileIO(json_file))
                             if tmp_def.get('$id') == clas:
-                                self.classId = tmp_def['$id']
+                                self.classId = tmp_def.get('meta:class',None)
                                 self.schemaClass = tmp_def['$id']
                                 clsM = ClassManager(tmp_def,schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox)
                                 found = True
@@ -350,6 +350,7 @@ class SchemaManager:
             self.altId = schemaDef.get('meta:altId')
         if schemaDef.get('meta:class'):
             self.classId = schemaDef.get('meta:class')
+    
 
     def __str__(self)->str:
         return json.dumps(self.schema,indent=2)
@@ -936,7 +937,7 @@ class SchemaManager:
                     else:
                         res = {'error':'not descriptors can be added to this schema because it has no $id attached. Create the schema before trying to attach descriptors.'}
                 dictionaryFGs[fg] = myFg
-            elif fg in  self.schemaAPI.data.fieldGroupsGlobal_altId.keys():
+            elif fg in  self.schemaAPI.data.fieldGroups_altId.keys():
                 if hasattr(self,'id'):
                     res = self.__prepareDescriptors__(subDF,dict_SourcePropery_Descriptor,fg)
                 else:

@@ -553,9 +553,12 @@ class FieldGroupManager:
                     properties = mydict[key].get('properties',None)
                     additionalProperties = mydict[key].get('additionalProperties',None)
                     if properties is not None:
-                        if key not in dictionary.keys():
-                            dictionary[key] = {}
-                        self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary[key])
+                        if key != "property" and key != "customFields":
+                            if key not in dictionary.keys():
+                                dictionary[key] = {}
+                            self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary[key])
+                        else:
+                            self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary)
                     elif additionalProperties is not None:
                         if additionalProperties.get('type') == 'array':
                             items = additionalProperties.get('items',{}).get('properties',None)
@@ -569,7 +572,27 @@ class FieldGroupManager:
                         self.__transformationDict__(levelProperties,typed,dictionary[key][0])
                     else:
                         if typed:
-                            dictionary[key] = [mydict[key]['items'].get('type','object')]
+                            type_array = mydict[key]['items'].get('type','object')
+                            if mydict[key]['items'].get('type','object') == 'string':
+                                if mydict[key]['items'].get('format',None) == 'date-time':
+                                    type_array = 'string:date-time'
+                                elif mydict[key]['items'].get('format',None) == 'date':
+                                    type_array = 'string:date'
+                                elif mydict[key]['items'].get('format',None) == 'uri-reference':
+                                    type_array = 'string:uri-reference'
+                                elif mydict[key]['items'].get('format',None) == 'ipv4' or mydict[key]['items'].get('format',None) == 'ipv6':
+                                    type_array = mydict[key]['items'].get('format',None)
+                            if mydict[key]['items'].get('type','object') == 'integer':
+                                if mydict[key]['items'].get('minimum',None) is not None and mydict[key]['items'].get('maximum',None) is not None:
+                                    if mydict[key]['items'].get('minimum',None) == -9007199254740991:
+                                        type_array = f"integer:long"
+                                    elif mydict[key]['items'].get('minimum',None) == -2147483648 and mydict[key]['items'].get('maximum',None) == 2147483647:
+                                        type_array = f"integer:int"
+                                    elif mydict[key]['items'].get('minimum',None) == -32768 and mydict[key]['items'].get('maximum',None) == 32767:
+                                        type_array = f"integer:short"
+                                    elif mydict[key]['items'].get('minimum',None) == -128 and mydict[key]['items'].get('maximum',None) == 128:
+                                        type_array = f"integer:byte"
+                            dictionary[key] = [type_array]
                         else:
                             dictionary[key] = []
                 else:
@@ -577,6 +600,25 @@ class FieldGroupManager:
                         dictionary[key] = mydict[key].get('type','object')
                         if mydict[key].get('enum',None) is not None:
                             dictionary[key] = f"{mydict[key].get('type')} enum: {','.join(mydict[key].get('enum',[]))}"
+                        if mydict[key].get('type','object') == 'string':
+                            if mydict[key].get('format',None) == 'date-time':
+                                dictionary[key] = 'string:date-time'
+                            elif mydict[key].get('format',None) == 'date':
+                                dictionary[key] = 'string:date'
+                            elif mydict[key].get('format',None) == 'uri-reference':
+                                dictionary[key] = 'string:uri-reference'
+                            elif mydict[key].get('format',None) == 'ipv4' or mydict[key].get('format',None) == 'ipv6':
+                                dictionary[key] = mydict[key].get('format',None)
+                        if mydict[key].get('type','object') == 'integer':
+                            if mydict[key].get('minimum',None) is not None and mydict[key].get('maximum',None) is not None:
+                                if mydict[key].get('minimum',None) == -9007199254740991:
+                                    dictionary[key] = f"integer:long"
+                                elif mydict[key].get('minimum',None) == -2147483648 and mydict[key].get('maximum',None) == 2147483647:
+                                    dictionary[key] = f"integer"
+                                elif mydict[key].get('minimum',None) == -32768 and mydict[key].get('maximum',None) == 32767:
+                                    dictionary[key] = f"integer:short"
+                                elif mydict[key].get('minimum',None) == -128 and mydict[key].get('maximum',None) == 128:
+                                    dictionary[key] = f"integer:byte"
                     else:
                         dictionary[key] = ""
         return dictionary
@@ -1788,3 +1830,49 @@ class FieldGroupManager:
             raise Exception('Require a schema API connection. Pass the instance of a Schema class or import a configuration file.')
         res = self.schemaAPI.putDescriptor(descriptorId, descriptorObj)
         return res
+    
+    def createFieldGroupTemplate(self,save:bool=False,filename:str=None,full:bool=False)->None:
+        """
+        Create and returns a dataframe template to fill in for the creation of a field group. 
+        The CSV will contains the following columns : "path", "xdmType", "fieldGroup", "title", "description"".
+        Argument:
+            save : OPTIONAL : If you want to save the CSV file. Default is False.
+            filename : OPTIONAL : The name of the CSV file to be created. Default is "fieldGroup_template.csv"
+            full : OPTIONAL : If you want to have all the possible columns to fill in for the creation of a field group. Default is False. If True, the CSV will contains the following columns : "path", "xdmType", "fieldGroup", "title", "description","enumValues","enum","mapType","minimum","maximum","minLength","maxLength","pattern","default"
+        """
+        if filename is None:
+            filename = 'fieldGroup_template.csv'
+        if full:
+            columns = ["path", "xdmType", "fieldGroup","title","description","enumValues","enum","mapType","minimum","maximum","minLength","maxLength","pattern","default"]
+        else:
+            columns = ["path", "xdmType", "fieldGroup", "title", "description"]
+        if self.tenantId is not None and self.tenantId != "  ":
+            path_tenant = self.tenantId
+        else:
+            path_tenant = '_tenantId'
+        paths = [f'{path_tenant}.object', f'{path_tenant}.object.astring', f'{path_tenant}.object.anumber', f'{path_tenant}.object.aboolean',f'{path_tenant}.object.adate', f'{path_tenant}.stringArray[]', f"{path_tenant}.arrayObject[]{{}}", f'{path_tenant}.arrayObject[]{{}}.astring']
+        xdmTypes = ['object', 'string', 'number', 'boolean', 'date', 'string', 'object','string']
+        fieldgroups = ['fieldGroup_example']*len(paths)
+        titles = [f'field {i.split(".")[-1]} Title' for i in paths]
+        descriptions = [f'field {i.split(".")[-1]} Description' for i in paths]
+        dict_data = {
+            "path": paths,
+            "xdmType": xdmTypes,
+            "fieldGroup": fieldgroups,
+            "title": titles,
+            "description": descriptions
+        }
+        if full:
+            dict_data["enumValues"] = [None,None,None,None,None,None,{"value1":"description value 1","value2":"description value 2"},None]
+            dict_data["enum"] = [None,None,None,None,None,None,True,None]
+            dict_data["mapType"] = [None,None,None,None,None,None,None,'string']
+            dict_data["minimum"] = [None,None,None,None,None,None,None,None]
+            dict_data["maximum"] = [None,None,None,None,None,None,None,None]
+            dict_data["minLength"] = [None,None,None,None,None,None,None,None]
+            dict_data["maxLength"] = [None,None,None,None,None,None,None,None]
+            dict_data["pattern"] = [None,None,None,None,None,r'^[a-zA-Z0-9]+$',None,None]
+            dict_data["default"] = [None,'default string',123,True,'2024-01-01',None,{"key":"value"},None]
+        df = pd.DataFrame(data=dict_data)
+        if save:
+            df.to_csv(filename,index=False)
+        return df

@@ -580,8 +580,9 @@ class ClassManager:
             dictionary = dictionary
         for key in mydict:
             if type(mydict[key]) == dict:
-                if mydict[key].get('type') == 'object' and 'properties' in mydict[key].keys():
+                if mydict[key].get('type') == 'object' or 'properties' in mydict[key].keys():
                     properties = mydict[key].get('properties',None)
+                    additionalProperties = mydict[key].get('additionalProperties',None)
                     if properties is not None:
                         if key != "property" and key != "customFields":
                             if key not in dictionary.keys():
@@ -589,13 +590,12 @@ class ClassManager:
                             self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary[key])
                         else:
                             self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary)
-                elif mydict[key].get('type') == 'object' and 'additionalProperties' in mydict[key].keys():
-                    properties = mydict[key].get('additionalProperties',{})
-                    if properties.get('type') == 'array':
-                        items = properties.get('items',{}).get('properties',None)
-                        if items is not None:
-                            dictionary[key] = {'key':[{}]}
-                            self.__transformationDict__(items,typed,dictionary=dictionary[key]["key"][0])
+                    elif additionalProperties is not None:
+                        if additionalProperties.get('type') == 'array':
+                            items = additionalProperties.get('items',{}).get('properties',None)
+                            if items is not None:
+                                dictionary[key] = {'key':[{}]}
+                                self.__transformationDict__(items,typed,dictionary=dictionary[key]["key"][0])
                 elif mydict[key].get('type') == 'array':
                     levelProperties = mydict[key]['items'].get('properties',None)
                     if levelProperties is not None:
@@ -603,7 +603,27 @@ class ClassManager:
                         self.__transformationDict__(levelProperties,typed,dictionary[key][0])
                     else:
                         if typed:
-                            dictionary[key] = [mydict[key]['items'].get('type','object')]
+                            type_array = mydict[key]['items'].get('type','object')
+                            if mydict[key]['items'].get('type','object') == 'string':
+                                if mydict[key]['items'].get('format',None) == 'date-time':
+                                    type_array = 'string:date-time'
+                                elif mydict[key]['items'].get('format',None) == 'date':
+                                    type_array = 'string:date'
+                                elif mydict[key]['items'].get('format',None) == 'uri-reference':
+                                    type_array = 'string:uri-reference'
+                                elif mydict[key]['items'].get('format',None) == 'ipv4' or mydict[key]['items'].get('format',None) == 'ipv6':
+                                    type_array = mydict[key]['items'].get('format',None)
+                            if mydict[key]['items'].get('type','object') == 'integer':
+                                if mydict[key]['items'].get('minimum',None) is not None and mydict[key]['items'].get('maximum',None) is not None:
+                                    if mydict[key]['items'].get('minimum',None) == -9007199254740991:
+                                        type_array = f"integer:long"
+                                    elif mydict[key]['items'].get('minimum',None) == -2147483648 and mydict[key]['items'].get('maximum',None) == 2147483647:
+                                        type_array = f"integer:int"
+                                    elif mydict[key]['items'].get('minimum',None) == -32768 and mydict[key]['items'].get('maximum',None) == 32767:
+                                        type_array = f"integer:short"
+                                    elif mydict[key]['items'].get('minimum',None) == -128 and mydict[key]['items'].get('maximum',None) == 128:
+                                        type_array = f"integer:byte"
+                            dictionary[key] = [type_array]
                         else:
                             dictionary[key] = []
                 else:
@@ -611,6 +631,25 @@ class ClassManager:
                         dictionary[key] = mydict[key].get('type','object')
                         if mydict[key].get('enum',None) is not None:
                             dictionary[key] = f"{mydict[key].get('type')} enum: {','.join(mydict[key].get('enum',[]))}"
+                        if mydict[key].get('type','object') == 'string':
+                            if mydict[key].get('format',None) == 'date-time':
+                                dictionary[key] = 'string:date-time'
+                            elif mydict[key].get('format',None) == 'date':
+                                dictionary[key] = 'string:date'
+                            elif mydict[key].get('format',None) == 'uri-reference':
+                                dictionary[key] = 'string:uri-reference'
+                            elif mydict[key].get('format',None) == 'ipv4' or mydict[key].get('format',None) == 'ipv6':
+                                dictionary[key] = mydict[key].get('format',None)
+                        if mydict[key].get('type','object') == 'integer':
+                            if mydict[key].get('minimum',None) is not None and mydict[key].get('maximum',None) is not None:
+                                if mydict[key].get('minimum',None) == -9007199254740991:
+                                    dictionary[key] = f"integer:long"
+                                elif mydict[key].get('minimum',None) == -2147483648 and mydict[key].get('maximum',None) == 2147483647:
+                                    dictionary[key] = f"integer"
+                                elif mydict[key].get('minimum',None) == -32768 and mydict[key].get('maximum',None) == 32767:
+                                    dictionary[key] = f"integer:short"
+                                elif mydict[key].get('minimum',None) == -128 and mydict[key].get('maximum',None) == 128:
+                                    dictionary[key] = f"integer:byte"
                     else:
                         dictionary[key] = ""
         return dictionary
