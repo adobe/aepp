@@ -40,12 +40,8 @@ class _Data:
         self.fieldGroups_id = {}
         self.fieldGroups_altId = {}
         self.fieldGroups = {}
-        self.fieldGroupsGlobal_id = {}
-        self.fieldGroupsGlobal_altId = {}
         self.dataTypes_id = {}
         self.dataTypes_altId = {}
-        self.dataTypesGlobal_id = {}
-        self.dataTypesGlobal_altId = {}
         self.classes_id = {}
         self.classes_altId = {}
 
@@ -317,6 +313,64 @@ class Schema:
             df = pd.DataFrame(data)
             return df
         return data
+    
+    def getSchemasGlobal(self,
+                         prop:str|None=None,
+                         format:str="xed",
+                         orderBy:str|None=None,
+                         limit:int=300,
+                         output:str='raw',
+                         **kwargs
+                         )->list:
+        """
+        Retrive the schema that are OOTB available in the global container. These schemas cannot be edited but can be used as a base for your custom schemas.
+        Arguments:
+            prop : OPTIONAL : A comma-separated list of top-level object properties to be returned in the response. 
+                            For example, property=meta:intendedToExtend==https://ns.adobe.com/xdm/context/profile
+            format : OPTIONAL : type of response, default "xdm", can be "xed" for xed format.
+            orderBy : OPTIONAL : Sort the listed resources by specified fields. For example orderby=title
+            limit : OPTIONAL : Number of resources to return per request, default 300 - the max.
+            output : OPTIONAL : type of output, default "raw", can be "df" for dataframe.
+        kwargs:
+            debug : if set to True, will print result for errors
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getSchemasGlobal")
+        privateHeader = deepcopy(self.header)
+        privateHeader.update({"Accept": f"application/vnd.adobe.{format}-id+json"})
+        params = {"limit":limit}
+        if prop is not None:
+            if 'property' not in params.keys():
+                params["property"] = prop
+            else:
+                params["property"] += prop
+        if orderBy is not None:
+            params['orderby'] = orderBy
+        path = f"/global/schemas/"
+        verbose = kwargs.get("verbose", False)
+        res = self.connector.getData(
+            self.endpoint + path, headers=privateHeader, params=params, verbose=verbose
+        )
+        if kwargs.get("debug", False):
+            if "results" not in res.keys():
+                print(res)
+        data = res["results"]
+        page = res["_page"]
+        while page["next"] is not None:
+            params["start"]= page["next"]
+            res = self.connector.getData(
+                self.endpoint + path, headers=privateHeader, params=params, verbose=verbose
+            )
+            data += res["results"]
+            page = res["_page"]
+        for el in data:
+            self.data.schemas_id[el["title"]] = el["$id"]
+            self.data.schemas_altId[el["title"]] = el["meta:altId"]
+        if output=="df":
+            df = pd.DataFrame(data)
+            return df
+        return data
+
 
     def getSchema(
         self,
@@ -1052,8 +1106,9 @@ class Schema:
             data += res.get("results")
             page = res.get("_page",{})
             nextPage = page.get('next',None)
-        self.data.fieldGroupsGlobal_id = {mix["title"]: mix["$id"] for mix in data}
-        self.data.fieldGroupsGlobal_altId = {mix["title"]: mix["meta:altId"] for mix in data}
+        for el in data:
+            self.data.fieldGroups_altId[el["title"]] = el["meta:altId"]
+            self.data.fieldGroups_id[el["title"]] = el["$id"]
         if output == 'df':
             df = pd.DataFrame(data)
             return df
@@ -1398,8 +1453,9 @@ class Schema:
             data += res.get("results",[])
             page = res.get("_page",{})
             nextPage = page.get('next',None)
-        self.data.dataTypesGlobal_altId = {mix["title"]: mix["$id"] for mix in data}
-        self.data.dataTypesGlobal_id = {mix["title"]: mix["meta:altId"] for mix in data}
+        for el in data:
+            self.data.dataTypes_id[el["title"]] = el["$id"]
+            self.data.dataTypes_altId[el["title"]] = el["meta:altId"]
         return data
 
 
