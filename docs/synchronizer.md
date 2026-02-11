@@ -61,6 +61,22 @@ Arguments:
 It is not required but if the type cannot be inferred from the component, it will raise an error. 
 * verbose : OPTIONAL : if True, it will print the details of the synchronization process
 
+#### syncAll
+Synchronize all the components to the target sandboxes.
+It will synchronize the components in the following order: 
+1. Identities
+2. Data Types
+3. Classes
+4. Field Groups
+5. Schemas
+6. Datasets
+Because the `Merge Policies` and `Audiences` needs the dataset and schema to be enabled in the target sandbox, and the synchronizer does not currently support enabling them for UPS.\
+They will not be synchronized with that method.
+Arguments:
+* force : OPTIONAL : if True, it will force the synchronization of the components even if they already exist in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
+* verbose : OPTIONAL : if True, it will print the details of the synchronization process
+
+
 #### getSyncFieldGroupManager
 Helper method to get the FieldGroupManager for a target sandbox.\
 It searches through the component cache to see if the FieldGroupManager for the target sandbox is already instantiated.\

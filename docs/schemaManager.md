@@ -289,13 +289,16 @@ Argument:
 
 Example of a table used for creating a new schema
 
-| path | xdmType | fieldGroup | title | 
-| -- | -- | -- | -- |
-|_tenant.object{} | object | fieldGroup1 | myObject|
-|_tenant.object.field1 | string | fieldGroup1 | myField 1 |
-|_tenant.object.arrayOfObject[]{} | object | fieldGroup1 | my Array of Object|
-|_tenant.object.arrayOfObject[]{}.double1 | double | fieldGroup1 | my double |
-|_tenant.object.arrayOfObject[]{}.stringArray[] | string | fieldGroup1 | my string array |
+| path | xdmType | fieldGroup | title | description |
+| -- | -- | -- | -- | -- |
+|_tenant.object{} | object | fieldGroup1 | myObject| This is my object description |
+|_tenant.object.field1 | string | fieldGroup1 | myField 1 | This is my string description |
+|_tenant.object.field2 | number | fieldGroup1 | myField 2 | This is my double description |
+|_tenant.object.field3 | boolean | fieldGroup1 | myField 3 | This is my boolean description |
+|_tenant.object.field4 | integer | fieldGroup1 | myField 4 | This is my integer description |
+|_tenant.object.arrayOfObject[]{} | object | fieldGroup1 | my Array of Object| This is my array of object description |
+|_tenant.object.arrayOfObject[]{}.double1 | double | fieldGroup1 | my double | This is my double description |
+|_tenant.object.arrayOfObject[]{}.stringArray[] | string | fieldGroup1 | my string array | This is my string array description |
 
 Supported type:
 * "object": For nested JSON objects.

@@ -151,6 +151,13 @@ Arguments:
 * `csv_path` : Path to the CSV file.
 * `-ts`, `--test` : Test the upload locally without sending to AEP (default: False).
 
+### create_fieldgroup_definition_template
+Create a CSV template for defining a field group.\
+Arguments:
+* `-tl`, `--title` : Name of the field group (default: "MyFieldGroup").
+* `-d`, `--description` : Description of the field group (default: "").
+* `-fn`, `--file_name` : Name of the output CSV file (default: None).
+
 ### upload_fieldgroup_definition_xdm
 Create or Update a field group using a JSON XDM file.\
 Arguments:
