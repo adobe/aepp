@@ -112,9 +112,12 @@ class FieldGroupManager:
                         if self.schemaAPI is not None:
                             if 'mixins' in fieldGroup.get('$id') and self.tenantId[1:] in fieldGroup.get('$id'): ## customer mixin
                                 self.fieldGroup = self.schemaAPI.getFieldGroup(fieldGroup['$id'],full=False)
-                                if '/datatypes/' in str(self.fieldGroup): ## if custom datatype used in Field Group
-                                    dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                    dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                                if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
+                                    dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
+                                    dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                                    dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                                    dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                                    dataTypes = dataTypes_id + dataTypes_name
                                     for dt in dataTypes:
                                         dt_manager = self.schemaAPI.DataTypeManager(dt)
                                         self.dataTypes[dt_manager.id] = dt_manager.title
@@ -138,9 +141,12 @@ class FieldGroupManager:
                                     if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
                                         self.fieldGroup = tmp_def
                                         if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
-                                            if '/datatypes/' in str(self.fieldGroup):
-                                                dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                                dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                                            if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
+                                                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+)'"
+                                                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                                                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                                                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                                                dataTypes = dataTypes_id + dataTypes_name
                                                 for dt in dataTypes:
                                                     dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
                                                     self.dataTypes[dt_manager.id] = dt_manager.title
@@ -172,9 +178,12 @@ class FieldGroupManager:
                             del self.fieldGroup['properties']
                         if self.schemaAPI is not None:
                             self.fieldGroup = self.schemaAPI.getFieldGroup(fieldGroup['$id'],full=False)
-                            if '/datatypes/' in str(self.fieldGroup): ## if custom datatype used in Field Group
-                                dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                            if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
+                                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
+                                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                                dataTypes = dataTypes_id + dataTypes_name
                                 for dt in dataTypes:
                                     dt_manager = self.schemaAPI.DataTypeManager(dt)
                                     self.dataTypes[dt_manager.id] = dt_manager.title
@@ -190,9 +199,12 @@ class FieldGroupManager:
                                     if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
                                         self.fieldGroup = tmp_def
                                         if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
-                                            if '/datatypes/' in str(self.fieldGroup):
-                                                dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                                dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                                            if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
+                                                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
+                                                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                                                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                                                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                                                dataTypes = dataTypes_id + dataTypes_name
                                                 for dt in dataTypes:
                                                     dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
                                                     self.dataTypes[dt_manager.id] = dt_manager.title
@@ -212,9 +224,12 @@ class FieldGroupManager:
                     self.fieldGroup = self.schemaAPI.getFieldGroup(fieldGroup,full=False)
                     self.tenantId = f"_{self.schemaAPI.getTenantId()}"
                     if self.tenantId[1:] in self.fieldGroup.get('$id', ''): ## custom field group 
-                        if '/datatypes/' in str(self.fieldGroup): ## if custom datatype used in Field Groupe
-                            dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                            dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup))
+                        if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
+                            dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
+                            dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                            dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                            dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                            dataTypes = dataTypes_id + dataTypes_name
                             for dt in dataTypes:
                                 dt_manager = self.schemaAPI.DataTypeManager(dt)
                                 self.dataTypes[dt_manager.id] = dt_manager.title
@@ -238,15 +253,20 @@ class FieldGroupManager:
                                 self.fieldGroup = tmp_def
                                 if tmp_def.get('meta:tenantNamespace',None) is not None:
                                     self.tenantId = tmp_def.get('meta:tenantNamespace')
-                                    if '/datatypes/' in str(self.fieldGroup):
-                                        dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-                                        dataTypes = re.findall(dataTypeSearch,str(self.fieldGroup.get('definitions')))
-                                        for file in folder.glob('*.json'):
-                                            tmp_def = json.load(FileIO(file))
-                                            if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
-                                                dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                                self.dataTypes[dt_manager.id] = dt_manager.title
-                                                self.dataTypeManagers[dt_manager.title] = dt_manager
+                                    if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
+                                        dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
+                                        dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                                        dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                                        dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                                        dataTypes = dataTypes_id + dataTypes_name
+                                        for aep_folder in self.localfolder:
+                                            dataTypes_folder = aep_folder / "datatype"
+                                            for file in dataTypes_folder.glob('*.json'):
+                                                tmp_def = json.load(FileIO(file))
+                                                if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
+                                                    dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
+                                                    self.dataTypes[dt_manager.id] = dt_manager.title
+                                                    self.dataTypeManagers[dt_manager.title] = dt_manager
                                 found = True
                                 break
                         if found:
