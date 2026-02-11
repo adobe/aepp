@@ -198,9 +198,12 @@ class DataTypeManager:
                     }],
                 'meta:tenantNamespace': self.tenantId
             }
-        if '/datatypes/' in str(self.dataType.get('definitions',{})): ## if custom datatype used in data types
-            dataTypeSearch = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
-            dataTypes = re.findall(dataTypeSearch,str(self.dataType.get('definitions',{})))
+        if '/datatypes/' in str(self.dataType.get('definitions',{})) or '/datatype_name/' in str(self.dataType.get('definitions',{})): ## if custom datatype used in data types
+            dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9a-z]+?)'"
+            dataTypes_id = re.findall(dataTypeSearch_id,str(self.dataType.get('definitions',{})))
+            dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9a-z]+?)'"
+            dataTypes_name = re.findall(dataTypeSearch_name,str(self.dataType.get('definitions',{})))
+            dataTypes = dataTypes_id + dataTypes_name
             if self.schemaAPI is not None:
                 for dt in dataTypes:
                     dt_manager = self.schemaAPI.DataTypeManager(dt)
