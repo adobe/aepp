@@ -404,6 +404,18 @@ Arguments:
 * spec_name : OPTIONAL : The name of the source specification corresponding to Data Lake.
 
 
+#### createConnectionToUPS
+Create a connection to UPS based on the following connectionSpec :
+```JSON
+"connectionSpec": {
+        "id": "8a9c3494-9708-43d7-ae3f-cda01e5030e1",
+        "version": "1.0",
+    }
+```
+Arguments:
+* name : REQUIRED : Name of the Connection.
+* description : OPTIONAL : if you want to add a description
+
 #### updateSourceConnection
 Update a source connection based on the ID provided with the object provided.\
 Arguments:

@@ -302,6 +302,32 @@ class FlowService:
             obj['auth']['params']['authenticationRequired'] = True
         res = self.createConnection(data=obj,responseType=kwargs.get('responseType','json'))
         return res
+    
+    def createConnectionToUPS(self,name:str=None,description:str="Connection to UPS",**kwargs)->dict:
+        """
+        Create a connection to UPS based on the following connectionSpec :
+        "connectionSpec": {
+                "id": "8a9c3494-9708-43d7-ae3f-cda01e5030e1",
+                "version": "1.0",
+            },
+        Arguments:
+            name : REQUIRED : Name of the Connection.
+            description : OPTIONAL : if you want to add a description
+        """
+        if name is None:
+            raise ValueError("Require a name for the connection")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting createConnectionToUPS")
+        obj = {
+            "name": name,
+            "description": description,
+            "connectionSpec": {
+                "id": "8a9c3494-9708-43d7-ae3f-cda01e5030e1",
+                "version": "1.0",
+            },
+        }
+        res = self.createConnection(data=obj)
+        return res
 
     def getConnection(self, connectionId: str = None) -> dict:
         """
