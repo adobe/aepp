@@ -18,6 +18,10 @@ Alternatively, you can use the docstring in the methods to have more information
     - [createSegment](#createsegment)
     - [deleteSegment](#deletesegment)
     - [updateSegment](#updatesegment)
+    - [createExtenalAudience](#createextenalaudience)
+    - [getExternalAudienceStatus](#getexternalaudiencestatus)
+    - [runExternalAudienceJob](#runexternalaudiencejob)
+    - [getExternalAudienceJob](#getexternalaudiencejob)
     - [getMultipleSegments](#getmultiplesegments)
     - [convertSegmentDef](#convertsegmentdef)
     - [getExportJobs](#getexportjobs)
@@ -141,6 +145,29 @@ possible kwargs:
 * expression : expression of the segment to be udpated
 * schema : schema of the segment to be udpated
 * ttlInDay : ttlInDays to be updated
+
+### createExtenalAudience
+New process to create external audience with the new endpoint.\
+This method will replace createSegment for external audience creation.\
+Argument :
+* audience_data : REQUIRED : Dictionary of the external audience definition. (see CREATE_EXTERNAL_AUDIENCE_DICT)
+
+### getExternalAudienceStatus
+Retrieve the status of an external audience creation based on its operation ID.\
+Argument: 
+* operationId : REQUIRED : The operation ID returned when creating the external audience.
+
+### runExternalAudienceJob
+Run an external audience job based on the audience ID.\
+Argument :
+* audience_id : REQUIRED : ID of the external audience to run.
+* startTime : OPTIONAL : (Epoch timestamp) The range specifying the starting time to determine which files will be processed. This means that the files selected will be files after the specified time
+
+### getExternalAudienceJob
+Get the status of an external audience job based on the audience ID and job ID.\
+Argument :
+* audience_id : REQUIRED : ID of the external audience.
+* job_id : REQUIRED : ID of the job to get the status from
 
 ### getMultipleSegments
 Retrieve multiple segments from a list of segment IDs.\

@@ -48,24 +48,41 @@ class Segmentation:
                     "ttlInDays": 60
                 }
     EXTERNAL_AUDIENCE_DICT = {
-                    "audienceId": "test-external-audience-id",
-                    "name": "externalSegment1",
-                    "namespace": "aam",
-                    "description": "This audience is generated to see people who ordered in the last 30 days.",
-                    "type": "ExternalSegment",
-                    "lifecycle": "published",
-                    "datasetId": "6254cf3c97f8e31b639fb14d",
-                    "labels": [
-                        "core/C1"
-                    ],
-                    "audienceMeta": {
-                        "segmentStatus": "ACTIVE",
-                        "AAMFolderId": "325813-testnew"
-                    },
-                    "linkedAudienceRef": {
-                        "flowId": "4685ea90-d2b6-11ec-9d64-0242ac120002"
-                    }
-                }  
+        "name": "Sample external audience",
+        "description": "A sample version of an external audience",
+        "fields": [
+            {
+                "name": "ppid",
+                "type": "string",
+                "identityNs": "email"
+            },
+            {
+                "name": "list_id",
+                "type": "string",
+                "labels": ["core/C2", "custom/deep"]
+            },
+            {
+                "name": "delete",
+                "type": "number"
+            },
+            {
+                "name": "process_consent",
+                "type": "string"
+            }
+        ],
+        "sourceSpec": {
+            "params": {
+                "path": "activation/sample-source/example.csv",
+                "type": "file",
+                "sourceType": "Cloud Storage",
+                "baseConnectionId": "1d1d4bc5-b527-46a3-9863-530246a61b2b"
+            }
+        },
+        "ttlInDays": "40",
+        "labels": ["core/C1"],
+        "audienceType": "people",
+        "originName": "CUSTOM_UPLOAD"
+    }
 
     def __init__(
         self,
@@ -242,6 +259,91 @@ class Segmentation:
             self.endpoint + path, data=segment_data, headers=self.header
         )
         return res
+    
+    def createExtenalAudience(self, audience_data: dict) -> dict:
+        """
+        New process to create external audience with the new endpoint. 
+        This method will replace createSegment for external audience creation.
+        Argument :
+            audience_data : REQUIRED : Dictionary of the external audience definition. (see CREATE_EXTERNAL_AUDIENCE_DICT)
+        """
+        if audience_data is None or type(audience_data) != dict:
+            raise Exception(
+                "Expecting data as dictionary format to create the external audience."
+            )
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting createExternalAudience")
+        endpoint = "https://platform.adobe.io/data/core/ais/external-audience/"
+        if audience_data.get('sourceSpec',{}).get('params',{}).get('cloudType') == 'DLZ':
+            if 'dlz-user-container/' not in audience_data.get('sourceSpec',{}).get('params',{}).get('path'):
+                audience_data['sourceSpec']['params']['path'] = 'dlz-user-container/' + audience_data['sourceSpec']['params']['path']
+        res = self.connector.postData(
+            endpoint, data=audience_data, headers=self.header
+        )
+        return res
+    
+    def getExternalAudienceStatus(self, operationId:str) -> dict:
+        """
+        Retrieve the status of an external audience creation based on its operation ID.
+        Argument: 
+            operationId : REQUIRED : The operation ID returned when creating the external audience.
+        """
+        if operationId is None:
+            raise Exception("Expecting an operation ID to get the external audience creation status.")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getExternalAudienceStatus")
+        endpoint = f"https://platform.adobe.io/data/core/ais/external-audience/operations/{operationId}"
+        res = self.connector.getData(
+            endpoint, headers=self.header
+        )
+        return res
+    
+    def runExternalAudienceJob(self, audience_id: str = None,startTime:int|None=None,endTime:str|int|None=None) -> dict:
+        """
+        Run an external audience job based on the audience ID.
+        Argument :
+            audience_id : REQUIRED : ID of the external audience to run.
+            startTime : OPTIONAL : (Epoch timestamp) The range specifying the starting time to determine which files will be processed. This means that the files selected will be files after the specified time    
+        """
+        if audience_id is None:
+            raise Exception("Expecting an audience ID to run the external audience job.")
+        if startTime is None or type(startTime) != int:
+            print("no startTime or invalid startTime. We will set the epoch timestamp to the current time minus one day.")
+            startTime = int(time.time()) - 86400
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting runExternalAudienceJob")
+        endpoint = f"https://platform.adobe.io/data/core/ais/external-audience/{audience_id}/runs"
+        data = {
+            "dataFilterStartTime": startTime
+            }
+        if endTime is not None:
+            if type(endTime) not in [int,str]:
+                print("End time provided is not in the correct format, we will skip it")
+            else:
+                data["dataFilterEndTime"] = endTime
+        res = self.connector.postData(
+            endpoint, headers=self.header,
+            data=data
+        )
+        return res
+    
+    def getExternalAudienceJob(self, audience_id: str = None, job_id:str=None) -> dict:
+        """
+        Get the status of an external audience job based on the audience ID and job ID.
+        Argument :
+            audience_id : REQUIRED : ID of the external audience.
+            job_id : REQUIRED : ID of the job to get the status from.
+        """
+        if audience_id is None or job_id is None:
+            raise Exception("Expecting an audience ID and a job ID to get the external audience job status.")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getExternalAudienceJob")
+        endpoint = f"https://platform.adobe.io/data/core/ais/external-audience/{audience_id}/runs/{job_id}"
+        res = self.connector.getData(
+            endpoint, headers=self.header
+        )
+        return res
+
 
     def deleteSegment(self, segment_id: str = None) -> dict:
         """
