@@ -735,7 +735,7 @@ class Catalog:
         res = self.connector.patchData(self.endpoint+path, data=data,headers=privateHeader)
         return res
     
-    def patchDataset(self,datasetId:str=None,data:dict=None)->dict:
+    def patchDataset(self,datasetId:str=None,data:list=None)->dict:
         """
         Patch the dataset with the operation provided in the data argument.
         Arguments:

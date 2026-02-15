@@ -1,3 +1,4 @@
+from html import parser
 from matplotlib.pyplot import table
 import aepp
 from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation, customerprofile
@@ -71,9 +72,9 @@ class ServiceShell(cmd.Cmd):
             self.prompt = f"{self.config.sandbox}> "
             console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
 
-    def do_createConfigFile(self, arg:Any) -> None:
-        """Create a configuration file for future use"""
-        parser = argparse.ArgumentParser(prog='createConfigFile', add_help=True)
+    def do_create_config_file(self, arg:Any) -> None:
+        """Create a configuration file for storing your AEP API connection details."""
+        parser = argparse.ArgumentParser(prog='create_config_file', add_help=True)
         parser.add_argument("-f", "--file_name", help="file name for your config file", default="aepp_config.json")
         args = parser.parse_args(shlex.split(arg))
         filename = args.file_name
@@ -84,7 +85,7 @@ class ServiceShell(cmd.Cmd):
 
     # # --- Commands ---
     def do_config(self, arg:Any) -> None:
-        """connect to an AEP instance"""
+        """Pass the different configuration parameters to connect to an AEP instance. Either individually or through a config file with the --config_file option."""
         parser = argparse.ArgumentParser(prog='config', add_help=True)
         parser.add_argument("-sx", "--sandbox", help="Auto-login sandbox")
         parser.add_argument("-s", "--secret", help="Secret")
@@ -185,7 +186,7 @@ class ServiceShell(cmd.Cmd):
         
     @login_required
     def do_get_profile_attributes_lineage(self,args:Any)->None:
-        """Get usage information for all Profile paths"""
+        """Get data lineage information for all profile paths. This method is very expensive and will take a long time. Use with caution."""
         parser = argparse.ArgumentParser(prog='get_profile_paths_info', add_help=True)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -211,7 +212,7 @@ class ServiceShell(cmd.Cmd):
         
     @login_required
     def do_get_profile_attribute_lineage(self, args:Any) -> None:
-        """Get path information on Profile"""
+        """Get data lineage information for a specific profile path. This method is expensive and will take a long time. Use with caution."""
         parser = argparse.ArgumentParser(prog='get_profile_path_info', add_help=True)
         parser.add_argument("path", help="Dot notation of the path to analyze in Profile Storage", default=None,type=str)
         try:
@@ -238,7 +239,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_event_attributes_lineage(self,args:Any)->None:
-        """Get information for all Experience Event paths"""
+        """Get data lineage information for all Experience Event paths. This method is very expensive and will take a long time. Use with caution."""
         parser = argparse.ArgumentParser(prog='get_event_paths_info', add_help=True)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -264,7 +265,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_event_attribute_lineage(self, args:Any) -> None:
-        """Get path information on Experience Event"""
+        """Get data lineage information for a specific Experience Event path. This method is expensive and will take a long time. Use with caution."""
         parser = argparse.ArgumentParser(prog='get_event_path_info', add_help=True)
         parser.add_argument("path", help="Dot notation of the path to analyze in Experience Event Storage", default=None,type=str)
         try:
@@ -291,7 +292,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_schemas(self, args:Any) -> None:
-        """List all schemas in the current sandbox"""
+        """List all schemas in the current sandbox. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_schemas', add_help=True)
         parser.add_argument("-sv", "--save",help="Save schemas to CSV file")
         try:
@@ -299,11 +300,6 @@ class ServiceShell(cmd.Cmd):
             aepp_schema = schema.Schema(config=self.config)
             schemas = aepp_schema.getSchemas()
             if len(schemas) > 0:
-                if args.save:
-                    df_schemas = pd.DataFrame(schemas)
-                    df_schemas.to_csv(f"{self.config.sandbox}_schemas.csv", index=False)
-                    console.print(f"Schemas exported to {self.config.sandbox}_schemas.csv", style="green")
-                table = Table(title=f"Schemas in Sandbox: {self.config.sandbox}")
                 table.add_column("ID", style="cyan")
                 table.add_column("Name", style="magenta")
                 table.add_column("Version", style="green")
@@ -314,6 +310,10 @@ class ServiceShell(cmd.Cmd):
                         str(sch.get("version","N/A")),
                     )
                 console.print(table)
+                if args.save:
+                    df_schemas = pd.DataFrame(schemas)
+                    df_schemas.to_csv(f"{self.config.sandbox}_schemas.csv", index=False)
+                    console.print(f"Schemas exported to {self.config.sandbox}_schemas.csv", style="green")
             else:
                 console.print("(!) No schemas found.", style="red")
         except Exception as e:
@@ -323,7 +323,7 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_get_ups_schemas(self, args) -> None:
-        """List all schemas enabled for Profile in the current sandbox"""
+        """List all schemas enabled for Profile in the current sandbox. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_schemas_enabled', add_help=True)
         parser.add_argument("-sv", "--save",help="Save enabled schemas to CSV file")
         try:
@@ -339,10 +339,6 @@ class ServiceShell(cmd.Cmd):
             list_enabled_schemas = []
             list_enabled_schemas = [sc for sc in schemas if sc.get("$id") in enabled_schemas]
             if len(list_enabled_schemas) > 0:
-                if args.save:
-                    df_schemas = pd.DataFrame(list_enabled_schemas)
-                    df_schemas.to_csv(f"{self.config.sandbox}_enabled_schemas.csv", index=False)
-                    console.print(f"Enabled Schemas exported to {self.config.sandbox}_enabled_schemas.csv", style="green")
                 table = Table(title=f"Enabled Schemas in Sandbox: {self.config.sandbox}")
                 table.add_column("ID", style="cyan")
                 table.add_column("Name", style="magenta")
@@ -354,6 +350,10 @@ class ServiceShell(cmd.Cmd):
                         str(sch.get("version","N/A")),
                     )
                 console.print(table)
+                if args.save:
+                    df_schemas = pd.DataFrame(list_enabled_schemas)
+                    df_schemas.to_csv(f"{self.config.sandbox}_enabled_schemas.csv", index=False)
+                    console.print(f"Enabled Schemas exported to {self.config.sandbox}_enabled_schemas.csv", style="green")
             else:
                 console.print("(!) No enabled schemas found.", style="red")
         except Exception as e:
@@ -363,7 +363,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_ups_fieldgroups(self, args:Any) -> None:
-        """List all field groups enabled for Profile in the current sandbox"""
+        """List all field groups enabled for Profile in the current sandbox. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_fieldgroups_enabled', add_help=True)
         parser.add_argument("-sv", "--save",help="Save enabled field groups to CSV file")
         try:
@@ -379,10 +379,6 @@ class ServiceShell(cmd.Cmd):
             list_enabled_fgs = []
             list_enabled_fgs = [f for f in fgs if f.get("$id") in enabled_fgs]
             if len(list_enabled_fgs) > 0:
-                if args.save:
-                    df_fgs = pd.DataFrame(list_enabled_fgs)
-                    df_fgs.to_csv(f"{self.config.sandbox}_enabled_field_groups.csv", index=False)
-                    console.print(f"Enabled Field Groups exported to {self.config.sandbox}_enabled_field_groups.csv", style="green")
                 table = Table(title=f"Enabled Field Groups in Sandbox: {self.config.sandbox}")
                 table.add_column("ID", style="cyan")
                 table.add_column("Name", style="magenta")
@@ -394,6 +390,10 @@ class ServiceShell(cmd.Cmd):
                         str(sch.get("version","N/A")),
                     )
                 console.print(table)
+                if args.save:
+                    df_fgs = pd.DataFrame(list_enabled_fgs)
+                    df_fgs.to_csv(f"{self.config.sandbox}_enabled_field_groups.csv", index=False)
+                    console.print(f"Enabled Field Groups exported to {self.config.sandbox}_enabled_field_groups.csv", style="green")
             else:
                 console.print("(!) No enabled field groups found.", style="red")
         except Exception as e:
@@ -403,8 +403,9 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_profile_schemas(self,args:Any) -> None:
-        """Get the current profile schema"""
+        """Get the current schema based on Profile class. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_schemas_enabled', add_help=True)
+        parser.add_argument("-sv", "--save",help="Save profile schemas to CSV file")
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -421,6 +422,10 @@ class ServiceShell(cmd.Cmd):
                         str(sch.get("version","N/A")),
                     )
                 console.print(table)
+                if args.save:
+                    df_schemas = pd.DataFrame(profile_schemas)
+                    df_schemas.to_csv(f"{self.config.sandbox}_profile_schemas.csv", index=False)
+                    console.print(f"Profile Schemas exported to {self.config.sandbox}_profile_schemas.csv", style="green")
             else:
                 console.print("(!) No profile schemas found.", style="red")
         except Exception as e:
@@ -430,7 +435,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_union_profile_json(self,args:Any) -> None:
-        """Get the current Profile union schema"""
+        """Get the current Profile union schema JSON structure and saving it in a file. It is the Profile schema that contains all enabled Profile class based schemas"""
         parser = argparse.ArgumentParser(prog='get_union_profile', add_help=True)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -446,7 +451,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_union_profile_csv(self,args:Any) -> None:
-        """Get the current Profile union schema"""
+        """Get the current Profile union schema CSV structure and saving it in a file. It is the Profile schema that contains all enabled Profile class based schemas"""
         parser = argparse.ArgumentParser(prog='get_union_profile', add_help=True)
         parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
         try:
@@ -462,7 +467,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_union_event_json(self,args:Any) -> None:
-        """Get the current Experience Event union schema"""
+        """Get the current Experience Event union schema JSON structure and saving it in a file. It is the Experience Event schema that contains all enabled Experience Event class based schemas"""
         parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -478,7 +483,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_union_event_csv(self,args:Any) -> None:
-        """Get the current Experience Event union schema"""
+        """Get the current Experience Event union schema CSV structure and saving it in a file. It is the Experience Event schema that contains all enabled Experience Event class based schemas"""
         parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
         parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
         try:
@@ -494,7 +499,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_event_schemas(self,args:Any) -> None:
-        """Get the current Experience Event schemas"""
+        """Get all the schemas using the Experience Event class as filter. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_event_schemas', add_help=True)
         parser.add_argument("-sv", "--save",help="Save event schemas to CSV file")
         try:
@@ -522,28 +527,11 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
-            return
-    
-    @login_required
-    def do_get_union_event_json(self,args:Any) -> None:
-        """Get the current Experience Event union schema"""
-        parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
-        try:
-            args = parser.parse_args(shlex.split(args))
-            event_union = schemamanager.SchemaManager('https://ns.adobe.com/xdm/context/experienceevent__union',config=self.config)
-            data = event_union.to_dict()
-            with open(f"{self.config.sandbox}_event_union_schema.json", 'w') as f:
-                json.dump(data, f, indent=4)
-            console.print(f"Event Union Schema exported to {self.config.sandbox}_event_union_schema.json", style="green")
-        except Exception as e:
-            console.print(f"(!) Error: {str(e)}", style="red")
-        except SystemExit:
-            return
-         
+            return         
 
     @login_required
     def do_get_schema_xdm(self, arg:Any) -> None:
-        """Get schema JSON by name or ID"""
+        """Get schema XDM JSON by name or $ID or alt:Id. By default it will save the output in a JSON file with the name of the schema title, use the --full option to get the full schema with all details but beware that it can be very long."""
         parser = argparse.ArgumentParser(prog='get_schema_xdm', add_help=True)
         parser.add_argument("schema", help="Schema title, $id or alt:Id to retrieve")
         parser.add_argument("-f","--full",default=False,help="Get full schema with all details",type=bool)
@@ -576,7 +564,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_schema_csv(self, arg:Any) -> None:
-        """Get schema CSV by name or ID"""
+        """Get schema CSV by name or ID. Use the --full option to get the full schema information with all details."""
         parser = argparse.ArgumentParser(prog='get_schema_csv', add_help=True)
         parser.add_argument("schema", help="Schema $id or alt:Id to retrieve")
         parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
@@ -606,7 +594,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_schema_json(self, args:Any) -> None:
-        """Get schema JSON by name or ID"""
+        """Get schema JSON representation by name or ID."""
         parser = argparse.ArgumentParser(prog='get_schema_json', add_help=True)
         parser.add_argument("schema", help="Schema $id or alt:Id to retrieve")
         try:
@@ -821,7 +809,7 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_create_fieldgroup_definition_template(self, args:Any) -> None:
+    def do_create_fieldgroup_template(self, args:Any) -> None:
         """Create a field group definition template CSV file"""
         parser = argparse.ArgumentParser(prog='create_fieldgroup_definition_template', add_help=True)
         parser.add_argument("-tl", "--title", help="Name of the field group",default="MyFieldGroup",type=str)
@@ -837,7 +825,7 @@ class ServiceShell(cmd.Cmd):
                 else:
                     filename = args.file_name
             else:
-                filename = f"{myfg.title}_template.csv"
+                filename = f"{myfg.title}.csv"
             df_template.to_csv(filename, index=False)
             console.print(f"Field Group definition template CSV created: {filename}", style="green")
         except Exception as e:
@@ -926,9 +914,9 @@ class ServiceShell(cmd.Cmd):
             return
     
     @login_required
-    def do_get_datasets_tableNames(self, args:Any) -> None:
+    def do_get_datasets_tablenames(self, args:Any) -> None:
         """List all datasets with their table names in the current sandbox"""
-        parser = argparse.ArgumentParser(prog='get_datasets_tableNames', add_help=True)
+        parser = argparse.ArgumentParser(prog='get_datasets_tablenames', add_help=True)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_cat = catalog.Catalog(config=self.config)
@@ -1080,7 +1068,7 @@ class ServiceShell(cmd.Cmd):
     @login_required
     def do_enable_dataset_for_ups(self, args:Any) -> None:
         """Enable a dataset for Profile"""
-        parser = argparse.ArgumentParser(prog='enable_dataset_for_ups', add_help=True)
+        parser = argparse.ArgumentParser(prog='enable_dataset_for_profile', add_help=True)
         parser.add_argument("dataset", help="Dataset ID or Dataset Name to enable for Profile")
         try:
             args = parser.parse_args(shlex.split(args))
@@ -1091,6 +1079,48 @@ class ServiceShell(cmd.Cmd):
                     datasetId = ds.get("id")
             result = aepp_cat.enableDatasetProfile(datasetId=datasetId)
             console.print(f"Dataset '{datasetId}' enabled for Profile.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_enable_dataset_for_uis(self, args:Any) -> None:
+        """Enable a dataset for Unified Identity Service"""
+        parser = argparse.ArgumentParser(prog='enable_dataset_for_uis', add_help=True)
+        parser.add_argument("dataset", help="Dataset ID or Dataset Name to enable for UIS")
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            for ds in datasets:
+                if ds.get("name","") == args.dataset or ds.get("id","") == args.dataset:
+                    datasetId = ds.get("id")
+            result = aepp_cat.enableDatasetIdentity(datasetId=datasetId)
+            console.print(f"Dataset '{datasetId}' enabled for UIS.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+    
+    @login_required
+    def do_enable_dataset(self,args:Any) -> None:
+        """Enable a dataset for Profile and Unified Identity Service"""
+        parser = argparse.ArgumentParser(prog='enable_dataset', add_help=True)
+        parser.add_argument("dataset", help="Dataset ID or Dataset Name to enable")
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            for ds in datasets:
+                if ds.get("name","") == args.dataset or ds.get("id","") == args.dataset:
+                    datasetId = ds.get("id")
+            enableDatasetForUISBody = [
+                { "op": "add", "path": "/tags/unifiedProfile", "value": ["enabled:true"] },
+                { "op": "add", "path": "/tags/unifiedIdentity", "value": ["enabled:true"] }
+            ]
+            res = aepp_cat.patchDataset(datasetId=datasetId,data=enableDatasetForUISBody)
+            console.print(f"Dataset '{datasetId}' enabled for Profile and UIS.", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1395,7 +1425,7 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_create_dataset_http_source(self,args:Any) -> None:
-        """Create an HTTP Source connection for a specific dataset, XDM compatible data only."""
+        """Create an HTTP Source connection for a specific dataset, for XDM compatible data only."""
         parser = argparse.ArgumentParser(prog='do_create_dataset_http_source', add_help=True)
         parser.add_argument("dataset", help="Name or ID of the Dataset Source connection to create")
         try:
@@ -1421,14 +1451,14 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_DLZ_credential(self,args:Any) -> None:
-        """Get Data Lake Zone credential for the current sandbox"""
+        """Get Data Lake Zone credential for the current sandbox. By default, it retrieves the 'user_drop_zone' credential, but you can specify 'dlz_destination' to get the credential for the DLZ destination connection."""
         parser = argparse.ArgumentParser(prog='get_DLZ_credential', add_help=True)
         parser.add_argument("type",nargs='?',help="Type of credential to retrieve: 'user_drop_zone' or 'dlz_destination'",default="user_drop_zone")
         try:
             args = parser.parse_args(shlex.split(args))
             flw = flowservice.FlowService(config=self.config)
             cred = flw.getLandingZoneCredential(dlz_type=args.type)
-            console.print(f"Data Lake Zone Credential for sandbox '{self.config.sandbox}':", style="green")
+            console.print(f"Data Landing Zone Credential '{args.type}' for sandbox '{self.config.sandbox}':", style="green")
             console.print_json(data=cred)
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
@@ -1437,7 +1467,7 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_get_queries(self, args:Any)-> None:
-        """List top 1000 queries in the current sandbox for the last 24 hours by default, optionally filtered by dataset ID"""
+        """List top 1000 queries in the current sandbox for the last 24 hours by default, optionally filtered by dataset ID. Display top 10 in console and export all to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_queries', add_help=True)
         parser.add_argument("-ds","--dataset", help="Dataset ID to filter queries", default=None)
         parser.add_argument("-st","--state", help="State to filter queries (running, completed, failed)", default=None)
@@ -1483,7 +1513,7 @@ class ServiceShell(cmd.Cmd):
             table.add_column("Created", style="yellow")
             table.add_column("Client", style="white")
             table.add_column("Elapsed Time (ms)", style="white")
-            for q in queries:
+            for q in list_queries[:10]:
                 table.add_row(
                     q.get("id","N/A"),
                     q.get("created","N/A"),
@@ -1584,7 +1614,7 @@ class ServiceShell(cmd.Cmd):
                 else:
                     summary_data["primaryIdentities"][primaryIdentity] += 1
             console.print_json(data=summary_data)
-            console.print(f"Profile attributes exported to {self.config.sandbox}_{args.user_id}_profile_attributes.json", style="green")
+            console.print(f"Profile attributes exported to {self.config.sandbox}_{args.user_id}_profile_event_attributes.json", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1592,7 +1622,7 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_extract_artifacts(self,args:Any) -> None:
-        """extract_artifacts to a localfolder"""
+        """extract all artifacts from the current sandbox to a localfolder"""
         parser = argparse.ArgumentParser(prog='extract_artifacts', description='Extract artifacts from AEP to a local folder',add_help=True)
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
         parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
@@ -1612,7 +1642,7 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_extract_artifact(self,args:Any) -> None:
-        """extract_artifact to a localfolder"""
+        """extract_artifact from the current sandbox to a localfolder"""
         parser = argparse.ArgumentParser(prog='extract_artifact', description='Extract a specific artifact from AEP to a local folder',add_help=True)
         parser.add_argument('artifact', help='artifact to extract (name or id): "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience"')
         parser.add_argument('-at','--artifactType', help='artifact type ')
@@ -1638,34 +1668,27 @@ class ServiceShell(cmd.Cmd):
 
     @login_required
     def do_sync(self,args:Any) -> None:
-        """sync localfolder"""
+        """sync all artifacts based on the parameters provided (local folder or base sandbox) to a target sandbox(s)"""
         parser = argparse.ArgumentParser(prog='sync', description='Synchronizing artifacts to an AEP Sandbox, either from sandbox or from local storage',add_help=True)
         parser.add_argument('artifact', help='artifact to sync (name or id)')
         parser.add_argument('-at','--artifactType', help='artifact type that has been passed, these type are supported: "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience" ',type=str)
         parser.add_argument('-t','--targets', help='target sandboxes',nargs='+',type=str)
         parser.add_argument('-lf','--localfolder', help='Local folder(s) to use for sync',default='extractions',nargs='+',type=str)
         parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization (if not using local folder)',type=str)
-        parser.add_argument('-rg','--region', help='Region to extract artifacts from: "ndl2" (default), "va7", "aus5", "can2", "ind2"',default='ndl2')
         parser.add_argument('-v','--verbose', help='Enable verbose output (default True)',default=True,type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             console.print("Initializing Synchronizor...", style="blue")
-            if args.region:
-                region=args.region
-            else:
-                region='ndl2'
             if args.baseSandbox:
                 synchronizor = synchronizer.Synchronizer(
                     config=self.config,
                     targets=args.targets,
-                    region=region,
                     baseSandbox=args.baseSandbox,
                 )
             elif args.localfolder:
                 synchronizor = synchronizer.Synchronizer(
                     config=self.config,
                     targets=args.targets,
-                    region=region,
                     localFolder=args.localfolder,
             )
             console.print("Starting Sync...", style="blue")
@@ -1682,6 +1705,131 @@ class ServiceShell(cmd.Cmd):
                 console.print(f"(!) Error: Artifact [blue]'{args.artifact}'[/blue] of type [blue]'{args.artifactType}'[/blue] not found", style="red")
             else:
                 console.print(f"(!) Error: {str(e)}", style="red")
+    
+    @login_required
+    def do_sync_all(self,args:Any) -> None:
+        """sync all artifacts based on the parameters provided (local folder or base sandbox) to a target sandbox(s)"""
+        parser = argparse.ArgumentParser(prog='sync_all', description='Synchronizing all artifacts to an AEP Sandbox, either from sandbox or from local storage',add_help=True)
+        parser.add_argument('-t','--targets', help='target sandboxes',nargs='+',type=str)
+        parser.add_argument('-lf','--localfolder', help='Local folder(s) to use for sync',default='extractions',nargs='+',type=str)
+        parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization (if not using local folder)',type=str)
+        parser.add_argument('-v','--verbose', help='Enable verbose output (default True)',default=True,type=bool)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            console.print("Initializing Synchronizor...", style="blue")
+            if args.baseSandbox:
+                synchronizor = synchronizer.Synchronizer(
+                    config=self.config,
+                    targets=args.targets,
+                    baseSandbox=args.baseSandbox,
+                )
+            elif args.localfolder:
+                synchronizor = synchronizer.Synchronizer(
+                    config=self.config,
+                    targets=args.targets,
+                    localFolder=args.localfolder,
+            )
+            console.print("Starting Sync...", style="blue")
+            synchronizor.syncAll(verbose=args.verbose)
+            console.print("Sync completed!", style="green")
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+
+    COMMAND_GROUPS = {
+        "System": ["config", "create_config_file", "get_sandboxes", "change_sandbox", "get_tags"],
+        "Schema": ["get_schemas",
+                   "get_ups_schemas",
+                   "get_ups_fieldgroups",
+                   "get_ups_fieldgroups",
+                   "get_profile_schemas",
+                   "get_event_schemas",
+                   "get_union_profile_json",
+                   "get_union_profile_csv",
+                   "get_union_event_json",
+                   "get_union_event_csv",
+                   "get_schema_xdm",
+                   "get_schema_csv",
+                   "get_schema_json",
+                   "get_fieldgroups",
+                   "get_fieldgroup_json",
+                   "get_fieldgroup_csv",
+                    "get_datatypes",
+                    "get_datatype_json",
+                    "get_datatype_csv",
+                    "enable_schema_for_ups",
+                    "create_fieldgroup_template",
+                    "upload_fieldgroup_definition_csv",
+                    "upload_fieldgroup_definition_xdm"
+                   ],
+        "Datasets": ["get_datasets",
+                     "get_datasets_tablenames",
+                     "get_datasets_infos",
+                     "get_observable_schema_json",
+                     "get_observable_schema_csv",
+                     "get_snapshot_datasets",
+                     "createDataset",
+                     "enable_dataset",
+                     "enable_dataset_for_ups",
+                     "enable_dataset_for_uis",
+                     "get_tags",],
+        "Audiences":["get_audiences"],
+        "Flows": ["get_flows",
+                  "get_flow_errors",
+                  "create_dataset_http_source",
+                  "get_DLZ_credential"],
+        "Queries": ["get_queries",
+                    "query"],
+        "Profiles": [
+                    "get_identities",
+                    "get_profile_attributes",
+                     "get_profile_events",
+                     "get_profile_attributes_lineage",
+                     "get_profile_attribute_lineage",
+                     "get_event_attributes_lineage",
+                     "get_event_attribute_lineage"],
+        "Synchronization": ["extract_artifacts",
+                            "extract_artifact",
+                            "sync",
+                            "sync_all"],
+        "Misc": ["help", "exit", "EOF"]
+
+    }
+    
+    def do_help(self, arg):
+        if arg:
+            # If user asks for specific help (e.g., 'help sync'), use default behavior
+            super().do_help(arg)
+        else:
+            # Custom grouped layout for the main help screen
+            print("\nDocumented commands (type help <topic>):")
+            print("==========================================")
+            for group, commands in self.get_grouped_commands().items():
+                print(f"\n{group}:")
+                print("-" * (len(group) + 1))
+                # Format the list of commands into a clean string
+                for command in commands:
+                    print("  " + command)
+            print()
+            print()
+
+    def get_grouped_commands(self):
+        # This maps the defined groups to actual commands available in the class
+        all_cmds = [n[3:] for n in self.get_names() if n.startswith('do_')]
+        grouped = {group: [] for group in self.COMMAND_GROUPS}
+        grouped["Misc"] = []
+
+        for c in all_cmds:
+            found = False
+            for group, cmds in self.COMMAND_GROUPS.items():
+                if c in cmds:
+                    grouped[group].append(c)
+                    found = True
+                    break
+            if not found and c != 'help': # Hide help from its own list
+                grouped["Misc"].append(c)
+        return grouped
     
     def do_exit(self, args:Any) -> None:
         """Exit the application"""

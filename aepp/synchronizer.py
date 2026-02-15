@@ -257,6 +257,7 @@ class Synchronizer:
                         component = cat_base.data.ids[component]
                     component = cat_base.getDataSet(component)
                 elif self.localfolder is not None:
+                    found = False
                     for folder in self.datasetFolder:
                         for file in folder.glob('*.json'):
                             ds_file = json.load(FileIO(file))
@@ -264,7 +265,12 @@ class Synchronizer:
                                 if len(ds_file.get('unifiedTags',[])) > 0 and self.dict_tag_name_id is not None:
                                     ds_file['unifiedTags'] = [self.dict_tag_name_id[tag_name] for tag_name in ds_file.get('unifiedTags',[]) if tag_name in self.dict_tag_name_id.keys()]
                                 component = ds_file
+                                found = True
                                 break
+                        if found:
+                            break
+                if found == False:
+                    raise ValueError("the dataset could not be found in the local folder")
                 if len(component) == 1: ## if the component is the catalog API response {'key': {dataset definition}}
                     component = component[list(component.keys())[0]] ## accessing the real dataset definition
             elif componentType == "mergepolicy":
@@ -349,6 +355,7 @@ class Synchronizer:
         6. Datasets
         Because the Merge Policies and Audiences needs the dataset and schema to be enabled in the target sandbox, and the synchronizer does not currently support enabling them for UPS.
         They will not sync with that method.
+        A variable syncIssue will be created to gather the artefacts that could not be synchronized.
         Arguments:
             force : OPTIONAL : if True, it will force the synchronization of the components even if they already exist in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
             verbose : OPTIONAL : if True, it will print the details of the synchronization process
@@ -356,6 +363,7 @@ class Synchronizer:
         base_identities = []
         base_schemas = []
         base_datasets = []
+        self.syncIssues = []
         if self.baseConfig is not None:
             if verbose:
                 print("Loading base components from the sandbox...")
@@ -392,12 +400,18 @@ class Synchronizer:
         if verbose:
             print("Syncing Schemas...")
         for sch in base_schemas:
-             self.__syncSchema__(sch,force=force,verbose=verbose)
+            try:
+                self.__syncSchema__(sch,force=force,verbose=verbose)
+            except Exception as e:
+                self.syncIssues.append({'component':sch.title,'type':'schema','error':str(e)})
         ### Syncing datasets
         if verbose:
-            print("Syncing Datasets...")
+                print("Syncing Datasets...")
         for ds in base_datasets:
-            self.__syncDataset__(ds,force=force,verbose=verbose)
+            try:
+                self.__syncDataset__(ds,force=force,verbose=verbose)
+            except Exception as e:
+                self.syncIssues.append({'component':ds.get('name','id not found'),'type':'dataset','error':str(e)})
 
             
     def __syncClass__(self,baseClass:classmanager.ClassManager,force:bool=False,verbose:bool=False)-> dict:
@@ -447,14 +461,12 @@ class Synchronizer:
             t_datatype = None
             if name_base_datatype in self.dict_targetComponents[target]['datatype'].keys(): ## if the datatype is already synchronized in the target cache
                 t_datatype = self.dict_targetComponents[target]['datatype'][name_base_datatype]
-            if name_base_datatype in targetSchema.data.dataTypes_altId.keys(): ## datatype already exists in target but not synced recently in the cache or force sync is on
+            if name_base_datatype in targetSchema.data.dataTypes_altId.keys() or name_base_datatype in self.dict_targetComponents[target]['datatype'].keys(): ## datatype already exists in target but not synced recently in the cache or force sync is on
                 if t_datatype is None: ## if need toe create the DataTypeManager
                     t_datatype = datatypemanager.DataTypeManager(targetSchema.data.dataTypes_altId[name_base_datatype],config=self.dict_targetsConfig[target],sandbox=target)
                 else: ## if the datatype is already synchronized in the target cache
                     if force == False:
-                        if verbose:
-                            print(f"datatype '{name_base_datatype}' already synchronized. Skipping synchronization.")
-                        return
+                        continue ## if the datatype is already synchronized in the target cache and force sync is not on, we skip the synchronization of this target
                 if verbose:
                     print(f"datatype '{name_base_datatype}' already exists in target {target}, checking it")
                 df_base = baseDataType.to_dataframe(full=True)
@@ -558,9 +570,7 @@ class Synchronizer:
                     t_fieldgroup = fieldgroupmanager.FieldGroupManager(targetSchema.data.fieldGroups_altId[name_base_fieldgroup],config=self.dict_targetsConfig[target],sandbox=target)
                 else:
                     if force == False:
-                        if verbose:
-                            print(f"field group '{name_base_fieldgroup}' already syncedhronized. Skipping synchronization.")
-                        return
+                        continue ## if the field group is already synchronized in the target cache and force sync is not on, we skip the synchronization of this target
                 for fg_class in t_fieldgroup.classIds:
                     if fg_class not in fg_class_ids:
                         fg_class_ids.append(fg_class)
@@ -701,7 +711,7 @@ class Synchronizer:
                     if force == False:
                         if verbose:
                             print(f"schema '{name_base_schema}' already synchronized. Skipping synchronization.")
-                        return
+                        continue ## if the schema is already synchronized in the target cache and force sync is not on, we skip the synchronization of this target
                 if verbose:
                     print(f"schema '{name_base_schema}' already exists in target {target}, checking it")
                 t_schema = schemamanager.SchemaManager(targetSchemaAPI.data.schemas_altId[name_base_schema],config=self.dict_targetsConfig[target],sandbox=target)
@@ -732,7 +742,6 @@ class Synchronizer:
                         raise Exception(res)
                     else:
                         t_schema = schemamanager.SchemaManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
-                ## handling descriptors
                 for fg_name in existing_fieldgroups:
                     if baseSchema.tenantId[1:] in dict_base_fg_name_id[fg_name]: ## custom field group
                         if fg_name not in self.dict_targetComponents[target]['fieldgroup'].keys(): ## if the field group is not already synchronized in the target cache
@@ -747,6 +756,7 @@ class Synchronizer:
                             self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
                         else:
                             pass ## if the field group is already in the cache, we can use it directly
+                ## handling descriptors
                 list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI=targetSchemaAPI,verbose=verbose)
                 ## handling the meta:refProperty setup if any
                 base_allOf = baseSchema.schema.get('allOf',[])
@@ -852,6 +862,10 @@ class Synchronizer:
         if not isinstance(targetSchemaManager,schemamanager.SchemaManager):
             raise TypeError("the targetSchemaManager must be a SchemaManager object")
         base_descriptors = baseSchemaManager.getDescriptors()
+        if len(base_descriptors) == 0:
+            return []
+        if verbose:
+            print(f"found {len(base_descriptors)} descriptors in the base schema '{baseSchemaManager.title}'. Synchronizing them to the target schema")
         if self.baseConfig is not None:
             baseSchemaAPI = schema.Schema(config=self.baseConfig)
             myschemas = baseSchemaAPI.getSchemas() ## to populate the data object
@@ -864,8 +878,6 @@ class Synchronizer:
         list_descriptors = []
         for baseDescriptor in base_descriptors:
             descType = baseDescriptor['@type']
-            if verbose:
-                print(f"Synchronizing descriptors '{descType}'")
             match descType:
                 case "xdm:descriptorIdentity":
                     target_identitiesDecs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorIdentity']
@@ -1072,13 +1084,11 @@ class Synchronizer:
             else: ### using an OOTB schema
                 schema_ootb = baseSchemaAPI.getSchemasGlobal()
                 if base_dataset_related_schemaId in baseSchemaAPI.data.schemas_id.values():
-                    if verbose:
-                        print(f"related schema is an OOTB schema, no need to synchronize dataset and schema")
-                    return
+                    return ## Avoid synchronization for all targets
                 else:
                     if verbose:
-                        print(f"related schema with id '{base_dataset_related_schemaId}' is not found, trying to find it in the local folder")
-                    return
+                        print(f"related schema with id '{base_dataset_related_schemaId}' is not found. Skipping dataset synchronization.")
+                    return ## avoid synchronization for all targets since the related schema is not found
         elif self.localfolder is not None:
             base_schemas = []
             for folder in self.schemaFolder:

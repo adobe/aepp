@@ -71,7 +71,11 @@ It will synchronize the components in the following order:
 5. Schemas
 6. Datasets
 Because the `Merge Policies` and `Audiences` needs the dataset and schema to be enabled in the target sandbox, and the synchronizer does not currently support enabling them for UPS.\
-They will not be synchronized with that method.
+They will not be synchronized with that method.\
+**NOTE**: a variable `syncIssues` is available on the synchronizer instance to track the different issues that happened during the synchronization process. Each issue is a dictionary with the following keys:
+* component : name of the component that caused the issue
+* type : original type of the component (e.g. "schema", "dataset"). A schema can have an issue related to a FieldGroup or a DataType, however, the schema will be the component that will be tracked in the issue and the type will be "schema" with the details of the error in the error message. 
+* error : error message
 Arguments:
 * force : OPTIONAL : if True, it will force the synchronization of the components even if they already exist in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
 * verbose : OPTIONAL : if True, it will print the details of the synchronization process

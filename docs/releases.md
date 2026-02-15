@@ -2,6 +2,24 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.5.3
+* soft removing dependency to `region` in `Synchronizer` and `Identity` class
+* adding `get_tags`, `get_profile_attributes`, `get_profile_events` method in the `cli` module
+* supporting tags on export and synchronization of datasets, audiences
+* adding `unifiedTags` support on dataset creation in `Catalog` module
+* prioritization to `config` parameter in `Schema` class initialization
+* Fixing issue on multiple localFolder support in `Synchronizer` class
+* adding additional information (`string:date`, `string:date-time`, `int:long`, `int:short`, `int:byte`) in the `to_dict` methods for `SchemaManager`, `FieldGroupManager` and `DataTypeManager` to support better synchronization and understanding of the schema.\
+* adding getSchemasGlobal in `Schema` class to support better synchronization and understanding of the schema.\
+* changing persistence of values to add global field groups, schemas and datatypes in their normal respective data point, no more additional data point for global values. This will help better synchronization and simplification of attributes.\
+* add support for creation of external audiences in the segmentation module.\
+  * createExtenalAudience
+  * getExternalAudienceStatus
+  * runExternalAudienceJob
+  * getExternalAudienceJob
+* adding the `syncAll` method to support synchronization of multiple artifacts. Based of folders or sandbox.
+* added `createConnectionToUPS` method in `flowservice` module to support connection to UPS for exporting data
+
 ## version 0.5.2
 * adding support for multiple values for localFolder in `SchemaManager`, `FieldGroupManager`, `DataTypeManager` and `ClassManager`
 * adding support for multiple values for localFolder in `Synchronizer` class

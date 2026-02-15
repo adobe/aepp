@@ -1073,12 +1073,14 @@ class Schema:
         self.data.fieldGroups_altId = {mix["title"]: mix["meta:altId"] for mix in data}
         return data
     
-    def getFieldGroupsGlobal(self,format: str = "xdm",output:str='raw', **kwargs)->list:
+    def getFieldGroupsGlobal(self,format: str = "xdm",output:str='raw', prop:str|None=None,**kwargs)->list:
         """
         returns the global fieldGroups of the account.
         Arguments:
             format : OPTIONAL : either "xdm" or "xed" format
-            output : OPTIONAL : either "raw" (default) or "df" for dataframe 
+            output : OPTIONAL : either "raw" (default) or "df" for dataframe
+            prop : OPTIONAL : A comma-separated list of top-level object properties to be returned in the response.
+                    For example, prop=meta:intendedToExtend==https://ns.adobe.com/xdm/context/profile 
         kwargs:
             debug : if set to True, will print result for errors
         """
@@ -1086,6 +1088,8 @@ class Schema:
             self.logger.debug(f"Starting getFieldGroups")
         path = f"/global/fieldgroups/"
         params = {}
+        if prop is not None:
+            params["property"] = prop
         verbose = kwargs.get("debug", False)
         privateHeader = deepcopy(self.header)
         privateHeader["Accept"] = f"application/vnd.adobe.{format}+json"
@@ -1106,6 +1110,7 @@ class Schema:
             data += res.get("results")
             page = res.get("_page",{})
             nextPage = page.get('next',None)
+            print(f"Getting next page of global field groups : {nextPage}")
         for el in data:
             self.data.fieldGroups_altId[el["title"]] = el["meta:altId"]
             self.data.fieldGroups_id[el["title"]] = el["$id"]

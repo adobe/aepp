@@ -1870,9 +1870,10 @@ class FieldGroupManager:
             path_tenant = self.tenantId
         else:
             path_tenant = '_tenantId'
-        paths = [f'{path_tenant}.object', f'{path_tenant}.object.astring', f'{path_tenant}.object.anumber', f'{path_tenant}.object.aboolean',f'{path_tenant}.object.adate', f'{path_tenant}.stringArray[]', f"{path_tenant}.arrayObject[]{{}}", f'{path_tenant}.arrayObject[]{{}}.astring']
-        xdmTypes = ['object', 'string', 'number', 'boolean', 'date', 'string', 'object','string']
-        fieldgroups = ['fieldGroup_example']*len(paths)
+        fg_title = self.title if self.title != "" else "fieldGroup_example"
+        paths = [f"{path_tenant}",f'{path_tenant}.object', f'{path_tenant}.object.astring', f'{path_tenant}.object.anumber', f'{path_tenant}.object.aboolean',f'{path_tenant}.object.adate', f'{path_tenant}.stringArray[]', f"{path_tenant}.arrayObject[]{{}}", f'{path_tenant}.arrayObject[]{{}}.astring']
+        xdmTypes = ['object','object', 'string', 'number', 'boolean', 'date', 'string', 'object','string']
+        fieldgroups = [fg_title]*len(paths)
         titles = [f'field {i.split(".")[-1]} Title' for i in paths]
         descriptions = [f'field {i.split(".")[-1]} Description' for i in paths]
         dict_data = {
@@ -1883,15 +1884,15 @@ class FieldGroupManager:
             "description": descriptions
         }
         if full:
-            dict_data["enumValues"] = [None,None,None,None,None,None,{"value1":"description value 1","value2":"description value 2"},None]
-            dict_data["enum"] = [None,None,None,None,None,None,True,None]
-            dict_data["mapType"] = [None,None,None,None,None,None,None,'string']
-            dict_data["minimum"] = [None,None,None,None,None,None,None,None]
-            dict_data["maximum"] = [None,None,None,None,None,None,None,None]
-            dict_data["minLength"] = [None,None,None,None,None,None,None,None]
-            dict_data["maxLength"] = [None,None,None,None,None,None,None,None]
-            dict_data["pattern"] = [None,None,None,None,None,r'^[a-zA-Z0-9]+$',None,None]
-            dict_data["default"] = [None,'default string',123,True,'2024-01-01',None,{"key":"value"},None]
+            dict_data["enumValues"] = [None,None,None,None,None,None,None,{"value1":"description value 1","value2":"description value 2"},None]
+            dict_data["enum"] = [None,None,None,None,None,None,None,True,None]
+            dict_data["mapType"] = [None,None,None,None,None,None,None,None,'string']
+            dict_data["minimum"] = [None,None,None,None,None,None,None,None,None]
+            dict_data["maximum"] = [None,None,None,None,None,None,None,None,None]
+            dict_data["minLength"] = [None,None,None,None,None,None,None,None,None]
+            dict_data["maxLength"] = [None,None,None,None,None,None,None,None,None]
+            dict_data["pattern"] = [None,None,None,None,None,None,r'^[a-zA-Z0-9]+$',None,None]
+            dict_data["default"] = [None,None,'default string',123,True,'2024-01-01',None,{"key":"value"},None]
         df = pd.DataFrame(data=dict_data)
         if save:
             df.to_csv(filename,index=False)

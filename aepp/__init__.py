@@ -228,10 +228,8 @@ def extractSandboxArtifacts(
     tag_manager = tags.Tags(config=sandbox)
     all_tags = tag_manager.getTags()
     dict_id_name = {tag['id']:tag['name'] for tag in all_tags}
-    for tag in all_tags:
-        safe_name = __titleSafe__(tag.get('name','unknown'))
-        with open(f"{tagPath / safe_name}.json",'w') as f:
-            json.dump(tag,f,indent=2)
+    with open(tagPath / "tags.json",'w') as f:
+        json.dump(all_tags,f,indent=2)
     myclasses = sch.getClasses()
     classesGlobal = sch.getClassesGlobal()
     behaviors = sch.getBehaviors()
@@ -281,6 +279,11 @@ def extractSandboxArtifacts(
         globalFgsElements = [(element, fieldgroupPathGlobale, '$id', 'title', sch.getFieldGroup) for element in globalFgs]
         with ThreadPoolExecutor(thread_name_prefix = 'globalFieldgroup') as thread_pool:
             results = thread_pool.map(writingFullFile, globalFgsElements)
+        ### exception for a fieldgroup not supported by default getFieldGroups endpoint
+        myfg = sch.getFieldGroup('https://ns.adobe.com/experience/intelligentServices/event-journeyai-sendtimeoptimization-summary',full=True,xtype='xed')
+        title_myfg = __titleSafe__(myfg.get('title',myfg.get('$id','unknown')))
+        with open(f"{fieldgroupPathGlobale / title_myfg}.json",'w') as f:
+            json.dump(myfg,f,indent=2)
     ## writing data types
     mydt = sch.getDataTypes()
     datatypeElements = [(element, datatypePath, 'meta:altId', 'title', sch.getDataType) for element in mydt]
