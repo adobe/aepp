@@ -93,12 +93,15 @@ class Synchronizer:
             if baseSandbox is not None:
                 self.baseSandbox = baseSandbox
             else:
-                for folder in self.localfolder:
-                    with open(folder / 'config.json','r') as f:
-                        local_config = json.load(f)
-                        if 'baseSandbox' in local_config.keys():
-                            self.baseSandbox = local_config['baseSandbox']
-                            break
+                try:
+                    for folder in self.localfolder:
+                            with open(folder / 'config.json','r') as f:
+                                local_config = json.load(f)
+                                if 'sandbox' in local_config.keys():
+                                    self.baseSandbox = local_config['sandbox']
+                                    break
+                except Exception as e:
+                    raise ValueError("baseSandbox must be provided in the constructor or in the config.json file in the local folder")
         self.dict_targetsConfig = {target: aepp.configure(org_id=config_object['org_id'],client_id=config_object['client_id'],scopes=config_object['scopes'],secret=config_object['secret'],sandbox=target,connectInstance=True) for target in targets}
         self.region = region
         self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}}  
@@ -269,8 +272,8 @@ class Synchronizer:
                                 break
                         if found:
                             break
-                if found == False:
-                    raise ValueError("the dataset could not be found in the local folder")
+                    if found == False:
+                        raise ValueError("the dataset could not be found in the local folder")
                 if len(component) == 1: ## if the component is the catalog API response {'key': {dataset definition}}
                     component = component[list(component.keys())[0]] ## accessing the real dataset definition
             elif componentType == "mergepolicy":
@@ -457,13 +460,17 @@ class Synchronizer:
         description_base_datatype = baseDataType.description
         for target in self.dict_targetsConfig.keys():
             targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
-            t_datatype = targetSchema.getDataTypes()
+            t_datatypes = targetSchema.getDataTypes()
+            t_datatypes_global = targetSchema.getDataTypesGlobal()
             t_datatype = None
             if name_base_datatype in self.dict_targetComponents[target]['datatype'].keys(): ## if the datatype is already synchronized in the target cache
                 t_datatype = self.dict_targetComponents[target]['datatype'][name_base_datatype]
             if name_base_datatype in targetSchema.data.dataTypes_altId.keys() or name_base_datatype in self.dict_targetComponents[target]['datatype'].keys(): ## datatype already exists in target but not synced recently in the cache or force sync is on
                 if t_datatype is None: ## if need toe create the DataTypeManager
                     t_datatype = datatypemanager.DataTypeManager(targetSchema.data.dataTypes_altId[name_base_datatype],config=self.dict_targetsConfig[target],sandbox=target)
+                    if t_datatype.dataType.get('meta:extensible',False) == False: ## if the data type is not extensible, it is OOTB can only use it.
+                        self.dict_targetComponents[target]['datatype'][t_datatype.title] = t_datatype ## adding it to the cache to avoid checking it again for other datatypes using it as base and to be able to use it if needed as reference when synchronizing other datatypes using it as base
+                        continue
                 else: ## if the datatype is already synchronized in the target cache
                     if force == False:
                         continue ## if the datatype is already synchronized in the target cache and force sync is not on, we skip the synchronization of this target
@@ -808,8 +815,6 @@ class Synchronizer:
                         ## adding the field group to the target components
                         self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
                     else:
-                        if verbose:
-                            print(f"field group '{fg_name}' is a custom field group, using it")
                         tmp_FieldGroup = baseSchema.getFieldGroupManager(fg_name)
                         self.__syncFieldGroup__(tmp_FieldGroup,force=force,verbose=verbose)
                         new_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][fg_name].id)

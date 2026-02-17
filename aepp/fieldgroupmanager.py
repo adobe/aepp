@@ -20,6 +20,7 @@ from .configs import ConnectObject
 from .datatypemanager import DataTypeManager
 from aepp.schema import Schema
 from aepp import som
+from aepp.manager_utils import __transformationDict__,__simpleDeepMerge__, __cleanPath__,__accessorAlgo__,__searchAlgo__,__searchAttrAlgo__
 from pathlib import Path
 from io import FileIO
 from tempfile import TemporaryDirectory
@@ -112,22 +113,7 @@ class FieldGroupManager:
                         if self.schemaAPI is not None:
                             if 'mixins' in fieldGroup.get('$id') and self.tenantId[1:] in fieldGroup.get('$id'): ## customer mixin
                                 self.fieldGroup = self.schemaAPI.getFieldGroup(fieldGroup['$id'],full=False)
-                                if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
-                                    dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
-                                    dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
-                                    dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
-                                    dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
-                                    dataTypes = dataTypes_id + dataTypes_name
-                                    for dt in dataTypes:
-                                        dt_manager = self.schemaAPI.DataTypeManager(dt)
-                                        self.dataTypes[dt_manager.id] = dt_manager.title
-                                        self.dataTypeManagers[dt_manager.title] = dt_manager
-                                    if full:
-                                        self.fieldGroup = self.schemaAPI.getFieldGroup(self.fieldGroup['$id'],full=True)
-                                    else:
-                                        self.EDITABLE = True
-                                else:
-                                    self.EDITABLE = True
+                                self.EDITABLE = True
                             else: ## OOTB mixins
                                 tmp_def = self.schemaAPI.getFieldGroup(fieldGroup['$id'],full=True) ## handling OOTB mixins
                                 tmp_def['definitions'] = tmp_def['properties']
@@ -140,26 +126,17 @@ class FieldGroupManager:
                                     tmp_def = json.load(FileIO(json_file))
                                     if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
                                         self.fieldGroup = tmp_def
-                                        if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
-                                            if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
-                                                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+)'"
-                                                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
-                                                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
-                                                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
-                                                dataTypes = dataTypes_id + dataTypes_name
-                                                for dt in dataTypes:
-                                                    dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                                    self.dataTypes[dt_manager.id] = dt_manager.title
-                                                    self.dataTypeManagers[dt_manager.title] = dt_manager
+                                        if self.fieldGroup.get('meta:extensible',False) == True and 'definitions' not in self.fieldGroup.keys(): ## if the field group is extensible but does not contains the definitions key, we consider that the properties are the definitions
+                                             self.fieldGroup['definitions'] = self.fieldGroup.get('properties',{})
                                         else: ## OOTB field group
                                             if 'properties' in self.fieldGroup.keys():
                                                 self.fieldGroup['definitions'] = self.fieldGroup['properties']
                                         found = True
+                                        self.EDITABLE = True
                                         break
                                 if found:
                                     break
-                            if self.fieldGroup == {}:
-                                found = False
+                            if found == False: ## looking into the global folder for OOTB field group
                                 for folder in self.fieldgroupGlobalFolder:
                                     for json_file in folder.glob('*.json'):
                                         tmp_def = json.load(FileIO(json_file))
@@ -168,6 +145,7 @@ class FieldGroupManager:
                                             if 'properties' in self.fieldGroup.keys():
                                                 self.fieldGroup['definitions'] = self.fieldGroup['properties']
                                             found = True
+                                            self.EDITABLE = False
                                             break
                                     if found:
                                         break
@@ -178,19 +156,7 @@ class FieldGroupManager:
                             del self.fieldGroup['properties']
                         if self.schemaAPI is not None:
                             self.fieldGroup = self.schemaAPI.getFieldGroup(fieldGroup['$id'],full=False)
-                            if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
-                                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
-                                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
-                                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
-                                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
-                                dataTypes = dataTypes_id + dataTypes_name
-                                for dt in dataTypes:
-                                    dt_manager = self.schemaAPI.DataTypeManager(dt)
-                                    self.dataTypes[dt_manager.id] = dt_manager.title
-                                    self.dataTypeManagers[dt_manager.title] = dt_manager
-                                if full:
-                                    self.fieldGroup = self.schemaAPI.getFieldGroup(self.fieldGroup['$id'],full=True)
-                                self.EDITABLE = True
+                            self.EDITABLE = True
                         elif self.localfolder is not None: ## looking into local folder
                             found = False
                             for folder in self.fieldgroupFolder:
@@ -198,21 +164,22 @@ class FieldGroupManager:
                                     tmp_def = json.load(FileIO(json_file))
                                     if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
                                         self.fieldGroup = tmp_def
-                                        if self.tenantId[1:] in self.fieldGroup.get('$id'): ## custom field group
-                                            if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
-                                                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
-                                                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
-                                                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
-                                                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
-                                                dataTypes = dataTypes_id + dataTypes_name
-                                                for dt in dataTypes:
-                                                    dt_manager = DataTypeManager(dt,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                                    self.dataTypes[dt_manager.id] = dt_manager.title
-                                                    self.dataTypeManagers[dt_manager.title] = dt_manager
                                         found = True
+                                        self.EDITABLE = True
                                         break
                                 if found:
                                     break
+                            if found == False: ## looking into global folder for OOTB field group without definition
+                                for folder in self.fieldgroupGlobalFolder:
+                                    for json_file in folder.glob('*.json'):
+                                        tmp_def = json.load(FileIO(json_file))
+                                        if tmp_def.get('$id') == fieldGroup['$id'] or tmp_def.get('meta:altId') == fieldGroup.get('meta:altId') or tmp_def.get('title') == fieldGroup.get('title'):
+                                            self.fieldGroup = tmp_def            
+                                            found = True
+                                            self.EDITABLE = False
+                                            break
+                                    if found:
+                                        break
                         else:
                             raise ValueError("The field group definition provided does not contains the 'definitions' key. Please check the field group.")
                 else:
@@ -223,27 +190,15 @@ class FieldGroupManager:
                 if self.schemaAPI is not None:
                     self.fieldGroup = self.schemaAPI.getFieldGroup(fieldGroup,full=False)
                     self.tenantId = f"_{self.schemaAPI.getTenantId()}"
-                    if self.tenantId[1:] in self.fieldGroup.get('$id', ''): ## custom field group 
-                        if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
-                            dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
-                            dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
-                            dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
-                            dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
-                            dataTypes = dataTypes_id + dataTypes_name
-                            for dt in dataTypes:
-                                dt_manager = self.schemaAPI.DataTypeManager(dt)
-                                self.dataTypes[dt_manager.id] = dt_manager.title
-                                self.dataTypeManagers[dt_manager.title] = dt_manager
-                            if full:
-                                self.fieldGroup = self.schemaAPI.getFieldGroup(self.fieldGroup['$id'],full=True)
-                            else:
-                                self.EDITABLE = True
-                        else:
-                            self.EDITABLE = True
-                    else: ## OOTB field group
+                    if full:
+                        self.fieldGroup = self.schemaAPI.getFieldGroup(self.fieldGroup['$id'],full=True)
+                        self.EDITABLE = True
+                    if self.fieldGroup.get('meta:extensible',False) == False: ## OOTB field group
                         tmp_def = self.schemaAPI.getFieldGroup(fieldGroup,full=True)
                         self.fieldGroup = tmp_def
                         self.EDITABLE = False
+                    else: ## custom field group
+                        self.EDITABLE = True
                 elif self.localfolder is not None:
                     found = False
                     for folder in self.fieldgroupFolder:
@@ -253,20 +208,7 @@ class FieldGroupManager:
                                 self.fieldGroup = tmp_def
                                 if tmp_def.get('meta:tenantNamespace',None) is not None:
                                     self.tenantId = tmp_def.get('meta:tenantNamespace')
-                                    if '/datatypes/' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{})): ## if custom datatype used in data types
-                                        dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
-                                        dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
-                                        dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
-                                        dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
-                                        dataTypes = dataTypes_id + dataTypes_name
-                                        for aep_folder in self.localfolder:
-                                            dataTypes_folder = aep_folder / "datatype"
-                                            for file in dataTypes_folder.glob('*.json'):
-                                                tmp_def = json.load(FileIO(file))
-                                                if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
-                                                    dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
-                                                    self.dataTypes[dt_manager.id] = dt_manager.title
-                                                    self.dataTypeManagers[dt_manager.title] = dt_manager
+                                self.EDITABLE = True
                                 found = True
                                 break
                         if found:
@@ -279,11 +221,42 @@ class FieldGroupManager:
                                     if tmp_def.get('$id') == fieldGroup or tmp_def.get('meta:altId') == fieldGroup or tmp_def.get('title') == fieldGroup:
                                         self.fieldGroup = tmp_def            
                                         found = True
+                                        self.EDITABLE = False
                                         break
                                 if found:
                                     break  
             else:
                 raise ValueError("the element pass is not a field group definition")
+        if self.fieldGroup.get('meta:extensible',False) == True: ## custom Field group
+            if '$ref' in str(self.fieldGroup.get('definitions',{})) or '/datatype_name/' in str(self.fieldGroup.get('definitions',{}))  or 'meta:referencedFrom' in str(self.fieldGroup.get('definitions',{})): ## if datatype used in data types
+                dataTypeSearch_id = f"(https://ns.adobe.com/{self.tenantId[1:]}/datatypes/[0-9A-Za-z]+?)'"
+                dataTypes_id = re.findall(dataTypeSearch_id,str(self.fieldGroup.get('definitions',{})))
+                dataTypeSearch_name = f"(https://[0-9A-Za-z.]+/datatype_name/[0-9A-Za-z]+?)'"
+                dataTypes_name = re.findall(dataTypeSearch_name,str(self.fieldGroup.get('definitions',{})))
+                metaRefSearch = f"'meta:referencedFrom': '(https://ns.adobe.com/.+?)'"
+                dataType_MetaRef_name = re.findall(metaRefSearch,str(self.fieldGroup.get('definitions',{})))
+                dataTypes = dataTypes_id + dataTypes_name + dataType_MetaRef_name
+                dataTypes = list(set(dataTypes))
+                if self.schemaAPI is not None:
+                    for dt in dataTypes:
+                        dt_manager = self.schemaAPI.DataTypeManager(dt)
+                        self.dataTypes[dt_manager.id] = dt_manager.title
+                        self.dataTypeManagers[dt_manager.title] = dt_manager
+                elif self.localfolder is not None:
+                    for folder in self.datatypeFolder:
+                        for file in folder.glob('*.json'):
+                            tmp_def = json.load(FileIO(file))
+                            if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
+                                dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
+                                self.dataTypes[dt_manager.id] = dt_manager.title
+                                self.dataTypeManagers[dt_manager.title] = dt_manager
+                    for folder in self.datatypeGlobalFolder:
+                        for file in folder.glob('*.json'):
+                            tmp_def = json.load(FileIO(file))
+                            if tmp_def.get('$id') in dataTypes or tmp_def.get('meta:altId') in dataTypes:
+                                dt_manager = DataTypeManager(tmp_def,localFolder=self.localfolder,sandbox=self.sandbox,tenantId=self.tenantId)
+                                self.dataTypes[dt_manager.id] = dt_manager.title
+                                self.dataTypeManagers[dt_manager.title] = dt_manager
         else:
             self.EDITABLE = True
             self.STATE = "NEW"
@@ -352,296 +325,6 @@ class FieldGroupManager:
     
     def __repr__(self)->dict:
         return json.dumps(self.fieldGroup,indent=2)
-    
-    def __simpleDeepMerge__(self,base:dict,append:dict)->dict:
-        """
-        Loop through the keys of 2 dictionary and append the new found key of append to the base.
-        Arguments:
-            base : The base you want to extend
-            append : the new dictionary to append
-        """
-        if type(append) == list:
-            append = append[0]
-        for key in append:
-            if type(base)==dict:
-                if key in base.keys():
-                    self.__simpleDeepMerge__(base[key],append[key])
-                else:
-                    base[key] = append[key]
-            elif type(base)==list:
-                base = base[0]
-                if type(base) == dict:
-                    if key in base.keys():
-                        self.__simpleDeepMerge__(base[key],append[key])
-                    else:
-                        base[key] = append[key]
-        return base
-    
-    def __accessorAlgo__(self,mydict:dict,path:str=None)->dict:
-        """
-        recursive method to retrieve all the elements.
-        Arguments:
-            mydict : REQUIRED : The dictionary containing the elements to fetch (in "properties" key)
-            path : REQUIRED : the path with dot notation.
-        """
-        path = self.__cleanPath__(path)
-        pathSplit = path.split('.')
-        key = pathSplit[0]
-        if 'customFields' in mydict.keys():
-            level = self.__accessorAlgo__(mydict.get('customFields',{}).get('properties',{}),'.'.join(pathSplit))
-            if 'error' not in level.keys():
-                return level
-        if 'property' in mydict.keys() :
-            level = self.__accessorAlgo__(mydict.get('property',{}).get('properties',{}),'.'.join(pathSplit))
-            return level
-        level = mydict.get(key,None)
-        if level is not None:
-            if level["type"] == "object":
-                levelProperties = mydict[key].get('properties',None)
-                if levelProperties is not None:
-                    level = self.__accessorAlgo__(levelProperties,'.'.join(pathSplit[1:]))
-                return level
-            elif level["type"] == "array":
-                levelProperties = mydict[key]['items'].get('properties',None)
-                if levelProperties is not None:
-                    level = self.__accessorAlgo__(levelProperties,'.'.join(pathSplit[1:]))
-                return level
-            else:
-                if len(pathSplit) > 1: 
-                    return {'error':f'cannot find the key "{pathSplit[1]}"'}
-                return level
-        else:
-            if key == "":
-                return mydict
-            return {'error':f'cannot find the key "{key}"'}
-
-    def __searchAlgo__(self,mydict:dict,string:str=None,partialMatch:bool=False,caseSensitive:bool=False,results:list=None,path:str=None,completePath:str=None)->list:
-        """
-        recursive method to retrieve all the elements.
-        Arguments:
-            mydict : REQUIRED : The dictionary containing the elements to fetch (start with fieldGroup definition)
-            string : the string to look for with dot notation.
-            partialMatch : if you want to use partial match
-            caseSensitive : to see if we should lower case everything
-            results : the list of results to return
-            path : the path currently set
-            completePath : the complete path from the start.
-        """
-        list_allOf_keys = [el['$ref'].split('/').pop() for el in self.fieldGroup.get('allOf',[])]
-        finalPath = None
-        if results is None:
-            results=[]
-        for key in mydict:
-            if caseSensitive == False:
-                keyComp = key.lower()
-                string = string.lower()
-            else:
-                keyComp = key
-                string = string
-            if partialMatch:
-                if string in keyComp:
-                    ### checking if element is an array without deeper object level
-                    if mydict[key].get('type') == 'array' and mydict[key]['items'].get('properties',None) is None:
-                        finalPath = path + f".{key}[]"
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = f"{key}"
-                    else:
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = f"{key}"
-                    value = deepcopy(mydict[key])
-                    value['path'] = finalPath
-                    value['queryPath'] = self.__cleanPath__(finalPath)
-                    if completePath is None:
-                        value['completePath'] = f"/definitions/{key}"
-                    else:
-                        value['completePath'] = completePath + "/" + key
-                    results.append({key:value})
-            else:
-                if caseSensitive == False:
-                    if keyComp == string:
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = key
-                        value = deepcopy(mydict[key])
-                        value['path'] = finalPath
-                        value['queryPath'] = self.__cleanPath__(finalPath)
-                        if completePath is None:
-                            value['completePath'] = f"/definitions/{key}"
-                        else:
-                            value['completePath'] = completePath + "/" + key
-                        results.append({key:value})
-                else:
-                    if keyComp == string:
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = key
-                        value = deepcopy(mydict[key])
-                        value['path'] = finalPath
-                        value['queryPath'] = self.__cleanPath__(finalPath)
-                        if completePath is None:
-                            value['completePath'] = f"/definitions/{key}"
-                        else:
-                            value['completePath'] = completePath + "/" + key
-                        results.append({key:value})
-            ## loop through keys
-            if mydict[key].get("type") == "object" or 'properties' in mydict[key].keys():
-                levelProperties = mydict[key].get('properties',{})
-                if levelProperties != dict():
-                    if completePath is None:
-                        tmp_completePath = f"/definitions/{key}"
-                    else:
-                        tmp_completePath = f"{completePath}/{key}"
-                    tmp_completePath += f"/properties"
-                    if path is None:
-                        if key not in list_allOf_keys:
-                            tmp_path = key
-                        else:
-                            tmp_path = None
-                    else:
-                        tmp_path = f"{path}.{key}"
-                    results = self.__searchAlgo__(levelProperties,string,partialMatch,caseSensitive,results,tmp_path,tmp_completePath)
-            elif mydict[key].get("type") == "array":
-                levelProperties = mydict[key]['items'].get('properties',{})
-                if levelProperties != dict():
-                    if completePath is None:
-                        tmp_completePath = f"/definitions/{key}"
-                    else:
-                        tmp_completePath = f"{completePath}/{key}"
-                    tmp_completePath += f"/items/properties"
-                    if levelProperties is not None:
-                        if path is None:
-                            if key not in list_allOf_keys:
-                                tmp_path = key
-                            else:
-                                tmp_path = None
-                        else:
-                            tmp_path = f"{path}.{key}[]{{}}"
-                        results = self.__searchAlgo__(levelProperties,string,partialMatch,caseSensitive,results,tmp_path,tmp_completePath)
-        return results
-
-    def __searchAttrAlgo__(self,mydict:dict,key:str=None,value:str=None,regex:bool=False, originalField:str=None, results:list=None)->list:
-        """
-        recursive method to retrieve all the elements.
-        Arguments:
-            mydict : REQUIRED : The dictionary containing the elements to fetch (start with fieldGroup definition)
-            key : key of the attribute
-            value : the value of that key to look for.
-            regex : if the regex match should be used.
-            originalField : the key used to dig deeper.
-            results : the list of results to return
-        """
-        if results is None:
-            results=[]
-        for k in mydict:
-            if key == k:
-                if regex:
-                    checkValue = deepcopy(mydict[k])
-                    if type(checkValue) == list or type(checkValue) == dict:
-                        checkValue = json.dumps(checkValue)
-                    if re.match(value,checkValue):
-                        if originalField is not None and originalField != 'property' and originalField != 'properties' and originalField != 'items':
-                            results.append(originalField)
-                else:
-                    if mydict[k] == value:
-                        if originalField is not None and originalField != 'property' and originalField != 'properties' and originalField != 'items':
-                            results.append(originalField)
-            ## recursive action for objects and array
-            if type(mydict[k]) == dict:
-                if k == "properties" or k == 'items':
-                    self.__searchAttrAlgo__(mydict[k],key,value,regex,originalField,results)
-                else:
-                    self.__searchAttrAlgo__(mydict[k],key,value,regex,k,results)
-        return results
-    
-    def __transformationDict__(self,mydict:dict=None,typed:bool=False,dictionary:dict=None)->dict:
-        """
-        Transform the current XDM schema to a dictionary.
-        """
-        if dictionary is None:
-            dictionary = {}
-        else:
-            dictionary = dictionary
-        for key in mydict:
-            if type(mydict[key]) == dict:
-                if mydict[key].get('type') == 'object' or 'properties' in mydict[key].keys():
-                    properties = mydict[key].get('properties',None)
-                    additionalProperties = mydict[key].get('additionalProperties',None)
-                    if properties is not None:
-                        if key != "property" and key != "customFields":
-                            if key not in dictionary.keys():
-                                dictionary[key] = {}
-                            self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary[key])
-                        else:
-                            self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary)
-                    elif additionalProperties is not None:
-                        if additionalProperties.get('type') == 'array':
-                            items = additionalProperties.get('items',{}).get('properties',None)
-                            if items is not None:
-                                dictionary[key] = {'key':[{}]}
-                                self.__transformationDict__(items,typed,dictionary=dictionary[key]["key"][0])
-                elif mydict[key].get('type') == 'array':
-                    levelProperties = mydict[key]['items'].get('properties',None)
-                    if levelProperties is not None:
-                        dictionary[key] = [{}]
-                        self.__transformationDict__(levelProperties,typed,dictionary[key][0])
-                    else:
-                        if typed:
-                            type_array = mydict[key]['items'].get('type','object')
-                            if mydict[key]['items'].get('type','object') == 'string':
-                                if mydict[key]['items'].get('format',None) == 'date-time':
-                                    type_array = 'string:date-time'
-                                elif mydict[key]['items'].get('format',None) == 'date':
-                                    type_array = 'string:date'
-                                elif mydict[key]['items'].get('format',None) == 'uri-reference':
-                                    type_array = 'string:uri-reference'
-                                elif mydict[key]['items'].get('format',None) == 'ipv4' or mydict[key]['items'].get('format',None) == 'ipv6':
-                                    type_array = mydict[key]['items'].get('format',None)
-                            if mydict[key]['items'].get('type','object') == 'integer':
-                                if mydict[key]['items'].get('minimum',None) is not None and mydict[key]['items'].get('maximum',None) is not None:
-                                    if mydict[key]['items'].get('minimum',None) == -9007199254740991:
-                                        type_array = f"integer:long"
-                                    elif mydict[key]['items'].get('minimum',None) == -2147483648 and mydict[key]['items'].get('maximum',None) == 2147483647:
-                                        type_array = f"integer:int"
-                                    elif mydict[key]['items'].get('minimum',None) == -32768 and mydict[key]['items'].get('maximum',None) == 32767:
-                                        type_array = f"integer:short"
-                                    elif mydict[key]['items'].get('minimum',None) == -128 and mydict[key]['items'].get('maximum',None) == 128:
-                                        type_array = f"integer:byte"
-                            dictionary[key] = [type_array]
-                        else:
-                            dictionary[key] = []
-                else:
-                    if typed:
-                        dictionary[key] = mydict[key].get('type','object')
-                        if mydict[key].get('enum',None) is not None:
-                            dictionary[key] = f"{mydict[key].get('type')} enum: {','.join(mydict[key].get('enum',[]))}"
-                        if mydict[key].get('type','object') == 'string':
-                            if mydict[key].get('format',None) == 'date-time':
-                                dictionary[key] = 'string:date-time'
-                            elif mydict[key].get('format',None) == 'date':
-                                dictionary[key] = 'string:date'
-                            elif mydict[key].get('format',None) == 'uri-reference':
-                                dictionary[key] = 'string:uri-reference'
-                            elif mydict[key].get('format',None) == 'ipv4' or mydict[key].get('format',None) == 'ipv6':
-                                dictionary[key] = mydict[key].get('format',None)
-                        if mydict[key].get('type','object') == 'integer':
-                            if mydict[key].get('minimum',None) is not None and mydict[key].get('maximum',None) is not None:
-                                if mydict[key].get('minimum',None) == -9007199254740991:
-                                    dictionary[key] = f"integer:long"
-                                elif mydict[key].get('minimum',None) == -2147483648 and mydict[key].get('maximum',None) == 2147483647:
-                                    dictionary[key] = f"integer"
-                                elif mydict[key].get('minimum',None) == -32768 and mydict[key].get('maximum',None) == 32767:
-                                    dictionary[key] = f"integer:short"
-                                elif mydict[key].get('minimum',None) == -128 and mydict[key].get('maximum',None) == 128:
-                                    dictionary[key] = f"integer:byte"
-                    else:
-                        dictionary[key] = ""
-        return dictionary
     
     def __transformationPydantic__(self,mydict:dict=None,dictionary:dict=None)->dict:
         """
@@ -739,8 +422,8 @@ class FieldGroupManager:
         else:
             dictionary = dictionary
         for key in mydict:
-            if type(mydict[key]) == dict:
-                if mydict[key].get('type') == 'object' or 'properties' in mydict[key].keys():
+            if type(mydict[key]) == dict and mydict[key].get('meta:referencedFrom',None) is None:## if the object is referenced from another definition, we skip it as it will be treated in the definition where it is referenced
+                if mydict[key].get('type') == 'object' or 'properties' in mydict[key].keys() : 
                     if path is None:
                         tmp_path = key
                     else:
@@ -756,7 +439,7 @@ class FieldGroupManager:
                         else:
                             dictionary["mapType"].append(pd.NA)
                         if queryPath or full:
-                            dictionary["querypath"].append(self.__cleanPath__(tmp_path))
+                            dictionary["querypath"].append(__cleanPath__(tmp_path))
                         if full:
                             dictionary['metaStatus'].append(mydict[key].get('meta:status',pd.NA))
                             dictionary['minLength'].append(mydict[key].get('minLength',np.nan))
@@ -799,7 +482,7 @@ class FieldGroupManager:
                         else:
                             dictionary["mapType"].append(pd.NA)
                         if (queryPath or full) and tmp_path is not None:
-                            dictionary["querypath"].append(self.__cleanPath__(tmp_path))
+                            dictionary["querypath"].append(__cleanPath__(tmp_path))
                         if full:
                             dictionary['metaStatus'].append(mydict[key].get('meta:status',pd.NA))
                             dictionary['minLength'].append(mydict[key].get('minLength',np.nan))
@@ -845,7 +528,7 @@ class FieldGroupManager:
                         else:
                             dictionary["mapType"].append(pd.NA)
                         if (queryPath or full) and finalpath is not None:
-                            dictionary["querypath"].append(self.__cleanPath__(finalpath))
+                            dictionary["querypath"].append(__cleanPath__(finalpath))
                         if full:
                             dictionary['metaStatus'].append(mydict[key]['items'].get('meta:status',pd.NA))
                             dictionary['minLength'].append(mydict[key]['items'].get('minLength',np.nan))
@@ -883,7 +566,7 @@ class FieldGroupManager:
                     else:
                         dictionary["mapType"].append(pd.NA)
                     if (queryPath or full) and finalpath is not None:
-                        dictionary["querypath"].append(self.__cleanPath__(finalpath))
+                        dictionary["querypath"].append(__cleanPath__(finalpath))
                     if full:
                         dictionary['metaStatus'].append(mydict[key].get('meta:status',pd.NA))
                         dictionary['minLength'].append(mydict[key].get('minLength',np.nan))
@@ -906,7 +589,31 @@ class FieldGroupManager:
                                 else:
                                     tmp_reqPath = f"{elRequired}"
                                 self.requiredFields.add(tmp_reqPath)
-
+            elif type(mydict[key]) == dict and mydict[key].get('meta:referencedFrom',None) is not None: ## if the object is referencing a dataType
+                if mydict[key].get('type') == 'object' or 'properties' in mydict[key].keys() : 
+                    if path is None:
+                        tmp_path = key
+                    else:
+                        tmp_path = f"{path}.{key}"
+                    if tmp_path is not None:
+                        dictionary["path"].append(tmp_path)
+                        dictionary["type"].append(f"{mydict[key].get('type','')}")
+                        dictionary["title"].append(f"{mydict[key].get('title','')}")
+                        dictionary["description"].append(f"{mydict[key].get('description','')}")
+                        dictionary["xdmType"].append(f"{mydict[key].get('meta:xdmType')}")
+                        dictionary["mapType"].append(pd.NA)
+                        if queryPath or full:
+                            dictionary["querypath"].append(__cleanPath__(tmp_path))
+                        if full:
+                            dictionary['metaStatus'].append(pd.NA)
+                            dictionary['minLength'].append(np.nan)
+                            dictionary['maxLength'].append(np.nan)
+                            dictionary['minimum'].append(np.nan)
+                            dictionary['maximum'].append(np.nan)
+                            dictionary['pattern'].append(pd.NA)
+                            dictionary['default'].append(pd.NA)
+                            dictionary['enumValues'].append(pd.NA)
+                            dictionary['enum'].append(False)
         return dictionary
     
     def __setField__(self,completePathList:list=None,fieldGroup:dict=None,newField:str=None,obj:dict=None)->dict:
@@ -1016,14 +723,6 @@ class FieldGroupManager:
                 if kwargs[kw] is not None:
                     obj[kw] = kwargs[kw]
         return obj
-
-    def __cleanPath__(self,string:str=None)->str:
-        """
-        An abstraction to clean the path string and remove the following characters : [,],{,}
-        Arguments:
-            string : REQUIRED : a string 
-        """
-        return deepcopy(string.replace('[','').replace(']','').replace("{",'').replace('}',''))
     
     def setTitle(self,title:str=None)->None:
         """
@@ -1074,7 +773,7 @@ class FieldGroupManager:
             path : REQUIRED : path with dot notation to which field you want to access
         """
         definition = self.fieldGroup.get('definitions',self.fieldGroup.get('properties',{}))
-        data = self.__accessorAlgo__(definition,path)
+        data = __accessorAlgo__(definition,path)
         return data
 
     def searchField(self,string:str,partialMatch:bool=True,caseSensitive:bool=False)->list:
@@ -1087,7 +786,7 @@ class FieldGroupManager:
             caseSensitive : OPTIONAL : if you want to compare with case sensitivity or not. (default False)
         """
         definition = self.fieldGroup.get('definitions',self.fieldGroup.get('properties',{}))
-        data = self.__searchAlgo__(definition,string,partialMatch,caseSensitive)
+        data = __searchAlgo__(self.fieldGroup.get('allOf',[]),definition,string,partialMatch,caseSensitive)
         return data
     
     def searchAttribute(self,attr:dict=None,regex:bool=False,extendedResults:bool=False,joinType:str='outer', **kwargs)->list:
@@ -1111,9 +810,9 @@ class FieldGroupManager:
         definition = self.fieldGroup.get('definitions',self.fieldGroup.get('properties',{}))
         for key in attr:
             if key == "arrayType":
-                resultsDict[key] += self.__searchAttrAlgo__(definition,"type",attr[key],regex)
+                resultsDict[key] += __searchAttrAlgo__(definition,"type",attr[key],regex)
             else:
-                resultsDict[key] += self.__searchAttrAlgo__(definition,key,attr[key],regex)
+                resultsDict[key] += __searchAttrAlgo__(definition,key,attr[key],regex)
         result_combi = []
         if joinType == 'outer':
             for key in resultsDict:
@@ -1165,7 +864,7 @@ class FieldGroupManager:
         if dataType == 'object' and objectComponents is None:
             raise AttributeError('Require a dictionary providing the object component')       
         if title is None:
-            title = self.__cleanPath__(path.split('.').pop())
+            title = __cleanPath__(path.split('.').pop())
         if title == 'items' or title == 'properties':
             raise Exception('"item" and "properties" are 2 reserved keywords')
         pathSplit = path.split('.')
@@ -1174,11 +873,11 @@ class FieldGroupManager:
         completePath = ['definitions',kwargs.get('defaultPath','customFields'),'properties']
         for p in pathSplit:
             if '[]{}' in p:
-                completePath.append(self.__cleanPath__(p))
+                completePath.append(__cleanPath__(p))
                 completePath.append('items')
                 completePath.append('properties')
             else:
-                completePath.append(self.__cleanPath__(p))
+                completePath.append(__cleanPath__(p))
                 completePath.append('properties')
         if dataType == "dataType":
             completePath.pop() ## removing last part
@@ -1265,10 +964,10 @@ class FieldGroupManager:
         if dataType == "dataType" and ref is None:
             raise ValueError("Required a reference to be passed when selecting 'dataType' type of data.")
         if title is None:
-            title = self.__cleanPath__(path.split('.').pop())
+            title = __cleanPath__(path.split('.').pop())
         if title == 'items' or title == 'properties':
             raise Exception('"items" and "properties" are 2 reserved keywords')
-        pathSplit = self.__cleanPath__(path).split('.')
+        pathSplit = __cleanPath__(path).split('.')
         if pathSplit[0] == '':
             del pathSplit[0]
         newField = pathSplit.pop()
@@ -1415,7 +1114,7 @@ class FieldGroupManager:
             raise Exception("The Field Group is not Editable via Field Group Manager")
         if path is None:
             raise ValueError('Require a path to remove it')
-        pathSplit = self.__cleanPath__(path).split('.')
+        pathSplit = __cleanPath__(path).split('.')
         if pathSplit[0] == '':
             del pathSplit[0]
         success = False
@@ -1441,9 +1140,9 @@ class FieldGroupManager:
             definition_deep = {}
             for key in list_allOf_keys:
                 if definition.get(key,None) is not None:
-                    definition_deep = self.__simpleDeepMerge__(definition_deep,definition[key]['properties'])
+                    definition_deep = __simpleDeepMerge__(definition_deep,definition[key]['properties'])
             definition = definition_deep
-        data = self.__transformationDict__(definition,typed)
+        data = __transformationDict__(definition,typed)
         mySom = som.Som(data)
         if len(self.dataTypes)>0:
             paths = self.getDataTypePaths()
@@ -1484,7 +1183,7 @@ class FieldGroupManager:
             definition_deep = {}
             for key in list_allOf_keys:
                 if definition.get(key,None) is not None:
-                    definition_deep = self.__simpleDeepMerge__(definition_deep,deepcopy(definition[key]['properties']))
+                    definition_deep = __simpleDeepMerge__(definition_deep,deepcopy(definition[key]['properties']))
             definition = definition_deep
         data = self.__transformationPydantic__(definition)
         mySom = som.Som(data)
@@ -1503,7 +1202,7 @@ class FieldGroupManager:
             for fgId in self.metaExtend:
                 tmp_fgManager = FieldGroupManager(fgId,schemaAPI=self.schemaAPI,localFolder=self.localfolder,tenantId=self.tenantId,sandbox=self.sandbox)
                 py_fg = tmp_fgManager.to_pydantic(origin='fieldgroup')
-                data = self.__simpleDeepMerge__(data,py_fg)
+                data = __simpleDeepMerge__(data,py_fg)
         if origin == "self":
             modelTypeOutput = kwargs.get("output_model_type",DataModelType.PydanticV2BaseModel)
             pydantic_json = {
@@ -1554,7 +1253,7 @@ class FieldGroupManager:
             definition_deep = {}
             for key in list_allOf_keys:
                 if definition.get(key,None) is not None:
-                    definition_deep = self.__simpleDeepMerge__(definition_deep,definition[key]['properties'])
+                    definition_deep = __simpleDeepMerge__(definition_deep,definition[key]['properties'])
             definition = definition_deep
         data = self.__transformationDF__(definition,queryPath=queryPath,required=required,full=full)
         df = pd.DataFrame(data)
@@ -1566,7 +1265,7 @@ class FieldGroupManager:
                 df['required'] = False
         df['origin'] = 'fieldGroup'
         if len(self.dataTypes)>0:
-            paths = self.getDataTypePaths()          
+            paths = self.getDataTypePaths()
             for path,dataElementId in paths.items():
                 tmp_dtManager = self.getDataTypeManager(dataElementId)
                 df_dataType = tmp_dtManager.to_dataframe(queryPath=queryPath,required=required,full=full)
@@ -1630,9 +1329,16 @@ class FieldGroupManager:
         """
         dict_results = {}
         for dt_id,dt_title in self.dataTypes.items():
-            results = self.searchAttribute({'$ref':dt_id},extendedResults=True)
-            paths = [res[list(res.keys())[0]]['path'] for res in results]
+            ref_results = self.searchAttribute({'$ref':dt_id},extendedResults=True)
+            paths = [res[list(res.keys())[0]]['path'] for res in ref_results]
             for path in paths:
+                res = self.getField(path) ## to ensure the type of the path
+                if res.get('type') == 'array':
+                    path = path +'[]{}'
+                dict_results[path] = dt_id
+            meta_ref_results = self.searchAttribute({'meta:referencedFrom':dt_id},extendedResults=True)
+            meta_paths = [res[list(res.keys())[0]]['path'] for res in meta_ref_results]
+            for path in meta_paths:
                 res = self.getField(path) ## to ensure the type of the path
                 if res.get('type') == 'array':
                     path = path +'[]{}'
@@ -1761,13 +1467,13 @@ class FieldGroupManager:
             else:
                 enumType = row.get('enum',False)
             if path.endswith("[]"):
-                clean_path = self.__cleanPath__(row['path'])
+                clean_path = __cleanPath__(row['path'])
                 self.addField(clean_path,typeElement,title=row['title'],description=row['description'],array=True,enumType=enumType,enumValues=enumValues,mapType=mapType,minimum=minimum,maximum=maximum,pattern=pattern,minLength=minLength,maxLength=maxLength,default=default,metaStatus=metaStatus)
             elif path.endswith("[]{}"):
-                clean_path = self.__cleanPath__(row['path'])
+                clean_path = __cleanPath__(row['path'])
                 self.addField(clean_path,'array',title=row['title'],description=row['description'],enumType=enumType,enumValues=enumValues,mapType=mapType,minimum=minimum,maximum=maximum,pattern=pattern,minLength=minLength,maxLength=maxLength,default=default,metaStatus=metaStatus)
             else:
-                clean_path = self.__cleanPath__(row['path'])
+                clean_path = __cleanPath__(row['path'])
                 self.addField(clean_path,typeElement,title=row['title'],description=row['description'],enumType=enumType,enumValues=enumValues,mapType=mapType,minimum=minimum,maximum=maximum,pattern=pattern,minLength=minLength,maxLength=maxLength,default=default,metaStatus=metaStatus)
         if title is not None:
             self.setTitle(title)

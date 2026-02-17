@@ -16,10 +16,11 @@ from pathlib import Path
 from io import FileIO
 import pandas as pd
 from .configs import ConnectObject
-from .fieldgroupmanager import FieldGroupManager
-from .classmanager import ClassManager
-from .catalog import ObservableSchemaManager
+from aepp.fieldgroupmanager import FieldGroupManager
+from aepp.classmanager import ClassManager
+from aepp.catalog import ObservableSchemaManager
 from aepp.schema import Schema
+from aepp.manager_utils import __simpleDeepMerge__
 from aepp import som
 from tempfile import TemporaryDirectory
 from datamodel_code_generator import InputFileType, generate
@@ -130,7 +131,7 @@ class SchemaManager:
                         if found:
                             break
             self.__setAttributes__(self.schema)
-            self.fieldGroupIds = [obj['$ref'] for obj in allOf if ('/mixins/' in obj['$ref'] or '/experience/' in obj['$ref'] or '/context/' in obj['$ref']) and obj['$ref'] != self.classId]
+            self.fieldGroupIds = [obj['$ref'] for obj in allOf if ('/mixins/' in obj['$ref'] or '/experience/' in obj['$ref'] or '/context/' in obj['$ref'] or '/common/' in obj['$ref']) and obj['$ref'] != self.classId]
             self.classIds = [self.classId]
             for ref in self.fieldGroupIds:
                 if '/mixins/' in ref and self.tenantId[1:] in ref:
@@ -177,7 +178,7 @@ class SchemaManager:
                 self.requiredFields = set([el.replace('@','_').replace('xdm:','') for el in self.schema.get('required',[])])
                 self.__setAttributes__(self.schema)
                 allOf = self.schema.get("allOf",[])
-                self.fieldGroupIds = [obj.get('$ref','') for obj in allOf if ('/mixins/' in obj.get('$ref','') or '/experience/' in obj.get('$ref','') or '/context/' in obj.get('$ref','')) and obj.get('$ref','') != self.classId]
+                self.fieldGroupIds = [obj.get('$ref','') for obj in allOf if ('/mixins/' in obj.get('$ref','') or '/experience/' in obj.get('$ref','') or '/context/' in obj.get('$ref','') or '/common/' in obj.get('$ref','')) and obj.get('$ref','') != self.classId]
                 self.classIds = [self.classId]
             elif localFolder is not None:
                 found = False
@@ -189,7 +190,7 @@ class SchemaManager:
                             self.requiredFields = set([el.replace('@','_').replace('xdm:','') for el in self.schema.get('required',[])])
                             self.__setAttributes__(self.schema)
                             allOf = self.schema.get("allOf",[])
-                            self.fieldGroupIds = [obj.get('$ref','') for obj in allOf if ('/mixins/' in obj.get('$ref','') or '/experience/' in obj.get('$ref','') or '/context/' in obj.get('$ref','')) and obj.get('$ref','') != self.classId]
+                            self.fieldGroupIds = [obj.get('$ref','') for obj in allOf if ('/mixins/' in obj.get('$ref','') or '/experience/' in obj.get('$ref','') or '/context/' in obj.get('$ref','') or '/common/' in obj.get('$ref','')) and obj.get('$ref','') != self.classId]
                             self.classIds = [self.classId]
                             if self.schema.get('meta:tenantNamespace') is not None:
                                 self.tenantId = self.schema.get('meta:tenantNamespace')
@@ -357,30 +358,6 @@ class SchemaManager:
     
     def __repr__(self)->str:
         return json.dumps(self.schema,indent=2)
-
-    def __simpleDeepMerge__(self,base:dict,append:dict)->dict:
-        """
-        Loop through the keys of 2 dictionary and append the new found key of append to the base.
-        Arguments:
-            base : The base you want to extend
-            append : the new dictionary to append
-        """
-        if type(append) == list:
-            append = append[0]
-        for key in append:
-            if type(base)==dict:
-                if key in base.keys():
-                    self.__simpleDeepMerge__(base[key],append[key])
-                else:
-                    base[key] = append[key]
-            elif type(base)==list:
-                base = base[0]
-                if type(base) == dict:
-                    if key in base.keys():
-                        self.__simpleDeepMerge__(base[key],append[key])
-                    else:
-                        base[key] = append[key]
-        return base
 
     def setTitle(self,title:str=None)->None:
         """
@@ -559,9 +536,9 @@ class SchemaManager:
         list_class_dicts = [clm.to_dict() for clm in list(self.classManagers.values())]
         result = {}
         for mydict in list_class_dicts:
-            result = self.__simpleDeepMerge__(result,mydict)
+            result = __simpleDeepMerge__(result,mydict)
         for mydict in list_dict:
-            result = self.__simpleDeepMerge__(result,mydict)
+            result = __simpleDeepMerge__(result,mydict)
         return result
     
     def to_som(self)->'som.Som':
@@ -582,9 +559,9 @@ class SchemaManager:
         list_class_pydantics = [clm.to_pydantic(origin='schema') for clm in list(self.classManagers.values())]
         result = {}
         for mydict in list_class_pydantics:
-            result = self.__simpleDeepMerge__(result,mydict)
+            result = __simpleDeepMerge__(result,mydict)
         for mydict in list_pydantics:
-            result = self.__simpleDeepMerge__(result,mydict)
+            result = __simpleDeepMerge__(result,mydict)
         pydantic_schema = {}
         pydantic_schema['title'] = self.schema.get('title',f'unknown_schema_{str(int(time.time()))}')
         pydantic_schema['description'] = self.schema.get('description','')

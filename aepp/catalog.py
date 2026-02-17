@@ -11,6 +11,7 @@
 import aepp
 from dataclasses import dataclass
 from aepp import connector
+from aepp.manager_utils import __searchAttrAlgo__,__cleanPath__,__transformationDict__,__simpleDeepMerge__, __accessorAlgo__,__searchAlgo__
 import pandas as pd
 from copy import deepcopy
 from typing import Union
@@ -984,208 +985,17 @@ class ObservableSchemaManager:
         for key in append:
             if type(base)==dict:
                 if key in base.keys():
-                    self.__simpleDeepMerge__(base[key],append[key])
+                    __simpleDeepMerge__(base[key],append[key])
                 else:
                     base[key] = append[key]
             elif type(base)==list:
                 base = base[0]
                 if type(base) == dict:
                     if key in base.keys():
-                        self.__simpleDeepMerge__(base[key],append[key])
+                        __simpleDeepMerge__(base[key],append[key])
                     else:
                         base[key] = append[key]
         return base
-    
-    def __cleanPath__(self,string:str=None)->str:
-        """
-        An abstraction to clean the path string and remove the following characters : [,],{,}
-        Arguments:
-            string : REQUIRED : a string 
-        """
-        return deepcopy(string.replace('[','').replace(']','').replace("{",'').replace('}',''))
-    
-    def __accessorAlgo__(self,mydict:dict,path:list=None)->dict:
-        """
-        recursive method to retrieve all the elements.
-        Arguments:
-            mydict : REQUIRED : The dictionary containing the elements to fetch (in "properties" key)
-            path : the path with dot notation.
-        """
-        path = self.__cleanPath__(path)
-        pathSplit = path.split('.')
-        key = pathSplit[0]
-        if 'customFields' in mydict.keys():
-            level = self.__accessorAlgo__(mydict.get('customFields',{}).get('properties',{}),'.'.join(pathSplit))
-            if 'error' not in level.keys():
-                return level
-        if 'property' in mydict.keys() :
-            level = self.__accessorAlgo__(mydict.get('property',{}).get('properties',{}),'.'.join(pathSplit))
-            return level
-        level = mydict.get(key,None)
-        if level is not None:
-            if level["type"] == "object":
-                levelProperties = mydict[key].get('properties',None)
-                if levelProperties is not None:
-                    level = self.__accessorAlgo__(levelProperties,'.'.join(pathSplit[1:]))
-                return level
-            elif level["type"] == "array":
-                levelProperties = mydict[key]['items'].get('properties',None)
-                if levelProperties is not None:
-                    level = self.__accessorAlgo__(levelProperties,'.'.join(pathSplit[1:]))
-                return level
-            else:
-                if len(pathSplit) > 1: 
-                    return {'error':f'cannot find the key "{pathSplit[1]}"'}
-                return level
-        else:
-            if key == "":
-                return mydict
-            return {'error':f'cannot find the key "{key}"'}
-
-    def __searchAlgo__(self,mydict:dict,string:str=None,partialMatch:bool=False,caseSensitive:bool=False,results:list=None,path:str=None,completePath:str=None)->list:
-        """
-        recursive method to retrieve all the elements.
-        Arguments:
-            mydict : REQUIRED : The dictionary containing the elements to fetch (start with fieldGroup definition)
-            string : the string to look for with dot notation.
-            partialMatch : if you want to use partial match
-            caseSensitive : to see if we should lower case everything
-            results : the list of results to return
-            path : the path currently set
-            completePath : the complete path from the start.
-        """
-        finalPath = None
-        if results is None:
-            results=[]
-        for key in mydict:
-            if caseSensitive == False:
-                keyComp = key.lower()
-                string = string.lower()
-            else:
-                keyComp = key
-                string = string
-            if partialMatch:
-                if string in keyComp:
-                    ### checking if element is an array without deeper object level
-                    if mydict[key].get('type') == 'array' and mydict[key]['items'].get('properties',None) is None:
-                        finalPath = path + f".{key}[]"
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = f"{key}"
-                    else:
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = f"{key}"
-                    value = deepcopy(mydict[key])
-                    value['path'] = finalPath
-                    value['queryPath'] = self.__cleanPath__(finalPath)
-                    if completePath is None:
-                        value['completePath'] = f"/definitions/{key}"
-                    else:
-                        value['completePath'] = completePath + "/" + key
-                    results.append({key:value})
-            else:
-                if caseSensitive == False:
-                    if keyComp == string:
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = key
-                        value = deepcopy(mydict[key])
-                        value['path'] = finalPath
-                        value['queryPath'] = self.__cleanPath__(finalPath)
-                        if completePath is None:
-                            value['completePath'] = f"/definitions/{key}"
-                        else:
-                            value['completePath'] = completePath + "/" + key
-                        results.append({key:value})
-                else:
-                    if keyComp == string:
-                        if path is not None:
-                            finalPath = path + f".{key}"
-                        else:
-                            finalPath = key
-                        value = deepcopy(mydict[key])
-                        value['path'] = finalPath
-                        value['queryPath'] = self.__cleanPath__(finalPath)
-                        if completePath is None:
-                            value['completePath'] = f"/definitions/{key}"
-                        else:
-                            value['completePath'] = completePath + "/" + key
-                        results.append({key:value})
-            ## loop through keys
-            if mydict[key].get("type") == "object" or 'properties' in mydict[key].keys():
-                levelProperties = mydict[key].get('properties',{})
-                if levelProperties != dict():
-                    if completePath is None:
-                        tmp_completePath = f"/definitions/{key}"
-                    else:
-                        tmp_completePath = f"{completePath}/{key}"
-                    tmp_completePath += f"/properties"
-                    if path is None:
-                        if key != "property" and key != "customFields" :
-                            tmp_path = key
-                        else:
-                            tmp_path = None
-                    else:
-                        tmp_path = f"{path}.{key}"
-                    results = self.__searchAlgo__(levelProperties,string,partialMatch,caseSensitive,results,tmp_path,tmp_completePath)
-            elif mydict[key].get("type") == "array":
-                levelProperties = mydict[key]['items'].get('properties',{})
-                if levelProperties != dict():
-                    if completePath is None:
-                        tmp_completePath = f"/definitions/{key}"
-                    else:
-                        tmp_completePath = f"{completePath}/{key}"
-                    tmp_completePath += f"/items/properties"
-                    if levelProperties is not None:
-                        if path is None:
-                            if key != "property" and key != "customFields":
-                                tmp_path = key
-                            else:
-                                tmp_path = None
-                        else:
-                            tmp_path = f"{path}.{key}[]{{}}"
-                        results = self.__searchAlgo__(levelProperties,string,partialMatch,caseSensitive,results,tmp_path,tmp_completePath)
-        return results
-    
-    def __transformationDict__(self,mydict:dict=None,typed:bool=False,dictionary:dict=None)->dict:
-        """
-        Transform the current XDM schema to a dictionary.
-        """
-        if dictionary is None:
-            dictionary = {}
-        else:
-            dictionary = dictionary
-        for key in mydict:
-            if type(mydict[key]) == dict:
-                if mydict[key].get('type') == 'object' or 'properties' in mydict[key].keys():
-                    properties = mydict[key].get('properties',None)
-                    if properties is not None:
-                        if key != "property" and key != "customFields":
-                            if key not in dictionary.keys():
-                                dictionary[key] = {}
-                            self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary[key])
-                        else:
-                            self.__transformationDict__(mydict[key]['properties'],typed,dictionary=dictionary)
-                elif mydict[key].get('type') == 'array':
-                    levelProperties = mydict[key]['items'].get('properties',None)
-                    if levelProperties is not None:
-                        dictionary[key] = [{}]
-                        self.__transformationDict__(levelProperties,typed,dictionary[key][0])
-                    else:
-                        if typed:
-                            dictionary[key] = [mydict[key]['items'].get('type','object')]
-                        else:
-                            dictionary[key] = []
-                else:
-                    if typed:
-                        dictionary[key] = mydict[key].get('type','object')
-                    else:
-                        dictionary[key] = ""
-        return dictionary 
 
     def __transformationDF__(self,mydict:dict=None,dictionary:dict=None,path:str=None,queryPath:bool=False,description:bool=False,xdmType:bool=False)->dict:
         """
@@ -1223,7 +1033,7 @@ class ObservableSchemaManager:
                         dictionary["type"].append(f"{mydict[key].get('type')}")
                         dictionary["title"].append(f"{mydict[key].get('title')}")
                         if queryPath:
-                            dictionary["querypath"].append(self.__cleanPath__(tmp_path))
+                            dictionary["querypath"].append(__cleanPath__(tmp_path))
                         if description:
                             dictionary["description"].append(f"{mydict[key].get('description','')}")
                         if xdmType:
@@ -1242,7 +1052,7 @@ class ObservableSchemaManager:
                         dictionary["type"].append(f"{mydict[key].get('type')}")
                         dictionary["title"].append(f"{mydict[key].get('title')}")
                         if queryPath and tmp_path is not None:
-                            dictionary["querypath"].append(self.__cleanPath__(tmp_path))
+                            dictionary["querypath"].append(__cleanPath__(tmp_path))
                         if description and tmp_path is not None:
                             dictionary["description"].append(mydict[key].get('description',''))
                         if xdmType:
@@ -1254,7 +1064,7 @@ class ObservableSchemaManager:
                         dictionary["type"].append(f"{mydict[key]['items'].get('type')}[]")
                         dictionary["title"].append(f"{mydict[key].get('title')}")
                         if queryPath and finalpath is not None:
-                            dictionary["querypath"].append(self.__cleanPath__(finalpath))
+                            dictionary["querypath"].append(__cleanPath__(finalpath))
                         if description and finalpath is not None:
                             dictionary["description"].append(mydict[key].get('description',''))
                         if xdmType:
@@ -1268,7 +1078,7 @@ class ObservableSchemaManager:
                     dictionary["type"].append(mydict[key].get('type','object'))
                     dictionary["title"].append(mydict[key].get('title',''))
                     if queryPath and finalpath is not None:
-                        dictionary["querypath"].append(self.__cleanPath__(finalpath))
+                        dictionary["querypath"].append(__cleanPath__(finalpath))
                     if description :
                         dictionary["description"].append(mydict[key].get('description',''))
                     if xdmType :
@@ -1285,8 +1095,52 @@ class ObservableSchemaManager:
             caseSensitive : OPTIONAL : if you want to compare with case sensitivity or not. (default False)
         """
         definition = self.observableSchema.get('properties',{})
-        data = self.__searchAlgo__(definition,string,partialMatch,caseSensitive)
+        data = __searchAlgo__(self.observableSchema.get('allOf',[]),definition,string,partialMatch,caseSensitive)
         return data
+    
+    def searchAttribute(self,attr:dict=None,regex:bool=False,extendedResults:bool=False,joinType:str='outer', **kwargs)->list:
+        """
+        Search for an attribute on the field of the field groups.
+        Returns either the list of fields that match this search or their full definitions.
+        Arguments:
+            attr : REQUIRED : a dictionary of key value pair(s).  Example : {"type" : "string"} 
+                NOTE : If you wish to have the array type on top of the array results, use the key "arrayType". Example : {"type" : "array","arrayType":"string"}
+                        This will automatically set the joinType to "inner". Use type for normal search. 
+            regex : OPTIONAL : if you want your value of your key to be matched via regex.
+                Note that regex will turn every comparison value to string for a "match" comparison.
+            extendedResults : OPTIONAL : If you want to have the result to contain all details of these fields. (default False)
+            joinType : OPTIONAL : If you pass multiple key value pairs, how do you want to get the match.
+                outer : provide the fields if any of the key value pair is matched.
+                inner : provide the fields if all the key value pair matched.
+        """
+        resultsDict = {f"{key}":[] for key in attr.keys()}
+        if 'arrayType' in attr.keys(): ## forcing inner join
+            joinType = 'inner'
+        definition = self.observableSchema.get('definitions',self.observableSchema.get('properties',{}))
+        for key in attr:
+            if key == "arrayType":
+                resultsDict[key] += __searchAttrAlgo__(definition,"type",attr[key],regex)
+            else:
+                resultsDict[key] += __searchAttrAlgo__(definition,key,attr[key],regex)
+        result_combi = []
+        if joinType == 'outer':
+            for key in resultsDict:
+                result_combi += resultsDict[key]
+            result_combi = set(result_combi)
+        elif joinType == 'inner':
+            result_combi = set()
+            for key in resultsDict:
+                resultsDict[key] = set(resultsDict[key])
+                if len(result_combi) == 0:
+                    result_combi = resultsDict[key]
+                else:
+                    result_combi = result_combi.intersection(resultsDict[key]) 
+        if extendedResults:
+            result_extended = []
+            for field in result_combi:
+                result_extended += self.searchField(field,partialMatch=False,caseSensitive=True)
+            return result_extended
+        return list(result_combi)
     
     def to_dataframe(self,save:bool=False,queryPath:bool=False,description:bool=False)->pd.DataFrame:
         """
@@ -1313,7 +1167,7 @@ class ObservableSchemaManager:
             save : OPTIONAL : If you wish to save the dictionary in a JSON file
         """
         definition = self.observableSchema.get('properties',self.observableSchema.get('definitions',{}))
-        data = self.__transformationDict__(definition,typed)
+        data = __transformationDict__(definition,typed)
         if save:
             filename = self.observableSchema.get('title',f'unknown_fieldGroup_{str(int(time.time()))}')
             aepp.saveFile(module='catalog',file=data,filename=f"{filename}.json",type_file='json')

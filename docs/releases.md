@@ -18,7 +18,11 @@ This page list all of the changes that came during the different release of the 
   * runExternalAudienceJob
   * getExternalAudienceJob
 * adding the `syncAll` method to support synchronization of multiple artifacts. Based of folders or sandbox.
-* added `createConnectionToUPS` method in `flowservice` module to support connection to UPS for exporting data
+* added `createConnectionToUPS` method in `flowservice` module to support connection to UPS for exporting data\
+Patch:
+* better handling of `config.json` file requirement or baseSandbox requirement for `Synchronizer` class.
+* Optimization of code structure for `managers` with the manager_utils module.
+* Better support of the `dataTypes` in the `FieldGroupManager` class and `DataTypeManager` class for Synchronizer.
 
 ## version 0.5.2
 * adding support for multiple values for localFolder in `SchemaManager`, `FieldGroupManager`, `DataTypeManager` and `ClassManager`
