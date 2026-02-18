@@ -35,7 +35,7 @@ python3 -m aepp.cli
 
 This command will launch the CLI, and you will be able to enter various commands to interact with your aepp projects. You can type `help` to see a list of available commands and their descriptions.
 
-Example of help command output:
+Example of help command output:\
 ![Help Command Output](help_cli.png)
 
 ### Instantiation options
@@ -105,7 +105,7 @@ Example of CLI prompt showing the connected sandbox:
 ```bash
 your_sandbox_name> 
 ```
- 
+
 ![CLI Prompt Example](connected_to_prod.png)
 
 
