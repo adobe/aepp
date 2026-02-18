@@ -105,8 +105,7 @@ Example of CLI prompt showing the connected sandbox:
 ```bash
 your_sandbox_name> 
 ```
-
-Image: 
+ 
 ![CLI Prompt Example](connected_to_prod.png)
 
 
