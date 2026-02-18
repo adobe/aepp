@@ -8,7 +8,7 @@ It is designed on top of the aepp Python library, and it provides a convenient w
 The methods available in the CLI are not a one-to-one mapping of the methods in the Python library. Instead, they are designed to provide a more user-friendly experience, often combining multiple library methods into a single CLI command. This allows users to accomplish tasks more efficiently without needing to understand the intricacies of the underlying library.\
 The aepp framework can still be used in order to accomplish more complex tasks that may not be directly supported by the CLI, or to have more control over the synchronization process. The CLI is meant to be a convenient tool for common tasks, while the Python library provides the flexibility and power needed for more advanced use cases.
 
-Finally the full documentation of the CLI methods is available here: [CLI documentation](./docs/cli.md)
+Finally the full documentation of the CLI methods is available here: [CLI documentation](./cli.md)
 
 ## Prequisites
 Before starting the aepp CLI, make sure you have the following prerequisites in place:
@@ -125,7 +125,7 @@ prod> get_sandboxes
 ```
 
 ### Available commands
-The CLI provides a variety of commands to manage and interact with Adobe Experience Platform resources. Below is a sample list of available commands by category: (for full documentation on the commands, please refer to the [CLI documentation](./docs/cli.md))
+The CLI provides a variety of commands to manage and interact with Adobe Experience Platform resources. Below is a sample list of available commands by category: (for full documentation on the commands, please refer to the [CLI documentation](./cli.md))
 
 * Schema: 
   * get_schemas
