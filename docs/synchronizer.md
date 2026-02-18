@@ -1,7 +1,6 @@
-# Synchronizer (BETA)
+# Synchronizer
 
-The `synchronizer` is a sub module that lives on top of several sub modules of aepp (schema, schemamanger,fieldgroupmanager, datatypemanager, classmanager, catalog, identity).\
-**NOTE** : The synchronizer module is currently a **work in progress** and is expected to support more capabilities in the future. Some elements could change in the future and the module is not stable since stated otherwise here. 
+The `synchronizer` is a sub module that lives on top of several sub modules of aepp (schema, schemamanger,fieldgroupmanager, datatypemanager, classmanager, catalog, identity).
 
 The module is intended to create or update elements between sandboxes within an organization.
 The current supported artifacts for the synchronization job are: 
@@ -44,7 +43,8 @@ Once instantiated the synchronizer object will contains certain attributes:
 * baseConfig : the config object with the base sandbox configuration to connect to the base sandbox (a `ConnectInstance` [instance](/getting-started.md#the-connectInstance-parameter))
 * dict_targetsConfig : A dictionary of the different target sandbox configuration object (children of `ConnectInstance` class)
 * region : The region used for the Identity Management for the Target and base Sandbox
-* dict_targetComponents : A dictionary of the target components that has been created. A cache mechanisme to optimize the future usage of these components in the future. 
+* dict_targetComponents : A dictionary of the target components that has been created. A cache mechanisme to optimize the future usage of these components in the future.
+* syncIssues : A variable created when using syncAll method that shows the artifact that could not be migrated.
 
 
 ### Synchronizer methods: 
@@ -69,17 +69,26 @@ It will synchronize the components in the following order:
 3. Classes
 4. Field Groups
 5. Schemas
-6. Datasets
+6. Datasets\
 Because the `Merge Policies` and `Audiences` needs the dataset and schema to be enabled in the target sandbox, and the synchronizer does not currently support enabling them for UPS.\
 They will not be synchronized with that method.\
 **NOTE**: a variable `syncIssues` is available on the synchronizer instance to track the different issues that happened during the synchronization process. Each issue is a dictionary with the following keys:
-* component : name of the component that caused the issue
-* type : original type of the component (e.g. "schema", "dataset"). A schema can have an issue related to a FieldGroup or a DataType, however, the schema will be the component that will be tracked in the issue and the type will be "schema" with the details of the error in the error message. 
-* error : error message
+   * component : name of the component that caused the issue
+   * type : original type of the component (e.g. "schema", "dataset"). A schema can have an issue related to a FieldGroup or a DataType, however, the schema will be the component that will be tracked in the issue and the type will be "schema" with the details of the error in the error message. 
+   * error : error message
+  
 Arguments:
 * force : OPTIONAL : if True, it will force the synchronization of the components even if they already exist in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
 * verbose : OPTIONAL : if True, it will print the details of the synchronization process
 
+##### Best Practices around syncAll
+It is not recommended to sync all the artefacts from one sandbox to another sandbox.\
+If done directly via `baseSandbox` configuration, everything will be tentatively sync. This is very expensive and may contain elements you do not want to sync, such as OOTB schema and datasets.
+
+The best practice is to download all the artifacts that you want to sync into one folder.\
+**Reminder**: All dependencies are resolved during the `extractArtifact` so extracting `datasets` will take care of extracting `schema`,`fieldgroup`,`datatype`,`descriptors`,`identities`
+
+Once all wished artifacts are in your folder, you can use the `syncAll` with a specifc folder.
 
 #### getSyncFieldGroupManager
 Helper method to get the FieldGroupManager for a target sandbox.\

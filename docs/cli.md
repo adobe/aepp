@@ -19,7 +19,8 @@ The AEPP Command Line Interface (CLI) is a powerful tool that allows developers 
 
 ## Installation
 
-This package can be accessible directly after installing the AEPP SDK. To install the SDK, follow the instructions in the [Getting Started Guide](./getting-started.md).
+This package can be accessible directly after installing the AEPP SDK. To install the SDK, follow the instructions in the [Getting Started Guide](./getting-started.md).\
+I provide a guide to get started with the CLI, see the [getting started with the CLI section](./getting-started-cli.md).
 
 ## Initializing the CLI
 
@@ -44,10 +45,10 @@ At the start of your instantiation, you can provide optional parameters that wou
 ## Available Commands
 The CLI provides a variety of commands to manage and interact with Adobe Experience Platform resources. Below is a list of available commands:
 
-### createConfigFile
+### create_config_file
 Generate a JSON configuration file with your connection parameters for future use.\
 Arguments:
-* `-f`, `--file_name` : File name for your config file (default: "aepp_config.json")
+* `-fn`, `--file_name` : File name for your config file (default: "aepp_config.json")
 
 
 ### config
@@ -65,6 +66,9 @@ Parameters:
 Switch the active sandbox session after initial configuration.\
 Arguments:
 * `sandbox` : The name of the sandbox to switch to.
+
+### get_sandboxes
+List all sandboxes available in the current organization.
 
 ## Schema Methods
 
@@ -90,13 +94,13 @@ Arguments:
 Get the raw JSON (XDM) definition of a specific schema.\
 Arguments:
 * `schema` : The Schema Title, $id, or alt:Id.
-* `-f`, `--full` : Get full schema details (default: False).
+* `-f`, `--full` : Boolean. Get full schema details (default: False, possible values: True, False).
 
 ### get_schema_csv
 Get the structure of a specific schema exported as a CSV file.\
 Arguments:
 * `schema` : The Schema $id or alt:Id.
-* `-f`, `--full` : Get full schema details (default: False).
+* `-f`, `--full` : Boolean. Get full schema details (default: False, possible values: True, False).
 
 ### get_schema_json
 Get the JSON representation of a specific schema manager object.\
@@ -114,7 +118,7 @@ Export the current Profile Union Schema to a JSON file.
 ### get_union_profile_csv
 Export the current Profile Union Schema to a CSV file.\
 Arguments:
-* `-f`, `--full` : Get full schema information (default: False).
+* `-f`, `--full` : Boolean. Get full schema information (default: False, possible values: True, False).
 
 ### get_union_event_json
 Export the current Experience Event Union Schema to a JSON file.
@@ -122,7 +126,7 @@ Export the current Experience Event Union Schema to a JSON file.
 ### get_union_event_csv
 Export the current Experience Event Union Schema to a CSV file.\
 Arguments:
-* `-f`, `--full` : Get full schema information (default: False).
+* `-f`, `--full` : Boolean. Get full schema information (default: False, possible values: True, False).
 
 ### get_fieldgroups
 List all field groups in the current sandbox.\
@@ -143,13 +147,13 @@ Arguments:
 Get the structure of a specific field group exported as a CSV file.\
 Arguments:
 * `fieldgroup` : Field Group Name, $id, or alt:Id.
-* `-f`, `--full` : Get full field group details (default: False).
+* `-f`, `--full` : Boolean. Get full field group details (default: False, possible values: True, False).
 
 ### upload_fieldgroup_definition_csv
 Create or Update a field group using a CSV definition file.\
 Arguments:
 * `csv_path` : Path to the CSV file.
-* `-ts`, `--test` : Test the upload locally without sending to AEP (default: False).
+* `-ts`, `--test` : Boolean. Test the upload locally without sending to AEP (default: False, possible values: True, False).
 
 ### create_fieldgroup_definition_template
 Create a CSV template for defining a field group.\
@@ -162,7 +166,7 @@ Arguments:
 Create or Update a field group using a JSON XDM file.\
 Arguments:
 * `xdm_path` : Path to the JSON file.
-* `-ts`, `--test` : Test the upload locally without sending to AEP (default: False). It will return a JSON file of your field group definition.
+* `-ts`, `--test` : Boolean. Test the upload locally without sending to AEP (default: False, possible values: True, False).
 
 ### get_datatypes
 List all data types in the current sandbox.\
@@ -171,13 +175,13 @@ List all data types in the current sandbox.\
 Export a specific Data Type structure to a CSV file.\
 Arguments:
 * `datatype` : Data Type Name, $id, or alt:Id.
-* `-f`, `--full` : Get full details (default: False).
+* `-f`, `--full` : Boolean. Get full details (default: False, possible values: True, False).
 
 ### get_datatype_json
 Export a specific Data Type definition to a JSON file.\
 Arguments:
 * `datatype` : Data Type Name, $id, or alt:Id.
-* `-f`, `--full` : Get full details (default: False).
+* `-f`, `--full` : Boolean. Get full details (default: False, possible values: True, False).
 
 ## Dataset Methods
 
@@ -212,8 +216,9 @@ Arguments:
 
 
 ### enable_dataset_for_ups
-Enable a specific dataset for the Unified Profile Service. Arguments:
-dataset : The Dataset ID or Name.
+Enable a specific dataset for the Unified Profile Service.\
+Arguments:
+* `dataset` : The Dataset ID or Name.
 
 ## Audience Methods
 
@@ -256,7 +261,7 @@ Arguments:
 List all identities in the current sandbox.\
 Arguments:
 * `-r`, `--region` : Region code (e.g., 'ndl2', 'va7', 'aus5'. Default: 'ndl2').
-* `-co`, `--custom_only` : List only custom namespaces (default: False).
+* `-co`, `--custom_only` : Boolean. List only custom namespaces (default: False, possible values: True, False).
 
 ## Query Service Methods
 
@@ -321,9 +326,6 @@ Arguments:
 
 
 ## Other methods
-
-### get_sandboxes
-List all sandboxes available in the current organization.
 
 ### get_tags
 Get the tag associated with your organization.

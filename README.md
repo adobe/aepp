@@ -30,7 +30,9 @@ pip install aepp --upgrade
 ## Getting Started
 
 In order to get started, I have compiled a guide to help you initialize this module and what is required.
-You can find this documentation [here](./docs/getting-started.md)
+You can find this documentation [here](./docs/getting-started.md)\
+Some notebooks are already available in the `notebooks` folder to help you get started with the module and its different functionalities.\
+For the CLI, you can find a specific documentation to get started with it [here](./docs/get-started-cli.md)
 
 ## AEPP docs
 
@@ -61,7 +63,8 @@ At the moment the current wrapper is containing the following sub modules:
 * [data hygiene](./docs/hygiene.md)
 * [edge](./docs/edge.md)
 * [som](./docs/som.md) (see note below)
-* [synchronizer](./docs/synchronizer.md)(BETA)
+* [synchronizer](./docs/synchronizer.md)
+* [cli](.docs/cli.md)
 
 Last but not least, the core methods are described here: [main](./docs/main.md)
 

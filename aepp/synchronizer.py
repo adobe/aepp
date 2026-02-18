@@ -358,7 +358,7 @@ class Synchronizer:
         6. Datasets
         Because the Merge Policies and Audiences needs the dataset and schema to be enabled in the target sandbox, and the synchronizer does not currently support enabling them for UPS.
         They will not sync with that method.
-        A variable syncIssue will be created to gather the artefacts that could not be synchronized.
+        A variable syncIssues will be created to gather the artefacts that could not be synchronized.
         Arguments:
             force : OPTIONAL : if True, it will force the synchronization of the components even if they already exist in the target sandbox. Works for Schema, FieldGroup, DataType and Class.
             verbose : OPTIONAL : if True, it will print the details of the synchronization process
@@ -399,6 +399,14 @@ class Synchronizer:
                     base_datasets.append(ds_file)
         else:
             raise ValueError("a base sandbox or a local folder must be provided to synchronize the components")
+        ### syncing identities
+        if verbose:
+            print("Syncing Identities...")
+        for identity in base_identities:
+            try:
+                self.__syncIdentity__(identity,force=force,verbose=verbose)
+            except Exception as e:
+                self.syncIssues.append({'component':identity.get('name','code not found'),'type':'identity','error':str(e)})
         ### Syncing schema components
         if verbose:
             print("Syncing Schemas...")

@@ -74,14 +74,21 @@ class ServiceShell(cmd.Cmd):
 
     def do_create_config_file(self, arg:Any) -> None:
         """Create a configuration file for storing your AEP API connection details."""
+
         parser = argparse.ArgumentParser(prog='create_config_file', add_help=True)
-        parser.add_argument("-f", "--file_name", help="file name for your config file", default="aepp_config.json")
-        args = parser.parse_args(shlex.split(arg))
-        filename = args.file_name
-        aepp.createConfigFile(destination=filename)
-        filename_json = filename + ".json" if not filename.endswith(".json") else filename
-        console.print(f"Configuration file created at {Path.cwd() / Path(filename_json)}", style="green")
-        return
+        parser.add_argument("-fn", "--file_name", help="file name for your config file", default="aepp_config.json",type=str)
+        try:
+            args = parser.parse_args(shlex.split(arg))
+            filename = args.file_name
+            aepp.createConfigFile(destination=filename)
+            filename_json = filename + ".json" if not filename.endswith(".json") else filename
+            console.print(f"Configuration file created at {Path.cwd() / Path(filename_json)}", style="green")
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
 
     # # --- Commands ---
     def do_config(self, arg:Any) -> None:
@@ -93,34 +100,40 @@ class ServiceShell(cmd.Cmd):
         parser.add_argument("-sc", "--scopes", help="Scopes")
         parser.add_argument("-cid", "--client_id", help="Auto-login client ID")
         parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
-        args = parser.parse_args(shlex.split(arg))
-        if args.config_file is not None:
-            mypath = Path.cwd()
-            dict_config = json.load(FileIO(mypath / Path(args.config_file)))
-            self.sandbox:str|None = args.sandbox if args.sandbox else dict_config.get("sandbox-name",args.sandbox)
-            self.secret:str|None = dict_config.get("secret",args.secret)
-            self.org_id:str|None = dict_config.get("org_id",args.org_id)
-            self.client_id:str|None = dict_config.get("client_id",args.client_id)
-            self.scopes:str|None = dict_config.get("scopes",args.scopes)
-            self.connectInstance = True
-        else:
-            if args.sandbox: self.sandbox = str(args.sandbox)
-            if args.secret: self.secret = str(args.secret)
-            if args.org_id: self.org_id = str(args.org_id)
-            if args.scopes: self.scopes = str(args.scopes)
-            if args.client_id: self.client_id = str(args.client_id)
-        console.print("Configuring connection...", style="blue")
-        self.config = aepp.configure(
-            connectInstance=self.connectInstance,
-            sandbox=self.sandbox,
-            secret=self.secret,
-            org_id=self.org_id,
-            client_id=self.client_id,
-            scopes=self.scopes
-        )
-        console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
-        self.prompt = f"{self.config.sandbox}> "
-        return 
+        try:
+            args = parser.parse_args(shlex.split(arg))
+            if args.config_file is not None:
+                mypath = Path.cwd()
+                dict_config = json.load(FileIO(mypath / Path(args.config_file)))
+                self.sandbox:str|None = args.sandbox if args.sandbox else dict_config.get("sandbox-name",args.sandbox)
+                self.secret:str|None = dict_config.get("secret",args.secret)
+                self.org_id:str|None = dict_config.get("org_id",args.org_id)
+                self.client_id:str|None = dict_config.get("client_id",args.client_id)
+                self.scopes:str|None = dict_config.get("scopes",args.scopes)
+                self.connectInstance = True
+            else:
+                if args.sandbox: self.sandbox = str(args.sandbox)
+                if args.secret: self.secret = str(args.secret)
+                if args.org_id: self.org_id = str(args.org_id)
+                if args.scopes: self.scopes = str(args.scopes)
+                if args.client_id: self.client_id = str(args.client_id)
+            console.print("Configuring connection...", style="blue")
+            self.config = aepp.configure(
+                connectInstance=self.connectInstance,
+                sandbox=self.sandbox,
+                secret=self.secret,
+                org_id=self.org_id,
+                client_id=self.client_id,
+                scopes=self.scopes
+            )
+            console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
+            self.prompt = f"{self.config.sandbox}> "
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
 
     def do_change_sandbox(self, args:Any) -> None:
         """Change the current sandbox after configuration"""
@@ -325,7 +338,7 @@ class ServiceShell(cmd.Cmd):
     def do_get_ups_schemas(self, args) -> None:
         """List all schemas enabled for Profile in the current sandbox. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_schemas_enabled', add_help=True)
-        parser.add_argument("-sv", "--save",help="Save enabled schemas to CSV file")
+        parser.add_argument("-sv", "--save",help="Boolean. Save enabled schemas to CSV file. Default False. Possible values: True, False",type=bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -365,7 +378,7 @@ class ServiceShell(cmd.Cmd):
     def do_get_ups_fieldgroups(self, args:Any) -> None:
         """List all field groups enabled for Profile in the current sandbox. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_fieldgroups_enabled', add_help=True)
-        parser.add_argument("-sv", "--save",help="Save enabled field groups to CSV file")
+        parser.add_argument("-sv", "--save",help="Boolean. Save enabled field groups to CSV file. Default False. Possible values: True, False",type=bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -405,7 +418,7 @@ class ServiceShell(cmd.Cmd):
     def do_get_profile_schemas(self,args:Any) -> None:
         """Get the current schema based on Profile class. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_schemas_enabled', add_help=True)
-        parser.add_argument("-sv", "--save",help="Save profile schemas to CSV file")
+        parser.add_argument("-sv", "--save",help="Boolean. Save profile schemas to CSV file. Default False. Possible values: True, False",type=bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -453,7 +466,7 @@ class ServiceShell(cmd.Cmd):
     def do_get_union_profile_csv(self,args:Any) -> None:
         """Get the current Profile union schema CSV structure and saving it in a file. It is the Profile schema that contains all enabled Profile class based schemas"""
         parser = argparse.ArgumentParser(prog='get_union_profile', add_help=True)
-        parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
+        parser.add_argument("-f","--full",default=False,help="Boolean. Get full schema information with all details. Default False. Possible values: True, False",type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             profile_union = schemamanager.SchemaManager('https://ns.adobe.com/xdm/context/profile__union',config=self.config)
@@ -485,7 +498,7 @@ class ServiceShell(cmd.Cmd):
     def do_get_union_event_csv(self,args:Any) -> None:
         """Get the current Experience Event union schema CSV structure and saving it in a file. It is the Experience Event schema that contains all enabled Experience Event class based schemas"""
         parser = argparse.ArgumentParser(prog='get_union_event', add_help=True)
-        parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
+        parser.add_argument("-f","--full",default=False,help="Boolean. Get full schema information with all details. Default False. Possible values: True, False",type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             event_union = schemamanager.SchemaManager('https://ns.adobe.com/xdm/context/experienceevent__union',config=self.config)
@@ -501,7 +514,7 @@ class ServiceShell(cmd.Cmd):
     def do_get_event_schemas(self,args:Any) -> None:
         """Get all the schemas using the Experience Event class as filter. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_event_schemas', add_help=True)
-        parser.add_argument("-sv", "--save",help="Save event schemas to CSV file")
+        parser.add_argument("-sv", "--save",help="Boolean. Save event schemas to CSV file. Default False. Possible values: True, False",type=bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -534,7 +547,7 @@ class ServiceShell(cmd.Cmd):
         """Get schema XDM JSON by name or $ID or alt:Id. By default it will save the output in a JSON file with the name of the schema title, use the --full option to get the full schema with all details but beware that it can be very long."""
         parser = argparse.ArgumentParser(prog='get_schema_xdm', add_help=True)
         parser.add_argument("schema", help="Schema title, $id or alt:Id to retrieve")
-        parser.add_argument("-f","--full",default=False,help="Get full schema with all details",type=bool)
+        parser.add_argument("-f","--full",default=False,help="Boolean. Get full schema with all details. Default False. Possible values: True, False",type=bool)
         try:
             args = parser.parse_args(shlex.split(arg))
             aepp_schema = schema.Schema(config=self.config)
@@ -567,7 +580,7 @@ class ServiceShell(cmd.Cmd):
         """Get schema CSV by name or ID. Use the --full option to get the full schema information with all details."""
         parser = argparse.ArgumentParser(prog='get_schema_csv', add_help=True)
         parser.add_argument("schema", help="Schema $id or alt:Id to retrieve")
-        parser.add_argument("-f","--full",default=False,help="Get full schema information with all details",type=bool)
+        parser.add_argument("-f","--full",default=False,help="Boolean. Get full schema information with all details. Default False. Possible values: True, False",type=bool)
         try:
             args = parser.parse_args(shlex.split(arg))
             aepp_schema = schema.Schema(config=self.config)
@@ -625,15 +638,14 @@ class ServiceShell(cmd.Cmd):
     def do_get_fieldgroups(self, args:Any) -> None:
         """List all field groups in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_fieldgroups', add_help=True)
-        parser.add_argument("-sv", "--save",help="Save field groups to CSV file")
+        parser.add_argument("-sv", "--save",help="Boolean. Save field groups to CSV file. Default False. Possible values: True, False",type=bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
             fieldgroups = aepp_schema.getFieldGroups()
-            if args.save:
+            if args.save and fieldgroups:
                 df_fgs = pd.DataFrame(fieldgroups)
                 df_fgs.to_csv(f"{self.config.sandbox}_fieldgroups.csv",index=False)
-                console.print(f"Field Groups exported to {self.config.sandbox}_fieldgroups.csv", style="green")
             if fieldgroups:
                 table = Table(title=f"Field Groups in Sandbox: {self.config.sandbox}")
                 table.add_column("altId", style="cyan")
@@ -644,6 +656,8 @@ class ServiceShell(cmd.Cmd):
                         fg.get("title","N/A"),
                     )
                 console.print(table)
+                if args.save:
+                    console.print(f"Field Groups exported to {self.config.sandbox}_fieldgroups.csv", style="green")
             else:
                 console.print("(!) No field groups found.", style="red")
         except Exception as e:
@@ -685,7 +699,7 @@ class ServiceShell(cmd.Cmd):
         """Get field group CSV by name or ID"""
         parser = argparse.ArgumentParser(prog='get_fieldgroup_csv', add_help=True)
         parser.add_argument("fieldgroup", help="Field Group name, $id or alt:Id to retrieve")
-        parser.add_argument("-f","--full",default=False,help="Get full field group information with all details",type=bool)
+        parser.add_argument("-f","--full",default=False,help="Boolean. Get full field group information with all details. Default False. Possible values: True, False",type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -739,7 +753,7 @@ class ServiceShell(cmd.Cmd):
         """Get data type CSV by name or ID"""
         parser = argparse.ArgumentParser(prog='get_datatype_csv', add_help=True)
         parser.add_argument("datatype", help="Data Type name, $id or alt:Id to retrieve")
-        parser.add_argument("-f","--full",default=False,help="Get full data type information with all details",type=bool)
+        parser.add_argument("-f","--full",default=False,help="Boolean. Get full data type information with all details. Default False. Possible values: True, False",type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -768,7 +782,6 @@ class ServiceShell(cmd.Cmd):
         """Get data type JSON by name or ID"""
         parser = argparse.ArgumentParser(prog='get_datatype_json', add_help=True)
         parser.add_argument("datatype", help="Data Type name, $id or alt:Id to retrieve")
-        parser.add_argument("-f","--full",default=False,help="Get full data type information with all details",type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
@@ -838,7 +851,7 @@ class ServiceShell(cmd.Cmd):
         """Upload a field group definition from a CSV file"""
         parser = argparse.ArgumentParser(prog='upload_fieldgroup_definition_csv', add_help=True)
         parser.add_argument("csv_path", help="Path to the field group CSV file")
-        parser.add_argument("-ts","--test",help="Test upload without uploading it to AEP",default=False,type=bool)
+        parser.add_argument("-ts","--test",help="Boolean. Test creation without uploading it to AEP. It will output a JSON file. Default False. Possible values: True, False",default=False,type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             myfg = fieldgroupmanager.FieldGroupManager(config=self.config)
@@ -862,7 +875,7 @@ class ServiceShell(cmd.Cmd):
         """Upload a field group definition from a JSON XDM file"""
         parser = argparse.ArgumentParser(prog='upload_fieldgroup_definition_xdm', add_help=True)
         parser.add_argument("xdm_path", help="Path to the field group JSON XDM file")
-        parser.add_argument("-ts","--test",help="Test upload without uploading it to AEP",default=False,type=bool)
+        parser.add_argument("-ts","--test",help="Boolean. Test upload without uploading it to AEP. It will output a JSON file. Default False. Possible values: True, False",default=False,type=bool)
         try:
             args = parser.parse_args(shlex.split(args))
             with open(args.xdm_path, 'r') as f:
@@ -1240,9 +1253,9 @@ class ServiceShell(cmd.Cmd):
     def do_get_flows(self, args:Any) -> None:
         """List flows in the current sandbox based on parameters provided. By default, list all sources and destinations."""
         parser = argparse.ArgumentParser(prog='get_flows', add_help=True)
-        parser.add_argument("-i","--internal_flows",help="Get internal flows", default=False,type=bool)
-        parser.add_argument("-adv","--advanced",help="Get advanced information about runs", default=False,type=bool)
-        parser.add_argument("-ao","--active_only",help="Get only active flows during that time period", default=True,type=bool)
+        parser.add_argument("-i","--internal_flows",help="Boolean. Get internal flows. Default False. Possible values: True, False", default=False,type=bool)
+        parser.add_argument("-adv","--advanced",help="Boolean. Get advanced information about runs. Default False. Possible values: True, False", default=False,type=bool)
+        parser.add_argument("-ao","--active_only",help="Boolean. Get only active flows during that time period. Default True. Possible values: True, False", default=True,type=bool)
         parser.add_argument("-mn","--minutes", help="Timeframe in minutes to check for errors, default 0", default=0,type=int)
         parser.add_argument("-H","--hours", help="Timeframe in hours to check for errors, default 0", default=0,type=int)
         parser.add_argument("-d","--days", help="Timeframe in days to check for errors, default 0", default=0,type=int)
