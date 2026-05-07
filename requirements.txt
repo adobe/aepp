@@ -7,3 +7,4 @@ datamodel-code-generator
 pathlib
 rich
 matplotlib
+openai
