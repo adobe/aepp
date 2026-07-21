@@ -2,6 +2,17 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.5.8
+* adding `get_flow_partial_success` in the CLI to export the partial success flows
+* Improving docstring information on CLI 
+* Adding `identityEnabled` as a column returned by `getDatasets` and `getDatasetsInfos` method in catalog
+* enhance `ObservableSchema` and `to_dict` method to better support `map` type.
+* adding knowledgegraph module [documentation](./knowledge-graph.md) and knowldege graph usage documentation [here](./knowledge-graph-usage.md)
+* better supports in schemaManager around ootb field groups and data types.
+* `getClassesGlobal` now also populate the `data` attributes regarding classes.
+* Change the `extract_paths` logic in segmentation to be more robust. 
+*  
+
 ## version 0.5.7
 * adding the `create_b2b_artifacts` method in the CLI. 
 * adding the possibility to pass command line arguments to the CLI module at instantiation time.[documentation](./cli.md#Non-interactive-mode-examples)

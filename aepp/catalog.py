@@ -442,6 +442,9 @@ class Catalog:
             obj['profileEnabled'] = [True for ding in el['tags'].get('unifiedProfile',[]) if 'enabled:true' in ding] or False
             if type(obj['profileEnabled']) == list:
                 obj['profileEnabled'] = obj['profileEnabled'][0]
+            obj['identityEnabled'] = [True for ding in el['tags'].get('unifiedIdentity',[]) if 'enabled:true' in ding] or False
+            if type(obj['identityEnabled']) == list:
+                obj['identityEnabled'] = obj['identityEnabled'][0]
             obj['datalake_rows'] = el.get('extensions',{}).get('adobe_lakeHouse',{}).get('metrics',{}).get('rowCount',0)
             obj['datalake_storageSize'] = el.get('extensions',{}).get('adobe_lakeHouse',{}).get('metrics',{}).get('storageSize',0)
             obj['datalake_files'] = el.get('extensions',{}).get('adobe_lakeHouse',{}).get('tableHealthMetrics',{}).get('noOfFilesTotal',0)
@@ -998,7 +1001,7 @@ class ObservableSchemaManager:
                         base[key] = append[key]
         return base
 
-    def __transformationDF__(self,mydict:dict=None,dictionary:dict=None,path:str=None,queryPath:bool=False,description:bool=False,xdmType:bool=False)->dict:
+    def __transformationDF__(self,mydict:dict=None,dictionary:dict=None,path:str=None,queryPath:bool=False,description:bool=False)->dict:
         """
         Transform the current XDM schema to a dictionary.
         Arguments:
@@ -1007,16 +1010,13 @@ class ObservableSchemaManager:
             path : path that is currently being developed
             queryPath: boolean to tell if we want to add the query path
             description : boolean to tell if you want to retrieve the description
-            xdmType : boolean to know if you want to retrieve the xdm Type
         """
         if dictionary is None:
-            dictionary = {'path':[],'type':[],'title':[]}
+            dictionary = {'path':[],'type':[],'title':[],'xdmType':[],'mapType':[]}
             if queryPath:
                 dictionary['querypath'] = []
             if description:
                 dictionary['description'] = []
-            if xdmType:
-                dictionary['xdmType'] = []
         else:
             dictionary = dictionary
         for key in mydict:
@@ -1033,15 +1033,18 @@ class ObservableSchemaManager:
                         dictionary["path"].append(tmp_path)
                         dictionary["type"].append(f"{mydict[key].get('type')}")
                         dictionary["title"].append(f"{mydict[key].get('title')}")
+                        dictionary["xdmType"].append(f"{mydict[key].get('meta:xdmType')}")
+                        if mydict[key].get('meta:xdmType') == 'map':
+                            dictionary["mapType"].append(f"{mydict[key].get('additionalProperties',{}).get('type','string')}")
+                        else:
+                            dictionary["mapType"].append(pd.NA)
                         if queryPath:
                             dictionary["querypath"].append(__cleanPath__(tmp_path))
                         if description:
                             dictionary["description"].append(f"{mydict[key].get('description','')}")
-                        if xdmType:
-                            dictionary["xdmType"].append(f"{mydict[key].get('meta:xdmType')}")
                     properties = mydict[key].get('properties',None)
                     if properties is not None:
-                        self.__transformationDF__(properties,dictionary,tmp_path,queryPath,description,xdmType)
+                        self.__transformationDF__(properties,dictionary,tmp_path,queryPath,description)
                 elif mydict[key].get('type') == 'array':
                     levelProperties = mydict[key]['items'].get('properties',None)
                     if levelProperties is not None: ## array of objects
@@ -1052,24 +1055,30 @@ class ObservableSchemaManager:
                         dictionary["path"].append(tmp_path)
                         dictionary["type"].append(f"{mydict[key].get('type')}")
                         dictionary["title"].append(f"{mydict[key].get('title')}")
+                        dictionary["xdmType"].append(f"{mydict[key].get('meta:xdmType')}")
+                        if mydict[key].get('meta:xdmType') == 'map':
+                            dictionary["mapType"].append(f"{mydict[key].get('additionalProperties',{}).get('type','string')}")
+                        else:
+                            dictionary["mapType"].append(pd.NA)
                         if queryPath and tmp_path is not None:
                             dictionary["querypath"].append(__cleanPath__(tmp_path))
                         if description and tmp_path is not None:
                             dictionary["description"].append(mydict[key].get('description',''))
-                        if xdmType:
-                            dictionary["xdmType"].append(f"{mydict[key].get('meta:xdmType')}")
-                        self.__transformationDF__(levelProperties,dictionary,tmp_path,queryPath,description,xdmType)
+                        self.__transformationDF__(levelProperties,dictionary,tmp_path,queryPath,description)
                     else: ## simple arrays
                         finalpath = f"{path}.{key}[]"
                         dictionary["path"].append(finalpath)
                         dictionary["type"].append(f"{mydict[key]['items'].get('type')}[]")
                         dictionary["title"].append(f"{mydict[key].get('title')}")
+                        dictionary["xdmType"].append(mydict[key]['items'].get('meta:xdmType',''))
+                        if mydict[key]['items'].get('meta:xdmType') == 'map':
+                            dictionary["mapType"].append(f"{mydict[key]['items'].get('additionalProperties',{}).get('type','string')}")
+                        else:
+                            dictionary["mapType"].append(pd.NA)
                         if queryPath and finalpath is not None:
                             dictionary["querypath"].append(__cleanPath__(finalpath))
                         if description and finalpath is not None:
                             dictionary["description"].append(mydict[key].get('description',''))
-                        if xdmType:
-                            dictionary["xdmType"].append(mydict[key]['items'].get('meta:xdmType',''))
                 else:
                     if path is not None:
                         finalpath = f"{path}.{key}"
@@ -1078,12 +1087,15 @@ class ObservableSchemaManager:
                     dictionary["path"].append(finalpath)
                     dictionary["type"].append(mydict[key].get('type','object'))
                     dictionary["title"].append(mydict[key].get('title',''))
+                    dictionary["xdmType"].append(mydict[key].get('meta:xdmType',''))
+                    if mydict[key].get('meta:xdmType') == 'map':
+                        dictionary["mapType"].append(f"{mydict[key].get('additionalProperties',{}).get('type','string')}")
+                    else:
+                        dictionary["mapType"].append(pd.NA)
                     if queryPath and finalpath is not None:
                         dictionary["querypath"].append(__cleanPath__(finalpath))
                     if description :
                         dictionary["description"].append(mydict[key].get('description',''))
-                    if xdmType :
-                        dictionary["xdmType"].append(mydict[key].get('meta:xdmType',''))
 
         return dictionary
     
@@ -1150,7 +1162,8 @@ class ObservableSchemaManager:
             save : OPTIONAL : If you wish to save it with the title used by the field group.
                 save as csv with the title used. Not title, used "unknown_fieldGroup_" + timestamp.
             queryPath : OPTIONAL : If you want to have the query path to be used.
-            description : OPTIONAL : If you want to have the description used
+            description : OPTIONAL : If you want to have the description used.
+                The dataframe always includes xdmType and mapType columns.
         """
         definition = self.observableSchema.get('properties',self.observableSchema.get('definitions',{}))
         data = self.__transformationDF__(definition,queryPath=queryPath,description=description)

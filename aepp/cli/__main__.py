@@ -1,5 +1,5 @@
 import aepp
-from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation, customerprofile
+from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation, customerprofile, knowledgegraph
 from aepp.cli.upsfieldsanalyzer import UpsFieldsAnalyzer
 import argparse, cmd, shlex, json
 from functools import wraps
@@ -43,6 +43,17 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+class ParseDict(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        d = getattr(namespace, self.dest) or {}
+        for item in values:
+            try:
+                k, v = item.split('=', 1)
+                d[k] = v
+            except ValueError:
+                raise argparse.ArgumentError(self, f"Could not parse geometry '{item}'. Must be in key=value format.")
+        setattr(namespace, self.dest, d)
+
 console = Console()
 
 # --- 2. The Interactive Shell ---
@@ -52,6 +63,7 @@ class ServiceShell(cmd.Cmd):
         self.config = None
         self.connectInstance = True
         self.ups_profile_analyzer:UpsFieldsAnalyzer|None = None
+        self.graph = None
         if kwargs.get("config_file") is not None:
             config_path = Path(kwargs.get("config_file"))
             if not config_path.is_absolute():
@@ -1602,13 +1614,13 @@ class ServiceShell(cmd.Cmd):
     
     @login_required
     def do_get_flows(self, args:Any) -> None:
-        """List flows in the current sandbox based on parameters provided. By default, list all sources and destinations."""
+        """List flows in the current sandbox based on parameters provided. By default, list all sources and destinations for customers. Default time check: Last 24h."""
         parser = argparse.ArgumentParser(prog='get_flows', add_help=True)
         parser.add_argument("-i","--internal_flows",help="Boolean. Get internal flows. Default False. Possible values: True, False", default=False,type=str2bool)
         parser.add_argument("-adv","--advanced",help="Boolean. Get advanced information about runs. Default False. Possible values: True, False", default=False,type=str2bool)
         parser.add_argument("-ao","--active_only",help="Boolean. Get only active flows during that time period. Default True. Possible values: True, False", default=True,type=str2bool)
         parser.add_argument("-mn","--minutes", help="Timeframe in minutes to check for errors, default 0", default=0,type=int)
-        parser.add_argument("-H","--hours", help="Timeframe in hours to check for errors, default 0", default=0,type=int)
+        parser.add_argument("-H","--hours", help="Timeframe in hours to check for errors, default 24", default=0,type=int)
         parser.add_argument("-d","--days", help="Timeframe in days to check for errors, default 0", default=0,type=int)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -1769,7 +1781,7 @@ class ServiceShell(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_flow_errors', add_help=True)
         parser.add_argument("flow_id", help="Flow ID to get errors for")
         parser.add_argument("-mn","--minutes", help="Timeframe in minutes to check for errors, default 0", default=0,type=int)
-        parser.add_argument("-H","--hours", help="Timeframe in hours to check for errors, default 0", default=0,type=int)
+        parser.add_argument("-H","--hours", help="Timeframe in hours to check for errors, default 24", default=0,type=int)
         parser.add_argument("-d","--days", help="Timeframe in days to check for errors, default 0", default=0,type=int)
         try:
             args = parser.parse_args(shlex.split(args))
@@ -1787,6 +1799,31 @@ class ServiceShell(cmd.Cmd):
         except SystemExit:
             return
     
+    @login_required
+    def do_get_flow_partial_success(self,args:Any) -> None:
+        """Get the partial success for a specific flow, saving it in a JSON file for specific timeframe, default last 24 hours."""
+        parser = argparse.ArgumentParser(prog='get_flow_partial_success', add_help=True)
+        parser.add_argument("flow_id", help="Flow ID to get partial success for")
+        parser.add_argument("-mn","--minutes", help="Timeframe in minutes to check for errors, default 0", default=0,type=int)
+        parser.add_argument("-H","--hours", help="Timeframe in hours to check for errors, default 24", default=0,type=int)
+        parser.add_argument("-d","--days", help="Timeframe in days to check for errors, default 0", default=0,type=int)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            timetotal_minutes = args.minutes + (args.hours * 60) + (args.days * 1440)
+            if timetotal_minutes == 0:
+                timetotal_minutes = 1440  # default to last 24 hours
+            aepp_flow = flowservice.FlowService(config=self.config)
+            timereference = int(datetime.now().timestamp()*1000) - (timetotal_minutes * 60 * 1000)
+            failed_runs = aepp_flow.getRuns(prop=['metrics.statusSummary.status==partialSuccess',f'flowId=={args.flow_id}',f'metrics.durationSummary.startedAtUTC>{timereference}'],n_results="inf")
+            with open(f"flow_{args.flow_id}_partial_success.json", 'w') as f:
+                json.dump(failed_runs, f, indent=4)
+            console.print(f"Flow errors exported to flow_{args.flow_id}_partial_success.json", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+
     @login_required
     def do_create_dataset_http_source(self,args:Any) -> None:
         """Create an HTTP Source connection for a specific dataset, for XDM compatible data only."""
@@ -2228,6 +2265,84 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
 
+    @login_required
+    def do_build_graph(self,args:Any) -> None:
+        """Build a graph of all artifacts in the current sandbox and save it as a JSON file"""
+        parser = argparse.ArgumentParser(prog='build_graph', description='Build a graph of all artifacts in the current sandbox',add_help=True)
+        parser.add_argument('-hd','--has_data', help='Boolean. If you want to retrieved information for all schemas and datasets. Default True', type=str2bool,default=True)
+        parser.add_argument('-d','--detail', help='Boolean. If you want to retrieved the path information for the schema and fieldgroups. Default True', type=str2bool, default=True)
+        parser.add_argument('-e','--enabled', help='Boolean. If you want to build the knowledge graph based on enabled dataset only. Default False', type=str2bool,default=False)
+        parser.add_argument('-ex','--export', help='Boolean. If you want to export the graph to a turtle file. Default False', type=str2bool,default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            console.print("Building artifact graph...", style="blue")
+            kn = knowledgegraph.KnowledgeGraph(config=self.config)
+            self.graph = kn.buildGraph(detail=args.detail, enabled=args.enabled)
+            if args.export:
+                kn.exportTurtle(graph=self.graph, path=f"{self.config.sandbox}.ttl")
+                console.print(f"Knowledge graph built and exported to {self.config.sandbox}.ttl", style="green")
+            else:
+                console.print(Panel("Graph build completed!", style="green"))
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+
+    @login_required
+    def do_export_graph(self,args:Any) -> None:
+        """Export the previously built graph to a turtle file"""
+        parser = argparse.ArgumentParser(prog='export_graph', description='Export the previously built graph to a turtle file',add_help=True)
+        parser.add_argument('filename', help='Filename to export the graph to (e.g., graph.ttl)', type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            kn = knowledgegraph.KnowledgeGraph(config=self.config)
+            kn.exportTurtle(graph=self.graph, path=args.filename)
+            console.print(f"Knowledge graph exported to {args.filename}", style="green")
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        
+    def do_load_graph(self,args:Any) -> None:
+        """Load a graph from a turtle file"""
+        parser = argparse.ArgumentParser(prog='load_graph', description='Load a graph from a turtle file',add_help=True)
+        parser.add_argument('filename', help='Filename to load the graph from (e.g., graph.ttl)', type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            kn = knowledgegraph.KnowledgeGraph(config=self.config)
+            self.graph = kn.loadGraph(path=args.filename)
+            console.print(f"Knowledge graph loaded from {args.filename}", style="green")
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+    
+    def do_add_path_attributes(self,args:Any) -> None:
+        """Add path attributes to the previously built graph. Attributes are passed as --attributes predicate1=value1 predicate2=value2 ..."""
+        parser = argparse.ArgumentParser(prog='add_path_attributes', description='Add path attributes to the previously built graph',add_help=True)
+        parser.add_argument('-p','--path', type=str, help='path to add the attributes to', required=True)
+        parser.add_argument('-a','--attributes', nargs='+', help='Attributes to add in the form predicate=value', required=True, action=ParseDict)    
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            kn = knowledgegraph.KnowledgeGraph(config=self.config)
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            else:
+                kn.loadGraph(graph=self.graph)
+            self.graph = kn.addPathAttributes(path=args.path, attributes=args.attributes)
+            console.print("Path attributes added to the graph.", style="green")
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+
     COMMAND_GROUPS = {
         "System": ["config", 
                    "create_config_file", 
@@ -2281,6 +2396,7 @@ class ServiceShell(cmd.Cmd):
                      "extract_audience_ref"],
         "Flows": ["get_flows",
                   "get_flow_errors",
+                  "get_flow_partial_success",
                   "create_dataset_http_source",
                   "get_DLZ_credential"],
         "Queries": ["get_queries",
@@ -2301,6 +2417,10 @@ class ServiceShell(cmd.Cmd):
                             "extract_artifact",
                             "sync",
                             "sync_all"],
+        "Knowledge Graph": ["build_graph",
+                            "export_graph",
+                            "load_graph",
+                            "add_path_attributes"],
         "Misc": ["help", "exit", "EOF"]
 
     }

@@ -11,6 +11,7 @@ The AEPP Command Line Interface (CLI) is a powerful tool that allows developers 
   - [Configs](#configs)
   - [Schema Methods](#schema-methods)
   - [Dataset Methods](#dataset-methods)
+  - [Audience Methods](#audience-methods)
   - [Flow Service](#flow-service)
   - [Identities methods](#identities-methods)
   - [Query Service Methods](#query-service-methods)

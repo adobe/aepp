@@ -211,23 +211,13 @@ class SchemaManager:
             else:
                 raise Exception("You need to provide a schemaAPI instance or a localFolder to use the local storage")
             for ref in self.fieldGroupIds:
-                definition = None
-                if self.schemaAPI is not None:
-                    definition = self.schemaAPI.getFieldGroup(ref,full=False)
-                elif self.localfolder is not None:
-                    found = False
-                    for folder in self.fieldgroupFolder:
-                        for json_file in folder.glob('*.json'):
-                            tmp_def = json.load(FileIO(json_file))
-                            if tmp_def.get('$id') == ref:
-                                definition = tmp_def
-                                found = True
-                                break
-                        if found:
-                            break
-                    found = False
-                    if definition is None:
-                        for folder in self.fieldgroupGlobalFolder:
+                if 'http' in ref and '#' not in ref and '@' not in ref:
+                    definition = None
+                    if self.schemaAPI is not None:
+                        definition = self.schemaAPI.getFieldGroup(ref,full=False)
+                    elif self.localfolder is not None:
+                        found = False
+                        for folder in self.fieldgroupFolder:
                             for json_file in folder.glob('*.json'):
                                 tmp_def = json.load(FileIO(json_file))
                                 if tmp_def.get('$id') == ref:
@@ -236,12 +226,23 @@ class SchemaManager:
                                     break
                             if found:
                                 break
-                if definition is None:
-                    raise ReferenceError(f"The Field Group {ref} was not found")
-                if 'properties' in definition.keys():
-                    definition['definitions'] = definition['properties']
-                fgM = FieldGroupManager(fieldGroup=definition['$id'],schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox,retry=self.retry)
-                self.fieldGroupsManagers[fgM.title] = fgM
+                        found = False
+                        if definition is None:
+                            for folder in self.fieldgroupGlobalFolder:
+                                for json_file in folder.glob('*.json'):
+                                    tmp_def = json.load(FileIO(json_file))
+                                    if tmp_def.get('$id') == ref:
+                                        definition = tmp_def
+                                        found = True
+                                        break
+                                if found:
+                                    break
+                    if definition is None:
+                        raise ReferenceError(f"The Field Group {ref} was not found")
+                    if 'properties' in definition.keys():
+                        definition['definitions'] = definition['properties']
+                    fgM = FieldGroupManager(fieldGroup=definition['$id'],schemaAPI=self.schemaAPI,localFolder=localFolder,tenantId=self.tenantId,sandbox=self.sandbox,retry=self.retry)
+                    self.fieldGroupsManagers[fgM.title] = fgM
             for clas in self.classIds:
                 if clas != "https://ns.adobe.com/xdm/data/adhoc-v2":
                     clsM = None

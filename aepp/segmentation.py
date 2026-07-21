@@ -1049,36 +1049,88 @@ class Segmentation:
         res = self.connector.putData(self.endpoint + path,data=audienceObj)
         return res
     
-    def __pqlJSONSegmentReader__(self,segmentValue:Union[str,dict],listFields=None,tmp_str=None)->list:
+    def __extract_pql_paths__(self,segment_value, include_keys=True):
         """
-        read the dictionary of the segment.expression.value
-        use listFields and tmp_str to pass data in recursive mode
-        return a list of paths
+        Extract dotted field paths from an AEP PQL expression AST.
+        Handles fieldLookup chains, fnApply 'get' (map/array access),
+        parameterReference / varRef roots, and event queries built from
+        'chain' / 'exists' / lambdas (binds lambda vars to their source array).
+        Returns a sorted list of unique paths.
         """
-        if type(segmentValue) == str:
-            json_data = json.loads(segmentValue)
-        else:
-            json_data = segmentValue
-        if listFields is None:
-            listFields = list()
-        for key in json_data:
-            if type(json_data[key]) == dict and key != 'object': ## if needs to be recursively checked, needs to pass the list already found
-                tmp_str = self.__pqlJSONSegmentReader__(json_data[key],listFields=listFields)
-            elif type(json_data[key]) == list: ## if needs to be looped through
-                for var in json_data[key]:
-                    if type(var) == dict: ## if element is a dict, it can be recursively checked, need to pass the list already found
-                        tmp_str = self.__pqlJSONSegmentReader__(var,listFields=listFields)
-            elif json_data[key] == 'fieldLookup': ## if the key is fieldLookup the path is built
-                if tmp_str is None: # if first element of the path
-                    tmp_str = json_data['fieldName']
-                else:
-                    tmp_str = f"{json_data['fieldName']}.{tmp_str}"
-                if 'object' in json_data.keys() and 'fieldName' in json_data.get('object',{}).keys(): ## if there is a lower/higher node to be added, passing the incomplete node and the list already found
-                    tmp_str = self.__pqlJSONSegmentReader__(json_data['object'],tmp_str=tmp_str,listFields=listFields)
-                else: ## if end of the nodes, just adding the path to the list of path found
-                    listFields.append(tmp_str)
-                    return tmp_str
-        return list(set(listFields))
+        root = json.loads(segment_value) if isinstance(segment_value, str) else segment_value
+        paths, consumed = [], set()   # consumed = id()s already folded into a chain
+
+        def resolve(node, env):
+            """Walk a chain inward to its root -> (dotted_path, side_branches)."""
+            parts, side, prefix = [], [], None
+            cur = node
+            while isinstance(cur, dict):
+                nt = cur.get('nodeType')
+                if nt == 'fieldLookup':
+                    consumed.add(id(cur)); parts.append(cur.get('fieldName')); cur = cur.get('object')
+                elif nt == 'fnApply' and cur.get('fnName') == 'get':
+                    consumed.add(id(cur)); p = cur.get('params', [])
+                    if len(p) >= 2:
+                        key = p[1]
+                        if isinstance(key, dict) and key.get('nodeType') == 'literal':
+                            if include_keys: parts.append(str(key.get('value')))
+                        else:
+                            side.append(key)          # dynamic key -> walk separately
+                    cur = p[0] if p else None
+                elif nt == 'parameterReference':
+                    consumed.add(id(cur)); cur = None
+                elif nt == 'varRef':
+                    consumed.add(id(cur)); prefix = env.get(cur.get('varName')); cur = None
+                else:                                  # chain interrupted by another expr
+                    side.append(cur); cur = None
+            ordered = list(reversed(parts))
+            if prefix: ordered = [prefix] + ordered
+            return '.'.join(str(x) for x in ordered if x not in (None, '')), side
+
+        def add(p):
+            if p: paths.append(p)
+
+        def walk(node, env):
+            if isinstance(node, dict):
+                nt, fn = node.get('nodeType'), node.get('fnName')
+
+                if (nt == 'fieldLookup' or (nt == 'fnApply' and fn == 'get')) and id(node) not in consumed:
+                    path, side = resolve(node, env); add(path)
+                    for b in side: walk(b, env)
+                    return
+
+                if nt == 'fnApply' and fn == 'exists':
+                    p = node.get('params', [])
+                    if len(p) >= 2:
+                        arr_path, arr_side = resolve(p[0], env) if isinstance(p[0], dict) else ('', [])
+                        add(arr_path)
+                        for b in arr_side: walk(b, env)
+                        lam = p[1]
+                        if isinstance(lam, dict) and lam.get('nodeType') == 'lambda':
+                            e = {**env, **{vn: arr_path for vn in lam.get('varNames', [])}}
+                            walk(lam.get('body'), e)
+                        else:
+                            walk(lam, env)
+                        return
+
+                if nt == 'chain':
+                    arr = node.get('array')
+                    arr_path, arr_side = resolve(arr, env) if isinstance(arr, dict) else ('', [])
+                    add(arr_path)
+                    for b in arr_side: walk(b, env)
+                    for lam in [el.get('what') for el in node.get('elements', []) if isinstance(el, dict)] \
+                            + [node.get('timestampField')]:
+                        if isinstance(lam, dict) and lam.get('nodeType') == 'lambda':
+                            e = {**env, **{vn: arr_path for vn in lam.get('varNames', [])}}
+                            walk(lam.get('body'), e)
+                    return
+
+                for v in node.values(): walk(v, env)      # generic descent
+            elif isinstance(node, list):
+                for item in node: walk(item, env)
+
+        walk(root, {})
+        return sorted(set(paths))
     
 
     def extractPaths(self,audience:Union[dict,str]=None,recursive:bool=False)->list:
@@ -1098,7 +1150,7 @@ class Segmentation:
             paths = re.findall(r'WHAT\((.+?)\.[^\.]+\(',audience.get('expression',{}).get('value'))
             return paths
         if formatt == 'pql/json':
-            paths = self.__pqlJSONSegmentReader__(audience.get('expression',{}).get('value'))
+            paths = self.__extract_pql_paths__(audience.get('expression',{}).get('value'))
             if recursive:
                 dependencies = self.extractAudiences(audience)
                 if len(dependencies) > 0:

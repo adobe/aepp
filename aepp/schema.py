@@ -886,6 +886,9 @@ class Schema:
             )
             data += res["results"]
             page = res["_page"]
+        for el in data:
+            self.data.classes_id[el["title"]] = el["$id"]
+            self.data.classes_altId[el["title"]] = el["meta:altId"]
         if output=="df":
             df = pd.DataFrame(data)
             return df

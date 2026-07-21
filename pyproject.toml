@@ -35,6 +35,9 @@ dependencies = [
     "psycopg2; sys_platform == 'win32'",
     # Optional: Install standard psycopg2 on Linux
     "psycopg2-binary; sys_platform == 'linux'",
+    "rdflib",
+    "networkx",
+    "pygraphviz"
 ]
 
 [project.urls]

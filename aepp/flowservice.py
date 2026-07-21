@@ -2049,6 +2049,8 @@ class FlowManager:
             flowSpecData = self.flowAPI.getFlowSpec(self.flowSpec['id'])
             self.flowSpec['name'] = flowSpecData['name']
             self.flowSpec['frequency'] = flowSpecData.get('attributes',{}).get('frequency')
+            if self.flowSpec['frequency'] is not None:
+                self.frequency = self.flowSpec['frequency']
         ## Source Connection part
         if self.flowSourceConnection['id'] is not None:
             sourceConnData = self.flowAPI.getSourceConnection(self.flowSourceConnection['id'])
@@ -2061,7 +2063,7 @@ class FlowManager:
                 self.connectionInfo['name'] = connSpec.get('name')
             if connSpec.get('sourceSpec',{}).get('attributes',{}).get('uiAttributes',{}).get('isSource',False):
                 self.connectionType = 'source'
-            elif  connSpec.get('attributes',{}).get('isDestination',False):
+            elif connSpec.get('attributes',{}).get('isDestination',False):
                 self.connectionType = 'destination'
             frequency = connSpec.get('sourceSpec',{}).get('attributes',{}).get('uiAttributes',{}).get('frequency',{}).get('key')
             if frequency is not None:

@@ -27,7 +27,7 @@ def __transformationDict__(mydict:dict=None,typed:bool=False,dictionary:dict=Non
                         if items is not None:
                             dictionary[key] = {'<key>':[{}]}
                             __transformationDict__(items,typed,dictionary=dictionary[key]["<key>"][0])
-                        else:
+                        elif additionalProperties.get('items',{}).get('$ref') is None:
                             dictionary[key] = {'<key>': [{}]}
                     else:
                         if typed:
