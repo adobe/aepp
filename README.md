@@ -67,6 +67,7 @@ At the moment the current wrapper is containing the following sub modules:
 * [som](./docs/som.md) (see note below)
 * [synchronizer](./docs/synchronizer.md)
 * [cli](./docs/cli.md)
+* [Knowledge Graph](./docs/knowledge-graph.md) (see note below)
 
 Last but not least, the core methods are described here: [main](./docs/main.md)
 
@@ -103,6 +104,13 @@ The FlowManager is part of the `flowservice` module and allows you to group ever
 
 The privacy service module is part of the AEP python wrapper (`aepp`) but requires a different API connection in console.adobe.io.
 Be careful that your developer project has the correct setup to access this API endpoints.
+
+### Knowledge Graph module
+
+The knowledge graph module is a module that allows you to build a Knowledge Graph from a specific sandbox.
+You can then export it and use it in your own AI setup. It would work as an AI assistant that will use the graph knowledge to answer questions regarding your data model and its relationships.\
+
+To use the Knowledge Graph, I recommend you to read the graph knowledge usage documentation [here](./knowledge-graph-usage.md)
 
 ## Releases
 
