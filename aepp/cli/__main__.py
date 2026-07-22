@@ -2343,6 +2343,52 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
 
+    def do_add_schema_attributes(self,args:Any) -> None:
+        """Add schema attributes to the previously built graph. Attributes are passed as --attributes predicate1=value1 predicate2=value2 ..."""
+        parser = argparse.ArgumentParser(prog='add_schema_attributes', description='Add schema attributes to the previously built graph',add_help=True)
+        parser.add_argument('-s','--schema', type=str, help='schema $id to add the attributes to', required=True)
+        parser.add_argument('-a','--attributes', nargs='+', help='Attributes to add in the form predicate=value', required=True, action=ParseDict)    
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            kn = knowledgegraph.KnowledgeGraph(config=self.config)
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            else:
+                kn.loadGraph(graph=self.graph)
+            self.graph = kn.addSchemaAttributes(schema=args.schema, attributes=args.attributes)
+            console.print("Schema attributes added to the graph.", style="green")
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        
+    def do_add_dataset_attributes(self,args:Any) -> None:
+        """Add dataset attributes to the previously built graph. Attributes are passed as --attributes predicate1=value1 predicate2=value2 ..."""
+        parser = argparse.ArgumentParser(prog='add_dataset_attributes', description='Add dataset attributes to the previously built graph',add_help=True)
+        parser.add_argument('-d','--dataset', type=str, help='dataset ID to add the attributes to', required=True)
+        parser.add_argument('-a','--attributes', nargs='+', help='Attributes to add in the form predicate=value', required=True, action=ParseDict)    
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            kn = knowledgegraph.KnowledgeGraph(config=self.config)
+            if self.graph is None:
+                console.print("No graph has been built yet. Please run 'build_graph' first.", style="red")
+                return
+            else:
+                kn.loadGraph(graph=self.graph)
+            self.graph = kn.addDatasetAttributes(dataset=args.dataset, attributes=args.attributes)
+            console.print("Dataset attributes added to the graph.", style="green")
+        except SystemExit:
+            return
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+
     COMMAND_GROUPS = {
         "System": ["config", 
                    "create_config_file", 
@@ -2420,7 +2466,9 @@ class ServiceShell(cmd.Cmd):
         "Knowledge Graph": ["build_graph",
                             "export_graph",
                             "load_graph",
-                            "add_path_attributes"],
+                            "add_path_attributes",
+                            "add_dataset_attributes",
+                            "add_schema_attributes"],
         "Misc": ["help", "exit", "EOF"]
 
     }

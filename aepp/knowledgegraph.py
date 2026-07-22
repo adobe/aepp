@@ -257,7 +257,6 @@ class KnowledgeGraph:
                             graph.add((self.SCHEMA[sourceProperty],self.SCHEMA.relationship, Literal("descriptorPrimaryKey")))
         if kwargs.get('only_schema',False) == False:
             for index, row in df_datasets.iterrows():
-                graph.add((SANDBOX_NODE, self.SANDBOX.contains, self.CATALOG[row['id']]))
                 graph.add((CATALOG_NODE, self.CATALOG.contains, self.CATALOG[row['id']]))
                 graph.add((self.CATALOG[row['id']], RDF.type, DCAT.Dataset))
                 graph.add((self.CATALOG[row['id']], self.SCHEMA.implements, URIRef(row['schemaId'])))
@@ -379,6 +378,48 @@ class KnowledgeGraph:
         node = self.SCHEMA[path.replace('{}', '').replace('[]', '')]
         if (node, self.SCHEMA.path, None) not in g:
             raise ValueError(f"Path '{path}' not found in the schema graph. Build the graph with detail=True first.")
+        for key, value in attributes.items():
+            g.add((node, self.SCHEMA[key], Literal(value)))
+        return g
+
+    def addSchemaAttributes(self, schemaId: str, attributes: dict, graph: Graph = None) -> Graph:
+        """
+        Attach custom attributes to an existing schema node.
+        The schema node must already exist in the graph (created when buildKnowledgeGraph
+        or buildSchemaRelationships was run).
+        Arguments:
+            schemaId  : REQUIRED : the XDM schema $id or altId.
+            attributes : REQUIRED : dictionary of {predicate: value} to add on that schema node as literal triples.
+            graph      : OPTIONAL : graph to mutate. Defaults to self.global_graph, then self.schema_graph.
+        Returns the mutated graph.
+        """
+        g = graph or self.global_graph or self.schema_graph
+        if g is None:
+            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+        node = URIRef(schemaId)
+        if (node, RDF.type, self.SCHEMA.schema) not in g:
+            raise ValueError(f"Schema '{schemaId}' not found in the graph. Build the graph first.")
+        for key, value in attributes.items():
+            g.add((node, self.SCHEMA[key], Literal(value)))
+        return g
+    
+    def addDatasetAttributes(self, datasetId: str, attributes: dict, graph: Graph = None) -> Graph:
+        """
+        Attach custom attributes to an existing dataset node.
+        The dataset node must already exist in the graph (created when buildKnowledgeGraph
+        or buildSchemaRelationships was run).
+        Arguments:
+            datasetId  : REQUIRED : the dataset ID (from the catalog).
+            attributes : REQUIRED : dictionary of {predicate: value} to add on that schema node as literal triples.
+            graph      : OPTIONAL : graph to mutate. Defaults to self.global_graph, then self.schema_graph.
+        Returns the mutated graph.
+        """
+        g = graph or self.global_graph or self.schema_graph
+        if g is None:
+            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+        node = self.CATALOG[datasetId]
+        if (node, RDF.type, DCAT.Dataset ) not in g:
+            raise ValueError(f"Dataset '{datasetId}' not found in the graph. Build the graph first.")
         for key, value in attributes.items():
             g.add((node, self.SCHEMA[key], Literal(value)))
         return g

@@ -169,7 +169,7 @@ def __titleSafe__(text: str) -> str:
     """
     valid_chars = "[^a-zA-Z0-9_\n\\.]"
     text = re.sub(valid_chars, "_", text)
-    return text
+    return text.lower()
 
 
 def extractSandboxArtifacts(

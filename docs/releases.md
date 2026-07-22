@@ -11,7 +11,7 @@ This page list all of the changes that came during the different release of the 
 * better supports in schemaManager around ootb field groups and data types.
 * `getClassesGlobal` now also populate the `data` attributes regarding classes.
 * Change the `extract_paths` logic in segmentation to be more robust. 
-*  
+* Ensure that files created by `extractSandboxArtifact` and `extractSandboxArtifacts` are created with the lower case name to avoid duplicated name with different casing.
 
 ## version 0.5.7
 * adding the `create_b2b_artifacts` method in the CLI. 

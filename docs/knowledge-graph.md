@@ -18,6 +18,8 @@ It crawls the other `aepp` modules ([schema](./schema.md), [catalog](./catalog.m
     - [buildGraph](#buildgraph)
     - [buildSchemaRelationships](#buildschemarelationships)
     - [addPathAttribute](#addpathattribute)
+    - [addSchemaAttributes](#addschemaattributes)
+    - [addDatasetAttributes](#adddatasetattributes)
     - [loadGraph](#loadgraph)
     - [exportTurtle](#exportturtle)
     - [exportInteractiveDiagram](#exportinteractivediagram)
@@ -104,6 +106,40 @@ myGraph.buildKnowledgeGraph(detail=True)
 myGraph.addPathAttribute(
     "person.name.firstName",
     {"piiType": "name", "owner": "marketing"}
+)
+```
+
+### addSchemaAttributes
+
+Attaches custom attributes to an existing schema node. The schema node must already exist in the graph (created when `buildKnowledgeGraph` or `buildSchemaRelationships` was run).\
+Arguments:
+* schemaId : REQUIRED : the XDM schema `$id` or altId.
+* attributes : REQUIRED : a dictionary of `{predicate: value}` added as literal triples on that schema node.
+* graph : OPTIONAL : the graph to mutate. Defaults to `self.global_graph`, then `self.schema_graph`.
+
+```python
+myGraph.buildKnowledgeGraph()
+
+myGraph.addSchemaAttributes(
+    "https://ns.adobe.com/mytenant/schemas/loyaltymembers",
+    {"owner": "marketing", "classification": "PII"}
+)
+```
+
+### addDatasetAttributes
+
+Attaches custom attributes to an existing dataset node. The dataset node must already exist in the graph (created when `buildKnowledgeGraph` or `buildSchemaRelationships` was run).\
+Arguments:
+* datasetId : REQUIRED : the dataset ID (from the catalog).
+* attributes : REQUIRED : a dictionary of `{predicate: value}` added as literal triples on that dataset node.
+* graph : OPTIONAL : the graph to mutate. Defaults to `self.global_graph`, then `self.schema_graph`.
+
+```python
+myGraph.buildKnowledgeGraph()
+
+myGraph.addDatasetAttributes(
+    "5f7a1b2c3d4e5f6a7b8c9d0e",
+    {"owner": "marketing", "refreshFrequency": "daily"}
 )
 ```
 
@@ -224,7 +260,6 @@ Nodes are typed with `rdf:type` (`RDF.type`) using the following values:
 | `XDM.fieldgroup` | an XDM field group |
 | `XDM.datatype` | an XDM data type |
 | `XDM.path` | a path (ex:_tenant.path.value) usedIn Schema, defines in a Field Group |
-| `XDM.path` | a data type |
 | `DCAT.Dataset` | a dataset |
 | `Flows.IngestionFlow` | an ingestion flow (source connector) |
 | `Audience.audience` | an audience  |
@@ -251,7 +286,7 @@ The most relevant predicates used across the graph:
 | `XDM.xdmType` | XDM type of a field path (`detail=True`) |
 | `XDM.identityField` / `SCHEMA.isPrimary` | a field path is used as an identity field, and whether it is the primary identity (`detail=True`) |
 | `XDM.origin` | For field defines at field group level, if it is defined directly in the Field Group or via Data Type reference (`detail=True`) |
-| `XDM.usedIn` | a field path is used by an audience definition or  in a schema definition (`detail=True`) |
+| `XDM.usedIn` | a field path is used in a schema definition (`detail=True`) |
 | `IDENTITY.linked` | a schema (or a dataset via profile) is linked to an identity namespace |
 | `CATALOG.contains` | The Catalog containing the different datasets |
 | `CATALOG.hasData` | a field path has ingested data (`detail=True`) |
@@ -283,7 +318,6 @@ graph TD
     Schema --> Path["Path (field path)"]
     Schema -->|implements| FieldGroup
     Schema -->|relationship| Schema
-    Schema -->|linked| Namespace
     FieldGroup -->|defines| Path
     FieldGroup --> |contains| DataType
     Path -->|usedIn| Schema

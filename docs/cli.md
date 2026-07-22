@@ -16,6 +16,7 @@ The AEPP Command Line Interface (CLI) is a powerful tool that allows developers 
   - [Identities methods](#identities-methods)
   - [Query Service Methods](#query-service-methods)
   - [Tools & Migration](#tools--migration)
+  - [Knowledge Graph](#knowledge-graph)
   - [Other methods](#other-methods)
 
 
@@ -480,6 +481,44 @@ Arguments:
 * `-b`, `--baseSandbox` : The source sandbox name.
 * `-v`, `--verbose` : Enable verbose logging (default: True).
 
+
+### Knowledge Graph
+
+#### build_graph
+Build a graph of all artifacts in the current sandbox and save it in memory for the session.\
+Arguments:
+* `-hd`, `--has_data` : Boolean. Retrieve information for all schemas and datasets. Default True.
+* `-d`, `--detail` : Boolean. Retrieve the path information for the schema and field groups. Default True.
+* `-e`, `--enabled` : Boolean. Build the knowledge graph based on enabled datasets only. Default False.
+* `-ex`, `--export` : Boolean. Export the graph to a turtle file (named `<sandbox>.ttl`) once built. Default False.
+
+#### export_graph
+Export the previously built graph (via `build_graph`) to a turtle file.\
+Arguments:
+* `filename` : Filename to export the graph to (e.g., `graph.ttl`).
+
+#### load_graph
+Load a graph from a turtle file into memory for the session.\
+Arguments:
+* `filename` : Filename to load the graph from (e.g., `graph.ttl`).
+
+#### add_path_attributes
+Add path attributes to the previously built graph. Requires a graph to have been built (`build_graph`) or loaded (`load_graph`) first.\
+Arguments:
+* `-p`, `--path` : Path to add the attributes to.
+* `-a`, `--attributes` : Attributes to add, in the form `predicate1=value1 predicate2=value2 ...`.
+
+#### add_schema_attributes
+Add schema attributes to the previously built graph. Requires a graph to have been built (`build_graph`) or loaded (`load_graph`) first.\
+Arguments:
+* `-s`, `--schema` : Schema `$id` to add the attributes to.
+* `-a`, `--attributes` : Attributes to add, in the form `predicate1=value1 predicate2=value2 ...`.
+
+#### add_dataset_attributes
+Add dataset attributes to the previously built graph. Requires a graph to have been built (`build_graph`) or loaded (`load_graph`) first.\
+Arguments:
+* `-d`, `--dataset` : Dataset ID to add the attributes to.
+* `-a`, `--attributes` : Attributes to add, in the form `predicate1=value1 predicate2=value2 ...`.
 
 ### Other methods
 
