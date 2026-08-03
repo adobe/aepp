@@ -1418,14 +1418,48 @@ class ServiceShell(cmd.Cmd):
                     for s in tmpSegmentShared:
                         s['flowId'] = tmpFlow['id']
                     segments_shared += tmpSegmentShared
-            segment_shared_dict = {seg.get('value',{}).get('id'):{
-                "exportMode" : seg.get('value',{}).get('exportMode'),
-                "scheduleFrequency": seg.get('value',{}).get("schedule",{}).get('frequency',''),
-                "flowId" : seg["flowId"]
-            } for seg in segments_shared}
+            segment_shared_dict = {}
+            for seg in segments_shared:
+                segId = seg.get('value',{}).get('id')
+                if segId is None:
+                    continue
+                scheduleEnd = seg.get('value',{}).get('schedule',{}).get('endDate')
+                entry = {
+                    "exportMode" : seg.get('value',{}).get('exportMode'),
+                    "scheduleFrequency": seg.get('value',{}).get("schedule",{}).get('frequency',''),
+                    "flowId" : seg["flowId"],
+                    "scheduleEnd": scheduleEnd
+                }
+                existing = segment_shared_dict.get(segId)
+                if existing is None:
+                    segment_shared_dict[segId] = entry
+                    continue
+                existingEnd = existing.get("scheduleEnd")
+                if existingEnd is None:
+                    continue
+                if scheduleEnd is None:
+                    segment_shared_dict[segId] = entry
+                    continue
+                try:
+                    if datetime.fromisoformat(scheduleEnd) > datetime.fromisoformat(existingEnd):
+                        segment_shared_dict[segId] = entry
+                except ValueError:
+                    pass
+            dateNow = datetime.now()
             for aud in audiences:
                 aud['usedInFlow'] = True if segment_shared_dict.get(aud.get("id","N/A"),{}) != {} else False
-                aud['sharedInfo'] = segment_shared_dict.get(aud.get("id","N/A"),{})    
+                if aud['usedInFlow']:
+                    scheduleEnd = segment_shared_dict.get(aud.get("id","N/A"),{}).get("scheduleEnd")
+                    if scheduleEnd:
+                        try:
+                            aud['activeInFlow'] = dateNow < datetime.fromisoformat(scheduleEnd)
+                        except ValueError:
+                            aud['activeInFlow'] = True
+                    else:
+                        aud['activeInFlow'] = True
+                else:
+                    aud['activeInFlow'] = '-'
+                aud['sharedInfo'] = segment_shared_dict.get(aud.get("id","N/A"),{})
             df_audiences = pd.DataFrame(audiences)
             df_audiences.to_csv(f"{self.config.sandbox}_audiences.csv",index=False)   
             table = Table(title=f"Audiences in Sandbox: {self.config.sandbox}")
@@ -1434,6 +1468,7 @@ class ServiceShell(cmd.Cmd):
             table.add_column("Evaluation", style="yellow")
             table.add_column("Total Profiles", style="green")
             table.add_column("In Flow", style="white")
+            table.add_column("Active in Flow", style="white")
             for aud in audiences:
                 table.add_row(
                     aud.get("id","N/A"),
@@ -1441,6 +1476,7 @@ class ServiceShell(cmd.Cmd):
                     '[bright_blue]Batch[/bright_blue]' if aud.get("evaluationInfo",{}).get("batch",{}).get('enabled') else '[chartreuse1]Streaming[/chartreuse1]' if aud.get("evaluationInfo",{}).get("continuous",{}).get('enabled') else '[purple]Edge[/purple]' if aud.get("evaluationInfo",{}).get("synchronous",{}).get('enabled') else 'N/A',
                     str(aud.get('metrics',{}).get('data',{}).get('totalProfiles','N/A')),
                     '[green3]True[/green3]' if aud.get("usedInFlow",False) else '[red3]False[/red3]',
+                    '[green3]True[/green3]' if aud.get("activeInFlow",False) == True else ('[red3]False[/red3]' if aud.get("activeInFlow") == False else "-"),
                 )
             console.print(table)
             console.print(f"Audiences exported to {self.config.sandbox}_audiences.csv", style="green")
@@ -1948,7 +1984,10 @@ class ServiceShell(cmd.Cmd):
             else:
                 filename=f"query_result_{int(datetime.now().timestamp())}.csv"
             result.to_csv(filename, index=False)
-            sample = result.sample(5)
+            if len(result) < 10: ## no need to sample if less than 10 rows
+                sample = result.head()
+            else:
+                sample = result.sample(5)
             console.print(sample)
             console.print(f"Query result exported to {filename}", style="green")
         except Exception as e:
@@ -2273,11 +2312,12 @@ class ServiceShell(cmd.Cmd):
         parser.add_argument('-d','--detail', help='Boolean. If you want to retrieved the path information for the schema and fieldgroups. Default True', type=str2bool, default=True)
         parser.add_argument('-e','--enabled', help='Boolean. If you want to build the knowledge graph based on enabled dataset only. Default False', type=str2bool,default=False)
         parser.add_argument('-ex','--export', help='Boolean. If you want to export the graph to a turtle file. Default False', type=str2bool,default=False)
+        parser.add_argument('-v','--verbose', help='Boolean. If you want to see the progress of the graph building. Default True', type=str2bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            console.print("Building artifact graph...", style="blue")
+            console.print(f"Building knowledge graph for {self.sandbox}", style="blue")
             kn = knowledgegraph.KnowledgeGraph(config=self.config)
-            self.graph = kn.buildGraph(detail=args.detail, enabled=args.enabled)
+            self.graph = kn.buildGraph(hasdata=args.has_data,detail=args.detail, enabled=args.enabled,verbose=args.verbose)
             if args.export:
                 kn.exportTurtle(graph=self.graph, path=f"{self.config.sandbox}.ttl")
                 console.print(f"Knowledge graph built and exported to {self.config.sandbox}.ttl", style="green")
