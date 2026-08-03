@@ -17,7 +17,7 @@ import deprecation
 from dataclasses import dataclass
 from typing import Union
 from aepp.configs import ConnectObject
-import datetime
+from datetime import datetime
 import random
 
 @dataclass
@@ -1976,7 +1976,7 @@ class FlowService:
             targetConnection : OPTIONAL : Target Connection name, by default "target-dataset-export-dlz" + date
             flowname : OPTIONAL : Name of your flow, by default "flow-dataset-export-dlz" + date
         """
-        date = datetime.datetime.now().date().isoformat()
+        date = datetime.now().date().isoformat()
         if baseConnection == "base-dataset-export-dlz":
             baseConnection = f"{baseConnection} {date}"
         if sourceConnection == "source-dataset-export-dlz":
@@ -2015,6 +2015,21 @@ class FlowManager:
     """
     A class that abstract the different information retrieved by the Flow ID in order to provide all relationships inside that Flow.
     It takes a flow id and dig to all relationship inside that flow.
+    it provides the following attributes: 
+    - schemaAPI : connector to the Schema Registry API
+    - cataLogAPI : connector to the Catalog API
+    - mapperAPI : connector to the Data Prep API
+    - flowAPI : connector to the Flow Service API
+    - flowData : Dictionary definition of the flow
+    - flowMapping : if there is any mapping (None if not)
+    - frequency : if frequency could be found (Batch or Streaming) (None if not)
+    - datasetId : if a dataset ID is linked
+    - audiences : list of audience ID 
+    - attributes : mapping of paths and their specification in the flow
+    - flowType : detect if it is Source, Destination, or Internal Flow
+    - flowSpec : basic data on flow spec
+    - flowSourceConnection : basic data on flow Source Connection
+    - flowTargetConnection : basic data on Flow Target Connection
     """
 
     def __init__(self,
@@ -2035,12 +2050,21 @@ class FlowManager:
         self.flowData = self.flowAPI.getFlow(flowId)
         self.__setAttributes__(self.flowData)
         self.flowMapping = None
-        self.frequency = None
-        self.datasetId = None
+        self.frequency:str = None
+        self.datasetId:str = None
+        self.audiences:list = []
+        self.attributes:dict = {}
+        self.flowType = None
         self.flowSpec = {'id' : self.flowData.get('flowSpec',{}).get('id')}
         self.flowSourceConnection = {'id' : self.flowData.get('sourceConnectionIds',[None])[0]}
         self.flowTargetConnection = {'id' : self.flowData.get('targetConnectionIds',[None])[0]}
         self.connectionInfo = {'id':self.flowData.get('sourceConnectionIds',[""])[0]}
+        if self.flowData.get('inheritedAttributes',{}).get('properties',{}).get('isDestinationFlow',False) == True:
+            self.flowType = 'destination'
+        elif self.flowData.get('inheritedAttributes',{}).get('properties',{}).get('isSourceFlow',False) == True:
+            self.flowType = 'source'
+        else:
+            self.flowType = 'internal'
         for trans in self.flowData.get('transformations',[{}]):
             if trans.get('name') == 'Mapping':
                 self.flowMapping = {'id':trans.get('params',{}).get('mappingId')}
@@ -2061,10 +2085,6 @@ class FlowManager:
                 connSpec = self.flowAPI.getConnectionSpec(self.flowSourceConnection['connectionSpec'].get('id'))
                 self.flowSourceConnection['connectionSpec']['name'] = connSpec.get('name')
                 self.connectionInfo['name'] = connSpec.get('name')
-            if connSpec.get('sourceSpec',{}).get('attributes',{}).get('uiAttributes',{}).get('isSource',False):
-                self.connectionType = 'source'
-            elif connSpec.get('attributes',{}).get('isDestination',False):
-                self.connectionType = 'destination'
             frequency = connSpec.get('sourceSpec',{}).get('attributes',{}).get('uiAttributes',{}).get('frequency',{}).get('key')
             if frequency is not None:
                 self.frequency = frequency
@@ -2080,7 +2100,14 @@ class FlowManager:
             self.flowTargetConnection['connectionSpec']:dict = targetConnData.get('connectionSpec',{})
             if self.flowTargetConnection['connectionSpec'].get('id',None) is not None:
                 connSpec = self.flowAPI.getConnectionSpec(self.flowSourceConnection['connectionSpec'].get('id'))
+                if "items" in connSpec.keys():
+                    if len(connSpec["items"]) == 1: 
+                        connSpec = connSpec["items"][0]
                 self.flowTargetConnection['connectionSpec']['name'] = connSpec.get('name')
+                if connSpec.get('attributes',{}).get('frequency') is not None:
+                    self.frequency = connSpec.get('attributes',{}).get('frequency')
+                if connSpec.get("targetSpec",{}).get("attributes",{}).get("uiAttributes",{}).get("frequency",{}).get("key") is not None:
+                    self.frequency = connSpec.get("targetSpec",{}).get("attributes",{}).get("uiAttributes",{}).get("frequency",{}).get("key")
         ## Catalog part
         if 'dataSetId' in self.flowTargetConnection.get('params',{}).keys():
             datasetInfo = self.catalogAPI.getDataSet(self.flowTargetConnection['params']['dataSetId'])
@@ -2112,6 +2139,38 @@ class FlowManager:
                 self.flowMapping['updatedAtTS'] = None
                 self.flowMapping['updatedAt'] = None
             self.getMapping = lambda : self.mapperAPI.getMappingSet(self.flowMapping['id'])
+        ## Destination
+        if self.flowType == 'destination':
+            if len(self.flowData.get('transformations',[])) > 0:
+                if self.flowData.get('transformations',[{}])[0].get('params') is not None:
+                    params = self.flowData.get('transformations',[{}])[0].get('params',{})
+                    if 'profileSelectors' in params.keys():
+                        if 'selectors' in params.get('profileSelectors',{}).keys():
+                            for selector in params.get('profileSelectors',{}).get('selectors',[]):
+                                if selector.get('value',{}).get('path') is not None:
+                                    self.attributes[selector['value']['path']] = {'mandatory':False, 'primary':False}
+                        if 'mandatoryFields' in params.get('profileSelectors',{}).keys():
+                            for field in params.get('profileSelectors',{}).get('mandatoryFields'):
+                                if field in self.attributes.keys():
+                                    self.attributes[field]['mandatory'] = True
+                        if 'primaryFields' in params.get('profileSelectors',{}).keys():
+                            for field in params.get('profileSelectors',{}).get('primaryFields'):
+                                if field['attributePath'] in self.attributes.keys():
+                                    try:
+                                        self.attributes[field['attributePath']]['primary'] = True
+                                    except Exception as e:
+                                        print(f"Error setting primary field for {field['attributePath']}: {e}")
+                                        print(f"Current flow: {self.flowData}")
+                    if 'segmentSelectors' in params.keys():
+                        if len(params.get('segmentSelectors',{}).get('selectors',[])) > 0:
+                            for audience in params.get('segmentSelectors',{}).get('selectors',[]):
+                                audienceId = audience.get('value',{}).get('id')
+                                endDate = audience.get('value',{}).get('schedule',{}).get('endDate')
+                                now = datetime.now()
+                                if endDate is not None and type(endDate) == str:
+                                    if now < datetime.fromisoformat(endDate):
+                                        self.audiences.append(audienceId)
+
 
     def __setAttributes__(self,flowData:dict)->None:
         """

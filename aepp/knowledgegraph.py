@@ -102,10 +102,8 @@ class KnowledgeGraph:
         self.PROFILE = Namespace(f"https://sandbox/{self.sandbox}/profile/")
         self.FLOWS = Namespace(f"https://sandbox/{self.sandbox}/flows/")
         self.AUDIENCES = Namespace(f"https://sandbox/{self.sandbox}/audiences/")
-        namespace_preview = self.customerProfileAPI.getPreviewNamespace()
-        self.__list_graph_identities_namespaces__ = []
-        for element in namespace_preview:
-            self.__list_graph_identities_namespaces__.append(element['code'])
+        self.__namespace_preview__ = self.customerProfileAPI.getPreviewNamespace()
+        self.__dataset_preview__ = self.customerProfileAPI.getPreviewDataSet()
         self.global_graph = None
         self.schema_graph = None
 
@@ -122,6 +120,8 @@ class KnowledgeGraph:
             detail : OPTIONAL : Provide additional information on row level for schema (default True)
             enabled : OPTIONAL : Filters to dataset enabled for Profile (Profile or Identity). Default False.
         """
+        if kwargs.get('verbose',False) == True:
+            print(f"retrieving classes, descriptors, datasets, flows and audiences for sandbox {self.sandbox}")
         s_classes:list = self.schemaAPI.getClasses()
         s_classesglobal:list = self.schemaAPI.getClassesGlobal()
         full_list_classes:list = s_classes + s_classesglobal
@@ -132,7 +132,10 @@ class KnowledgeGraph:
             df_datasets:pd.DataFrame = self.catalogAPI.data.infos[self.catalogAPI.data.infos.datalake_storageSize>0].copy()
         else: 
             df_datasets:pd.DataFrame = self.catalogAPI.data.infos.copy()
+        if kwargs.get('verbose',False) == True:
+            print(f"retrieved {len(df_datasets)} datasets")
         ingestion_flows = self.flowServiceAPI.getFlows(onlySources=True)
+        destination_flows = self.flowServiceAPI.getFlows(onlyDestinations=True)
         if enabled:
             df_datasets = df_datasets[df_datasets.profileEnabled |df_datasets.identityEnabled ].copy()
         list_obs_schemas = self._build_observable_schema_(df_datasets["id"].tolist())
@@ -142,12 +145,19 @@ class KnowledgeGraph:
         else:
             list_of_schema = [el['$id'] for el in self.schemaAPI.getSchemas() if '__union' not in el['$id'] and self.tenant in el['$id']]
         ## Schema Managers 
+        if kwargs.get('verbose',False) == True:
+            print(f"Building Schema Managers for {len(list_of_schema)} schemas")
         schema_managers: list[SchemaManager] = self._build_schema_managers_(list_of_schema)
         ## Flow Managers
-        flow_managers: list[flowservice.FlowManager] = self._build_flow_managers_([flow['id'] for flow in ingestion_flows])
+        if kwargs.get('verbose',False) == True:
+            print(f"Building Flow Managers for {len(ingestion_flows) + len(destination_flows)} flows")
+        source_flow_managers: list[flowservice.FlowManager] = self._build_flow_managers_([flow['id'] for flow in ingestion_flows])
+        destination_flow_managers: list[flowservice.FlowManager] = self._build_flow_managers_([flow['id'] for flow in destination_flows])
         ## Audiences 
         audiences = self.segmentationAPI.getAudiences()
         ## building graph
+        if kwargs.get('verbose',False) == True:
+            print(f"Building Graph")
         graph = Graph()
         SANDBOX_NODE = URIRef(str(self.SANDBOX))
         SCHEMA_NODE = URIRef(str(self.SCHEMA))
@@ -173,16 +183,19 @@ class KnowledgeGraph:
         graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.IdentityGraph))
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, IDENTITY_NODE))
         graph.add((SANDBOX_NODE, RDFS.label, Literal(self.sandbox)))
-        for namespace_code in self.__list_graph_identities_namespaces__:
-            graph.add((IDENTITY_NODE,self.IDENTITY.contains,self.IDENTITY[namespace_code]))
-            graph.add((self.IDENTITY[namespace_code],RDFS.label,Literal(namespace_code)))
-            graph.add((self.IDENTITY[namespace_code],RDF.type,self.IDENTITY.namespace))
+        for element in self.__namespace_preview__:
+            graph.add((IDENTITY_NODE,self.IDENTITY.contains,self.IDENTITY[element.get('code')]))
+            graph.add((self.IDENTITY[element.get('code')],RDFS.label,Literal(element.get('code'))))
+            graph.add((self.IDENTITY[element.get('code')],RDF.type,Literal('IdentityNamespace')))
+            graph.add((self.IDENTITY[element.get('code')],self.IDENTITY.counts,Literal(element.get('fullIDsCount'),datatype=XSD.integer)))
         classes = set([sc.classId for sc in schema_managers if sc.classId is not None])
         for clas in classes:
             graph.add((SCHEMA_NODE, self.SCHEMA.contains, URIRef(clas)))
             graph.add((URIRef(clas), RDF.type, self.SCHEMA["class"]))
             graph.add((URIRef(clas), RDFS.label, Literal(dict_id_title.get(clas,clas))))
         dict_field_group_managers = {}
+        if kwargs.get('verbose',False) == True:
+            print(f"  --Schemas")
         for sch in schema_managers:
             if '__union' not in sch.classId:
                 graph.add((URIRef(sch.id), RDF.type, self.SCHEMA.schema))
@@ -255,6 +268,8 @@ class KnowledgeGraph:
                                 graph.add((self.SCHEMA[sourceProperty.replace('/','.').replace('[*]','')[1:]],self.SCHEMA.relationship, self.SCHEMA.implementation))
                             sourceProperty = sourceProperty[0]
                             graph.add((self.SCHEMA[sourceProperty],self.SCHEMA.relationship, Literal("descriptorPrimaryKey")))
+        if kwargs.get('verbose',False) == True:
+            print(f"  --Datasets")
         if kwargs.get('only_schema',False) == False:
             for index, row in df_datasets.iterrows():
                 graph.add((CATALOG_NODE, self.CATALOG.contains, self.CATALOG[row['id']]))
@@ -268,15 +283,21 @@ class KnowledgeGraph:
                 if row['identityEnabled']:
                     graph.add((self.CATALOG[row['id']],self.PROFILE.linked, PROFILE_NODE))
                     graph.add((self.CATALOG[row['id']],self.PROFILE.participates,self.PROFILE.IdentityGraph))
-            for flow in flow_managers:
+            for element in self.__dataset_preview__:
+                graph.add((self.CATALOG[element.get('value')],self.PROFILE.counts, Literal(element.get('fullIDsCount'),datatype=XSD.integer)))
+                graph.add((self.CATALOG[element.get('datasetId')],self.PROFILE.participates,self.PROFILE.UPS))
+            graph.add((FLOWS_NODE, self.FLOWS.contains, self.FLOWS.SourceFlows))
+            for flow in source_flow_managers:
                 if hasattr(flow, 'datasetId'):
                     if flow.datasetId is not None and flow.datasetId in df_datasets['id'].tolist():
-                        graph.add((FLOWS_NODE, self.SANDBOX.contains, self.FLOWS[flow.id]))
+                        graph.add((self.FLOWS.SourceFlows, self.FLOWS.contains, self.FLOWS[flow.id]))
                         graph.add((self.FLOWS[flow.id], RDFS.label, Literal(flow.name)))
-                        graph.add((self.FLOWS[flow.id], RDF.type, Literal('Ingestion Flow')))
+                        graph.add((self.FLOWS[flow.id], RDF.type, Literal('IngestionFlow')))
                         graph.add((self.FLOWS[flow.id], self.FLOWS.loads, self.CATALOG[flow.datasetId]))
                         if flow.frequency is not None:
                             graph.add((self.FLOWS[flow.id], self.FLOWS.frequency, Literal(flow.frequency)))
+            if kwargs.get('verbose',False) == True:
+                print(f"  --Audiences")
             for audience in audiences:
                 graph.add((AUDIENCES_NODE, self.AUDIENCES.contains, self.AUDIENCES[audience['id']]))
                 graph.add((self.AUDIENCES[audience['id']], RDFS.label, Literal(audience.get('name'))))
@@ -311,6 +332,27 @@ class KnowledgeGraph:
                             graph.add((node, self.SCHEMA.usedIn, RDF.nil))
                         if '@' in path:
                             graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.behavior, Literal("Relationship-based")))
+            if kwargs.get('verbose',False) == True:
+                print(f"  --Flows")
+            graph.add((FLOWS_NODE, self.FLOWS.contains, self.FLOWS.DestinationFlows))
+            for destination in destination_flow_managers:
+                graph.add((self.FLOWS.DestinationFlows, self.FLOWS.contains, self.FLOWS[destination.id]))
+                graph.add((self.FLOWS[destination.id], RDF.type, Literal('DestinationFlow')))
+                graph.add((self.FLOWS[destination.id], RDFS.label, Literal(destination.name)))
+                graph.add((self.FLOWS[destination.id], self.FLOWS.frequency, Literal(destination.frequency)))
+                if len(destination.attributes)>0:
+                    for key, value in destination.attributes.items():
+                        node = self.SCHEMA[key.replace('{}', '').replace('[]', '')]
+                        graph.add((node, self.FLOWS.usedIn, self.FLOWS[destination.id]))
+                        graph.add((self.FLOWS[destination.id], self.FLOWS.sharedAttributes, node))
+                        if value.get('primary',False) == True:
+                            graph.add((self.FLOWS[destination.id], self.FLOWS.primaryAttributes, node))
+                        if value.get('mandatory',False) == True:
+                            graph.add((self.FLOWS[destination.id], self.FLOWS.mandatoryAttributes, node))
+                if len(destination.audiences)>0:
+                    for audienceId in destination.audiences:
+                        graph.add((self.FLOWS[destination.id], self.FLOWS.audiences, self.AUDIENCES[audienceId]))
+                        graph.add((self.AUDIENCES[audienceId], self.FLOWS.usedIn, self.FLOWS[destination.id]))
             self.global_graph = graph
             return self.global_graph
         else:
