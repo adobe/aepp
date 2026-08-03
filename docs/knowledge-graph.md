@@ -79,12 +79,12 @@ Arguments:
 
 
 ```python
-myGraph.buildKnowledgeGraph(enabled=True, detail=True)
+myGraph.buildGraph(enabled=True, detail=True)
 ```
 
 ### buildSchemaRelationships
 
-A lighter version of `buildKnowledgeGraph` restricted to the XDM artefacts (class, schema, field group, data type). It skips datasets, identities, ingestion flows and audiences. The result is cached on `self.schema_graph`.\
+A lighter version of `buildGraph` restricted to the XDM artefacts (class, schema, field group, data type). It skips datasets, identities, ingestion flows and audiences. The result is cached on `self.schema_graph`.\
 Arguments:
 * detail : OPTIONAL : if True, adds row-level field path information, same as `buildKnowledgeGraph`. Default False.
 
@@ -262,6 +262,7 @@ Nodes are typed with `rdf:type` (`RDF.type`) using the following values:
 | `XDM.path` | a path (ex:_tenant.path.value) usedIn Schema, defines in a Field Group |
 | `DCAT.Dataset` | a dataset |
 | `Flows.IngestionFlow` | an ingestion flow (source connector) |
+| `Flows.DestinationFlow` | a destination flow |
 | `Audience.audience` | an audience  |
 
 Identity namespace nodes (under `IDENTITY`) and audience nodes (under `AUDIENCES`) are not typed with `rdf:type`; they are recognized by the predicates that point to them (`IDENTITY.linked`, `AUDIENCES.contains`).
@@ -272,11 +273,10 @@ The most relevant predicates used across the graph:
 
 | Predicate | Usage |
 | -- | -- |
-| `RDF.type` | node type  (could be class, schema, fieldgroup, datatype, path, DCAT.Dataset, Ingestion Flow, audience )|
+| `RDF.type` | node type  (could be IdentityNamespace, class, schema, fieldgroup, datatype, path, DCAT.Dataset, Ingestion Flow, audience )|
 | `RDFS.label` | human-readable title of a node |
 | `DCTERMS.title` | dataset title |
 | `SANDBOX.contains` | sandbox contains a top-level family (schema, catalog, flows, audiences, profile, identity) or a dataset/flow |
-| `IDENTITY.contains` | The Identity Node contains different namespaces |
 | `XDM.contains` | The Schema Node contains classes, a schema contains a field path (`detail=True`) |
 | `XDM.implements` | a schema implements a class and Field Groups, a dataset implements a schema |
 | `XDM.relationship` | a schema (or field path) has a lookup/relationship to another schema, or to an identity namespace |
@@ -287,12 +287,21 @@ The most relevant predicates used across the graph:
 | `XDM.identityField` / `SCHEMA.isPrimary` | a field path is used as an identity field, and whether it is the primary identity (`detail=True`) |
 | `XDM.origin` | For field defines at field group level, if it is defined directly in the Field Group or via Data Type reference (`detail=True`) |
 | `XDM.usedIn` | a field path is used in a schema definition (`detail=True`) |
+| `IDENTITY.contains` | The Identity Node contains different namespaces |
+| `IDENTITY.counts` | number of full IDs in an identity namespace |
 | `IDENTITY.linked` | a schema (or a dataset via profile) is linked to an identity namespace |
 | `CATALOG.contains` | The Catalog containing the different datasets |
 | `CATALOG.hasData` | a field path has ingested data (`detail=True`) |
 | `PROFILE.participates`| a dataset can participates in `UPS` or `IdentityGraph` |
-| `FLOWS.frequency` | ingestion frequency of a flow, either STREAMING or BATCH |
+| `PROFILE.counts` | number of profiles in a dataset |
+| `PROFILE.linked` | a dataset is linked to the Profile Node if it has been enabled |
+| `FLOWS.frequency` | frequency of a flow, either STREAMING or BATCH |
 | `FLOWS.loads` | a flow loads data into a dataset |
+| `FLOWS.usedIn` | a field path or an audience is used in a flow (`detail=True`) |
+| `FLOWS.audiences` | The list of audiences that are part of destination flow (`detail=True`) |
+| `FLOWS.sharedAttributes` | The list of shared attributes for a destination flow (`detail=True`) |
+| `FLOWS.mandatoryAttributes` | The list of mandatory attributes for a destination flow (`detail=True`) |
+| `FLOWS.primaryAttributes` | The list of primary attributes for a destination flow (`detail=True`) |
 | `AUDIENCES.contains`| audience containment of different audiences IDs |
 | `AUDIENCES.evaluation` | evaluation methods for the audience, either `BATCH`, `STREAMING`, `EDGE` |
 | `AUDIENCES.usedIn` | a field path is used by an audience definition (`detail=True`) |
@@ -328,19 +337,29 @@ graph TD
     Path -->|hasData| False
     Path -->|origin| FieldGroup
     Path -->|origin| DataType
+    Path -->|usedIn| FlowId
+    Path -->
     Catalog -->|contains| Dataset
     Dataset -->|implements| Schema
     Dataset -->|linked| IdentityGraph
     Dataset -->|linked| UPS
-    Flows --> |contains| FlowId
+    Flows --> |contains| SourceFlows
+    Flows --> |contains| DestinationFlows
+    SourceFlows -->|contains| FlowId
+    DestinationFlows -->|contains| FlowId
     FlowId -->|linked| Dataset
     FlowId -->|frequency| STREAMING
     FlowId -->|frequency| BATCH
+    FlowId -->|attributes | Path
+    FlowId -->|sharedAttributes | Path
+    FlowId -->|mandatoryAttributes | Path
+    FlowId -->|primaryAttributes | Path
     Audiences --> |contains | AudienceId
     Audiences -->|contains| Path
     AudienceId --> |evaluation| Batch
     AudienceId --> |evaluation| Streaming
     AudienceId --> |evaluation| Edge
+    AudienceId --> |usedIn| FlowId
     
 ```
 ## Knowledge Graph usage

@@ -279,8 +279,17 @@ Arguments:
 #### get_audiences
 List all audiences in the current sandbox.
 If the `getAudiences` method fails, it will fallback to `getSegments` method, which might not include external audiences.\
+The result will be saved in a CSV with more information than what is being displayed in the terminal. 
 Arguments:
 * `-f`, `--filter`: filter the audience returned based name and on lower case and partial match of that string
+
+The results displayed in the Terminal will have the following columns: 
+- ID : Audience ID
+- Name : Audience Name
+- Evaluation : Evaluation Method, Batch, Streaming or Edge
+- Total Profiles : The total profile of that audience if available 
+- In Flow : If the audience has been shared (`True` or `False`)
+- Active in Flow : If the audience expiration date for actively being shared is below today (`True` or `False`)
 
 #### create_audiences_job
 Create a job for audience segmentation. Only 50 jobs available per year for production sandboxes.
@@ -491,6 +500,7 @@ Arguments:
 * `-d`, `--detail` : Boolean. Retrieve the path information for the schema and field groups. Default True.
 * `-e`, `--enabled` : Boolean. Build the knowledge graph based on enabled datasets only. Default False.
 * `-ex`, `--export` : Boolean. Export the graph to a turtle file (named `<sandbox>.ttl`) once built. Default False.
+* `-v`, `--verbose` : Boolean. If you want to see the progress of the graph building. Default `False`.
 
 #### export_graph
 Export the previously built graph (via `build_graph`) to a turtle file.\

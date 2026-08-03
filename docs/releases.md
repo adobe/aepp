@@ -11,7 +11,12 @@ This page list all of the changes that came during the different release of the 
 * better supports in schemaManager around ootb field groups and data types.
 * `getClassesGlobal` now also populate the `data` attributes regarding classes.
 * Change the `extract_paths` logic in segmentation to be more robust. 
-* Ensure that files created by `extractSandboxArtifact` and `extractSandboxArtifacts` are created with the lower case name to avoid duplicated name with different casing.
+* Ensure that files created by `extractSandboxArtifact` and `extractSandboxArtifacts` are created with the lower case name to avoid duplicated name with different casing.\
+Patch: 
+* Fix issue when displaying sample for `query` command in CLI when the result is less than 5 rows.
+* Extending CLI retrieval for segments to check if the segment used in Flow are still actively shared. 
+* Extending KnowledgeGraph with destination Flows for `segments` and `profile attributes`
+* Extending capability of `FlowManager` to better support destination flows and their attributes.
 
 ## version 0.5.7
 * adding the `create_b2b_artifacts` method in the CLI. 
