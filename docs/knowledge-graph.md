@@ -292,7 +292,8 @@ The most relevant predicates used across the graph:
 | `IDENTITY.linked` | a schema (or a dataset via profile) is linked to an identity namespace |
 | `CATALOG.contains` | The Catalog containing the different datasets |
 | `CATALOG.hasData` | a field path has ingested data (`detail=True`) |
-| `PROFILE.participates`| a dataset can participates in `UPS` or `IdentityGraph` |
+| `CATALOG.rows` | number of data lake rows in a dataset |
+| `PROFILE.participates`| a dataset can participates in `UPS` or `UIS` |
 | `PROFILE.counts` | number of profiles in a dataset |
 | `PROFILE.linked` | a dataset is linked to the Profile Node if it has been enabled |
 | `FLOWS.frequency` | frequency of a flow, either STREAMING or BATCH |
@@ -321,7 +322,7 @@ graph TD
     Sandbox --> Identity
     Identity -->|contains| Namespace
     Profile --> |contains| UPS
-    Profile --> |contains| IdentityGraph
+    Profile --> |contains| UIS
     XDM --> Class
     Schema -->|implements| Class
     Schema --> Path["Path (field path)"]
@@ -341,7 +342,7 @@ graph TD
     Path -->
     Catalog -->|contains| Dataset
     Dataset -->|implements| Schema
-    Dataset -->|linked| IdentityGraph
+    Dataset -->|linked| UIS
     Dataset -->|linked| UPS
     Flows --> |contains| SourceFlows
     Flows --> |contains| DestinationFlows

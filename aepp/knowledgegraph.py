@@ -180,7 +180,7 @@ class KnowledgeGraph:
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, AUDIENCES_NODE))
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, PROFILE_NODE))
         graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.UPS))
-        graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.IdentityGraph))
+        graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.UIS))
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, IDENTITY_NODE))
         graph.add((SANDBOX_NODE, RDFS.label, Literal(self.sandbox)))
         for element in self.__namespace_preview__:
@@ -276,13 +276,14 @@ class KnowledgeGraph:
                 graph.add((self.CATALOG[row['id']], RDF.type, DCAT.Dataset))
                 graph.add((self.CATALOG[row['id']], self.SCHEMA.implements, URIRef(row['schemaId'])))
                 graph.add((self.CATALOG[row['id']], DCTERMS.title, Literal((row.get('name')))))
+                graph.add((self.CATALOG[row['id']], self.CATALOG.rows, Literal(row.get('datalake_rows'),datatype=XSD.integer)))
                 if row['profileEnabled']:
                     graph.add((PROFILE_NODE,self.PROFILE.contains,self.CATALOG[row['id']]))
                     graph.add((self.CATALOG[row['id']],self.PROFILE.linked, PROFILE_NODE))
                     graph.add((self.CATALOG[row['id']],self.PROFILE.participates,self.PROFILE.UPS))
                 if row['identityEnabled']:
                     graph.add((self.CATALOG[row['id']],self.PROFILE.linked, PROFILE_NODE))
-                    graph.add((self.CATALOG[row['id']],self.PROFILE.participates,self.PROFILE.IdentityGraph))
+                    graph.add((self.CATALOG[row['id']],self.PROFILE.participates,self.PROFILE.UIS))
             for element in self.__dataset_preview__:
                 graph.add((self.CATALOG[element.get('value')],self.PROFILE.counts, Literal(element.get('fullIDsCount'),datatype=XSD.integer)))
                 graph.add((self.CATALOG[element.get('datasetId')],self.PROFILE.participates,self.PROFILE.UPS))

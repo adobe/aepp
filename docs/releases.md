@@ -17,6 +17,8 @@ Patch:
 * Extending CLI retrieval for segments to check if the segment used in Flow are still actively shared. 
 * Extending KnowledgeGraph with destination Flows for `segments` and `profile attributes`
 * Extending capability of `FlowManager` to better support destination flows and their attributes.
+* Patch the name of the dataset created during extraction to reflect the name and not the table name. It means that the file name can evolve over time now. 
+* Fix identification of audiences shares in detination when no end date provided in Graph.
 
 ## version 0.5.7
 * adding the `create_b2b_artifacts` method in the CLI. 

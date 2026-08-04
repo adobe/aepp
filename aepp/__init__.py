@@ -324,7 +324,8 @@ def extractSandboxArtifacts(
         if len(ds.get('unifiedTags',[])) > 0:
             tag_names = [dict_id_name.get(tag_id) for tag_id in ds.get('unifiedTags',[])]
             ds['unifiedTags'] = tag_names
-        with open(f"{datasetPath / ds.get('tags',{}).get('adobe/pqs/table',[ds.get('id','unknown')])[0]}.json",'w') as f:
+        filename = __titleSafe__(ds.get('name',ds.get('tags',{}).get('adobe/pqs/table',[ds.get('id','unknown')])[0])).lower()
+        with open(f"{datasetPath / filename}.json",'w') as f:
             json.dump(ds,f,indent=2)
     identities = ide.getIdentities()
     for el in identities:
@@ -603,7 +604,7 @@ def __extractDataset__(dataset: str,folder: Union[str, Path] = None,sandbox: 'Co
         raise IndexError("The dataset you want to extract is not present in the sandbox or the id/name provided is not correct")
     datasetPath = Path(folder) / 'dataset'
     datasetPath.mkdir(exist_ok=True)
-    file_name = __titleSafe__(myDataset.get('tags',{}).get('adobe/pqs/table',[myDataset.get('id','unknown')])[0])
+    file_name = __titleSafe__(myDataset.get('name',myDataset.get('tags',{}).get('adobe/pqs/table',[myDataset.get('id','unknown')])[0]))
     with open(f"{datasetPath / file_name}.json",'w') as f:
         json.dump(myDataset,f,indent=2)
     schema = myDataset.get('schemaRef',{}).get('id',None)

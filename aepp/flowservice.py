@@ -2167,9 +2167,11 @@ class FlowManager:
                                 audienceId = audience.get('value',{}).get('id')
                                 endDate = audience.get('value',{}).get('schedule',{}).get('endDate')
                                 now = datetime.now()
-                                if endDate is not None and type(endDate) == str:
+                                if type(endDate) == str:
                                     if now < datetime.fromisoformat(endDate):
                                         self.audiences.append(audienceId)
+                                elif endDate is None: ## no end date so always on
+                                    self.audiences.append(audienceId)
 
 
     def __setAttributes__(self,flowData:dict)->None:

@@ -177,6 +177,7 @@ class ServiceShell(cmd.Cmd):
             if self.config is not None:
                 if args.sandbox:
                     self.config.setSandbox(str(args.sandbox))
+                    self.sandbox = str(args.sandbox)
                     self.prompt = f"{self.config.sandbox}> "
                     console.print(Panel(f"Sandbox changed to: [bold green]{self.config.sandbox}[/bold green]", style="blue"))
             else:
@@ -390,6 +391,41 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
+
+    @login_required
+    def do_get_classes(self,args) -> None:
+        """List all classes in the current sandbox. By default do not save the output to a file as it can be very long, use the --save option to export the data to a CSV file."""
+        parser = argparse.ArgumentParser(prog='get_classes', add_help=True)
+        parser.add_argument("-sv", "--save",help="Save classes to CSV file",type=str2bool,default=False)
+        parser.add_argument("-f","--filter",help="filter the class return by name (non-case sensitive and partial match)",type=str,default="")
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_schema = schema.Schema(config=self.config)
+            classes = aepp_schema.getClasses()
+            global_classes = aepp_schema.getClassesGlobal()
+            all_classes = [{'$id':cls.get('$id'), 'title':cls.get('title'), 'version':cls.get('version')} for cls in classes + global_classes]
+            if args.filter != "":
+                all_classes = [cls for cls in all_classes if args.filter.lower() in cls['title'].lower()]
+            if len(all_classes) > 0:
+                table = Table(title=f"Classes in Sandbox: {self.config.sandbox}")
+                table.add_column("$ID", style="cyan")
+                table.add_column("Name", style="magenta")
+                for cl in all_classes:
+                    table.add_row(
+                        cl.get("$id","N/A"),
+                        cl.get("title","N/A"),
+                    )
+                console.print(table)
+                if args.save:
+                    df_classes = pd.DataFrame(all_classes)
+                    df_classes.to_csv(f"{self.config.sandbox}_classes.csv", index=False)
+                    console.print(f"Classes exported to {self.config.sandbox}_classes.csv", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+            
+
 
     @login_required
     def do_get_ups_schemas(self, args) -> None:
@@ -1434,17 +1470,15 @@ class ServiceShell(cmd.Cmd):
                 if existing is None:
                     segment_shared_dict[segId] = entry
                     continue
-                existingEnd = existing.get("scheduleEnd")
-                if existingEnd is None:
-                    continue
                 if scheduleEnd is None:
                     segment_shared_dict[segId] = entry
                     continue
-                try:
-                    if datetime.fromisoformat(scheduleEnd) > datetime.fromisoformat(existingEnd):
-                        segment_shared_dict[segId] = entry
-                except ValueError:
-                    pass
+                else:
+                    try:
+                        if datetime.fromisoformat(scheduleEnd) > datetime.fromisoformat(scheduleEnd):
+                            segment_shared_dict[segId] = entry
+                    except ValueError:
+                        pass
             dateNow = datetime.now()
             for aud in audiences:
                 aud['usedInFlow'] = True if segment_shared_dict.get(aud.get("id","N/A"),{}) != {} else False
@@ -1653,6 +1687,7 @@ class ServiceShell(cmd.Cmd):
         """List flows in the current sandbox based on parameters provided. By default, list all sources and destinations for customers. Default time check: Last 24h."""
         parser = argparse.ArgumentParser(prog='get_flows', add_help=True)
         parser.add_argument("-i","--internal_flows",help="Boolean. Get internal flows. Default False. Possible values: True, False", default=False,type=str2bool)
+        parser.add_argument("-t","--type",help="Type of flows to get. Possible values: source, destination, internal. Default: all", default="all",type=str)
         parser.add_argument("-adv","--advanced",help="Boolean. Get advanced information about runs. Default False. Possible values: True, False", default=False,type=str2bool)
         parser.add_argument("-ao","--active_only",help="Boolean. Get only active flows during that time period. Default True. Possible values: True, False", default=True,type=str2bool)
         parser.add_argument("-mn","--minutes", help="Timeframe in minutes to check for errors, default 0", default=0,type=int)
@@ -1674,10 +1709,15 @@ class ServiceShell(cmd.Cmd):
             destinations_flows = aepp_flow.getFlows(onlyDestinations=True)
             list_source_ids = [f.get("id") for f in source_flows]
             list_destination_ids = [f.get("id") for f in destinations_flows]
-            if args.internal_flows:
+            if args.internal_flows or args.type == "internal":
                 list_flows = flows
             else:
-                list_flows = source_flows + destinations_flows
+                if args.type == "source":
+                    list_flows = source_flows
+                elif args.type == "destination":
+                    list_flows = destinations_flows
+                else:
+                    list_flows = source_flows + destinations_flows
             if args.active_only:
                 list_flows = [fl for fl in list_flows if fl.get("id") in active_flow_ids]
             if args.advanced:
@@ -2437,6 +2477,7 @@ class ServiceShell(cmd.Cmd):
                    "create_sandbox",
                    "get_tags"],
         "Schema": ["get_schemas",
+                   "get_classes",
                    "get_ups_schemas",
                    "get_ups_fieldgroups",
                    "get_ups_fieldgroups",

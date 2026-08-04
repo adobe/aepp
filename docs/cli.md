@@ -114,6 +114,12 @@ List all schemas in the current sandbox.\
 Arguments:
 * `-sv`, `--save` : Save the list of schemas to a CSV file.
 * `-f`, `--filter`: filter the schema returned based on title and on lower case and partial match of that string
+
+#### get_classes
+List all classes in the current sandbox.\
+Arguments:
+* `-sv`, `--save` : Save the list of classes to a CSV file.
+* `-f`, `--filter`: filter the classes returned based on title and on lower case and partial match of that string
   
 #### get_ups_schemas
 List all schemas enabled for Unified Profile in the current sandbox.\
@@ -363,6 +369,7 @@ Arguments:
 List flows in the sandbox. Supports filtering by source/destination and time. Default last 24h.\
 Arguments:
 * `-i`, `--internal_flows` : Include internal flows (default: False).
+* `-t`, `--type` : Filter by flow type (source, destination, internal, all).
 * `-adv`, `--advanced` : Fetch run metrics (success/fail rates) (default: False).
 * `-ao`, `--active_only` : List only flows active in the time period (default: True).
 * `-mn`, `--minutes` : Lookback window in minutes (default: 0).
