@@ -87,6 +87,8 @@ from mcp.server.fastmcp import FastMCP
 import rdflib
 
 mcp = FastMCP("knowledge-graphs")
+LOCAL_FILE_PATH = r"C:\Users\xxxxx\Documents\Clients\client_project\Graph\ontology_description.md"
+RESOURCE_URI = Path(LOCAL_FILE_PATH).as_uri()
 
 GRAPHS = {
     "prod": {"path": r"C:\Users\xxxxx\Documents\Clients\client_project\Graph\prod.ttl", "desc": "Adobe Experience Platform Sandbox PROD knowledge graph."},
@@ -102,8 +104,24 @@ def get_graph(name: str) -> rdflib.Graph:
 
 @mcp.tool()
 def list_graphs() -> str:
-    """List available knowledge graphs and what each one contains. Call this first."""
-    return "\n".join(f"{k}: {v['desc']}" for k, v in GRAPHS.items())
+    """
+    List available knowledge graphs and return the full ontology documentation.
+      ALWAYS call this tool first before building any SPARQL query or exploring any graph.
+      The response includes the ontology structure (classes, predicates, relationships)
+      that is required to understand what can be queried.
+    """
+    graph_list = "\n".join(f"  - {k}: {v['desc']}" for k, v in GRAPHS.items())
+
+    ontology_path = Path(LOCAL_FILE_PATH)
+    ontology = ontology_path.read_text(encoding="utf-8") if ontology_path.exists() else "(Ontology file not found)"
+
+    return (
+        "=== AVAILABLE GRAPHS ===\n"
+        f"{graph_list}\n\n"
+        "=== ONTOLOGY DOCUMENTATION ===\n"
+        "Read this carefully before querying — it defines all classes, predicates, and relationships.\n\n"
+        f"{ontology}"
+    )
 
 @mcp.tool()
 def get_schema(graph: str) -> str:
@@ -233,7 +251,7 @@ You can save context window by adding a multi step process when the AI wants to 
 This time, we will add the ontology as a resource in the MCP server. This way, the AI model can access the ontology description without having to call a method. 
 
 ```py
-LOCAL_FILE_PATH = r"C:\Users\piccini\Clients\client_project\Graph\ontology_description.md"
+LOCAL_FILE_PATH = r"C:\Users\xxxx\Clients\client_project\Graph\ontology_description.md"
 # Convert the Windows path to a valid file:// URI for the MCP server
 RESOURCE_URI = Path(LOCAL_FILE_PATH).as_uri()
 

@@ -213,7 +213,7 @@ mySandbox = aepp.importConfigFile('myconfig.json', sandbox='mysandbox', connectI
 myGraph = knowledgegraph.KnowledgeGraph(config=mySandbox)
 
 ## crawl the sandbox, restrict to datasets enabled for Profile/Identity, and add field-level detail
-myGraph.buildKnowledgeGraph(enabled=True, detail=True)
+myGraph.buildGraph(enabled=True, detail=True)
 
 ## persist the graph so it can be reloaded later without re-crawling the sandbox
 myGraph.exportTurtle("mysandbox.ttl")
@@ -263,7 +263,7 @@ Nodes are typed with `rdf:type` (`RDF.type`) using the following values:
 | `DCAT.Dataset` | a dataset |
 | `Flows.IngestionFlow` | an ingestion flow (source connector) |
 | `Flows.DestinationFlow` | a destination flow |
-| `Audience.audience` | an audience  |
+| `Audiences.audience` | an audience  |
 
 Identity namespace nodes (under `IDENTITY`) and audience nodes (under `AUDIENCES`) are not typed with `rdf:type`; they are recognized by the predicates that point to them (`IDENTITY.linked`, `AUDIENCES.contains`).
 
