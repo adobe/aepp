@@ -75,7 +75,7 @@ Crawls the sandbox (classes, schemas, field groups, data types, datasets, ingest
 Arguments:
 * hasData : OPTIONAL : if True, retrieves information based on datasets that contains data. Default `True`.
 * detail : OPTIONAL : if True, adds row-level information for each schema (field paths, `xdmType`, identity field, primary key, description, ...). Default `True`.
-* enabled : OPTIONAL : if True, filters datasets down to the ones enabled for Profile and/or Identity. Default `False`.
+* enabled : OPTIONAL : if True, filters datasets down to the ones enabled for Profile and/or Identity. Default `False`.\
 Possible kwargs: 
 * verbose : OPTIONAL : if True, prints progress messages to the console. Default `False`.
 
