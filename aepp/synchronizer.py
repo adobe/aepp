@@ -19,20 +19,17 @@ from .configs import ConnectObject
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 class Synchronizer:
-    ## TO DO -> Add support for local environment
     def __init__(self,
                  targets:list|None=None,
                  config:ConnectObject|None=None,
                  baseSandbox:str|None=None,
-                 region:str='nld2',
-                 localFolder:str|list|None=None):
+                 localFolder:str|list|None=None,**kwargs):
         """
         Setup the synchronizor object with the base sandbox and target sandbox.
         Arguments:
             targets : REQUIRED : list of target sandboxes as strings
             config : REQUIRED : ConnectObject with the configuration. Make sure that the configuration of your API allows connection to all sandboxes.
             baseSandbox : OPTIONAL : name of the base sandbox
-            region : OPTIONAL : region of the sandboxes. default is 'nld2', possible values are: "va7" or "aus5 or "can2" or "ind2"
             localFolder : OPTIONAL : if provided, it will use the local environment as the base. Default is False.
                 If localFolder is provided, the baseSandbox and targets are not used, and the configuration is used to connect to the local environment.
                 configuration to use local environment is a folder with the name of your sandbox, inside that folder there must a folder for each base component:
@@ -104,7 +101,6 @@ class Synchronizer:
                 except Exception as e:
                     raise ValueError("baseSandbox must be provided in the constructor or in the config.json file in the local folder")
         self.dict_targetsConfig = {target: aepp.configure(org_id=config_object['org_id'],client_id=config_object['client_id'],scopes=config_object['scopes'],secret=config_object['secret'],sandbox=target,connectInstance=True) for target in targets}
-        self.region = region
         self.dict_baseComponents = {'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}}  
         self.dict_targetComponents = {target:{'schema':{},'class':{},'fieldgroup':{},'datatype':{},'datasets':{},'identities':{},"schemaDescriptors":{},'mergePolicy':{},'audience':{}} for target in targets}
 
@@ -247,7 +243,7 @@ class Synchronizer:
                     component = classmanager.ClassManager(component,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
             elif componentType == 'identity':
                 if self.baseConfig is not None:
-                    id_base = identity.Identity(config=self.baseConfig,region=self.region)
+                    id_base = identity.Identity(config=self.baseConfig)
                     identities:list = id_base.getIdentities()
                 elif self.localfolder is not None:
                     identities = []
@@ -725,178 +721,179 @@ class Synchronizer:
         name_base_schema = baseSchema.title
         ## Guard against re-entrant calls caused by circular descriptor relationships (A→B→A).
         ## _syncing_schemas tracks schemas currently mid-flight in this call stack only.
-        ## discard() is called at every exit point so sequential re-calls are not blocked.
+        ## discard() runs in the finally block so it always happens, even on an exception.
         if not hasattr(self, '_syncing_schemas'):
             self._syncing_schemas = set()
         if name_base_schema in self._syncing_schemas:
             return
         self._syncing_schemas.add(name_base_schema)
-        self.dict_baseComponents['schema'][name_base_schema] = baseSchema
-        descriptors = baseSchema.getDescriptors()
-        base_field_groups_names = list(baseSchema.fieldGroups.values())
-        base_schema_description = baseSchema.description
-        dict_base_fg_name_id = {name:fg_id for fg_id,name in baseSchema.fieldGroups.items()}
-        if 'meta:service' in baseSchema.schema.keys():
-            if verbose:
-                print(f"schema '{name_base_schema}' is a service schema, skipping the synchronization")
-            self._syncing_schemas.discard(name_base_schema)
-            return
-        for target in self.dict_targetsConfig.keys():
-            targetSchemaAPI = schema.Schema(config=self.dict_targetsConfig[target])
-            t_schema = None
-            if name_base_schema in self.dict_targetComponents[target]['schema'].keys():
-                t_schema = self.dict_targetComponents[target]['schema'][name_base_schema]
-            t_schemas = targetSchemaAPI.getSchemas()
-            t_fieldGroups = targetSchemaAPI.getFieldGroups()
-            if name_base_schema in targetSchemaAPI.data.schemas_altId.keys(): ## schema already exists in target and not synced recently in the cache or force sync is on
-                if t_schema is None: ## if need to create the SchemaManager
-                    t_schema = schemamanager.SchemaManager(targetSchemaAPI.data.schemas_altId[name_base_schema],config=self.dict_targetsConfig[target],sandbox=target)
-                else: ## if the schema is already synchronized in the target cache
-                    if force == False:
-                        if verbose:
-                            print(f"schema '{name_base_schema}' already synchronized. Skipping synchronization.")
-                        continue ## if the schema is already synchronized in the target cache and force sync is not on, we skip the synchronization of this target
+        try:
+            self.dict_baseComponents['schema'][name_base_schema] = baseSchema
+            descriptors = baseSchema.getDescriptors()
+            base_field_groups_names = list(baseSchema.fieldGroups.values())
+            base_schema_description = baseSchema.description
+            dict_base_fg_name_id = {name:fg_id for fg_id,name in baseSchema.fieldGroups.items()}
+            if 'meta:service' in baseSchema.schema.keys():
                 if verbose:
-                    print(f"schema '{name_base_schema}' already exists in target {target}, checking it")
-                new_fieldgroups = [fg for fg in base_field_groups_names if fg not in t_schema.fieldGroups.values()]
-                existing_fieldgroups = [fg for fg in base_field_groups_names if fg in t_schema.fieldGroups.values()]
-                removed_fieldgroups = [fg for fg, n in t_schema.fieldGroups.items() if n not in dict_base_fg_name_id]
-                if len(removed_fieldgroups) > 0 or len(new_fieldgroups) > 0 or base_schema_description != t_schema.description or force==True: ## if new field groups
-                    if verbose:
+                    print(f"schema '{name_base_schema}' is a service schema, skipping the synchronization")
+                return
+            for target in self.dict_targetsConfig.keys():
+                targetSchemaAPI = schema.Schema(config=self.dict_targetsConfig[target])
+                t_schema = None
+                if name_base_schema in self.dict_targetComponents[target]['schema'].keys():
+                    t_schema = self.dict_targetComponents[target]['schema'][name_base_schema]
+                t_schemas = targetSchemaAPI.getSchemas()
+                t_fieldGroups = targetSchemaAPI.getFieldGroups()
+                if name_base_schema in targetSchemaAPI.data.schemas_altId.keys(): ## schema already exists in target and not synced recently in the cache or force sync is on
+                    if t_schema is None: ## if need to create the SchemaManager
+                        t_schema = schemamanager.SchemaManager(targetSchemaAPI.data.schemas_altId[name_base_schema],config=self.dict_targetsConfig[target],sandbox=target)
+                    else: ## if the schema is already synchronized in the target cache
                         if force == False:
-                            print('found difference in the schema, updating it')
-                        else:
-                            print('force flag is set to True, updating the schema')
-                    ## handling field groups
-                    for r in removed_fieldgroups:
-                        ra = [a for a in t_schema.schema["allOf"] if a["$ref"] == r]
-                        if len(ra) > 0:
-                            rae = ra[0]
-                            t_schema.schema["allOf"].remove(rae)
-
-                        t_schema.fieldGroups.pop(r, None)
-                    for new_fieldgroup in new_fieldgroups:
-                        if baseSchema.tenantId[1:] not in dict_base_fg_name_id[new_fieldgroup]: ## ootb field group
                             if verbose:
-                                print(f"field group '{new_fieldgroup}' is a OOTB field group, using it")
-                            self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[new_fieldgroup],config=self.dict_targetsConfig[target],sandbox=target)
-                            t_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup].id)
-                        else:
-                            if verbose:
-                                print(f"field group '{new_fieldgroup}' is a custom field group, syncing it")
-                            tmp_FieldGroup = baseSchema.getFieldGroupManager(new_fieldgroup)
-                            self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose,force=force)
-                            t_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup].id)
-                    t_schema.setDescription(base_schema_description)
-                    res = t_schema.updateSchema()
-                    if '$id' not in res.keys():
-                        raise Exception(res)
-                    else:
-                        t_schema = schemamanager.SchemaManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
-                for fg_name in existing_fieldgroups:
-                    if baseSchema.tenantId[1:] in dict_base_fg_name_id[fg_name]: ## custom field group
-                        if fg_name not in self.dict_targetComponents[target]['fieldgroup'].keys(): ## if the field group is not already synchronized in the target cache
-                            tmp_fieldGroupManager = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.baseConfig,sandbox=target,localFolder=self.localfolder)
-                        else:
-                            tmp_fieldGroupManager = self.dict_targetComponents[target]['fieldgroup'][fg_name]
-                        self.__syncFieldGroup__(tmp_fieldGroupManager,force=force,verbose=verbose)
-                    else:
+                                print(f"schema '{name_base_schema}' already synchronized. Skipping synchronization.")
+                            continue ## if the schema is already synchronized in the target cache and force sync is not on, we skip the synchronization of this target
+                    if verbose:
+                        print(f"schema '{name_base_schema}' already exists in target {target}, checking it")
+                    new_fieldgroups = [fg for fg in base_field_groups_names if fg not in t_schema.fieldGroups.values()]
+                    existing_fieldgroups = [fg for fg in base_field_groups_names if fg in t_schema.fieldGroups.values()]
+                    removed_fieldgroups = [fg for fg, n in t_schema.fieldGroups.items() if n not in dict_base_fg_name_id]
+                    if len(removed_fieldgroups) > 0 or len(new_fieldgroups) > 0 or base_schema_description != t_schema.description or force==True: ## if new field groups
                         if verbose:
-                            print(f"field group '{fg_name}' is a OOTB field group, using it")
-                        if fg_name not in self.dict_targetComponents[target]['fieldgroup'].keys(): ## if the field group is not already synchronized in the target cache
+                            if force == False:
+                                print('found difference in the schema, updating it')
+                            else:
+                                print('force flag is set to True, updating the schema')
+                        ## handling field groups
+                        for r in removed_fieldgroups:
+                            ra = [a for a in t_schema.schema["allOf"] if a["$ref"] == r]
+                            if len(ra) > 0:
+                                rae = ra[0]
+                                t_schema.schema["allOf"].remove(rae)
+
+                            t_schema.fieldGroups.pop(r, None)
+                        for new_fieldgroup in new_fieldgroups:
+                            if baseSchema.tenantId[1:] not in dict_base_fg_name_id[new_fieldgroup]: ## ootb field group
+                                if verbose:
+                                    print(f"field group '{new_fieldgroup}' is a OOTB field group, using it")
+                                self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[new_fieldgroup],config=self.dict_targetsConfig[target],sandbox=target)
+                                t_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup].id)
+                            else:
+                                if verbose:
+                                    print(f"field group '{new_fieldgroup}' is a custom field group, syncing it")
+                                tmp_FieldGroup = baseSchema.getFieldGroupManager(new_fieldgroup)
+                                self.__syncFieldGroup__(tmp_FieldGroup,verbose=verbose,force=force)
+                                t_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][new_fieldgroup].id)
+                        t_schema.setDescription(base_schema_description)
+                        res = t_schema.updateSchema()
+                        if '$id' not in res.keys():
+                            raise Exception(res)
+                        else:
+                            t_schema = schemamanager.SchemaManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
+                    for fg_name in existing_fieldgroups:
+                        if baseSchema.tenantId[1:] in dict_base_fg_name_id[fg_name]: ## custom field group
+                            if fg_name not in self.dict_targetComponents[target]['fieldgroup'].keys(): ## if the field group is not already synchronized in the target cache
+                                tmp_fieldGroupManager = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.baseConfig,sandbox=target,localFolder=self.localfolder)
+                            else:
+                                tmp_fieldGroupManager = self.dict_targetComponents[target]['fieldgroup'][fg_name]
+                            self.__syncFieldGroup__(tmp_fieldGroupManager,force=force,verbose=verbose)
+                        else:
+                            if verbose:
+                                print(f"field group '{fg_name}' is a OOTB field group, using it")
+                            if fg_name not in self.dict_targetComponents[target]['fieldgroup'].keys(): ## if the field group is not already synchronized in the target cache
+                                self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
+                            else:
+                                pass ## if the field group is already in the cache, we can use it directly
+                    ## handling descriptors
+                    list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI=targetSchemaAPI,verbose=verbose)
+                    ## handling the meta:refProperty setup if any
+                    base_allOf = baseSchema.schema.get('allOf',[])
+                    base_fg_name_metaref = {}
+                    for refEl in base_allOf: ## retrieving the meta:refProperty from the base schema
+                        if 'meta:refProperty' in refEl.keys():
+                            tmp_base_fg_id = refEl['$ref']
+                            if baseSchema.tenantId[1:] in tmp_base_fg_id:
+                                tmp_base_fg_manager = self.getSyncFieldGroupManager(tmp_base_fg_id,sandbox=baseSchema.sandbox)
+                                base_fg_name_metaref[tmp_base_fg_manager.title] = refEl['meta:refProperty']
+                            else:
+                                base_fg_name_metaref[tmp_base_fg_id] = refEl['meta:refProperty']
+                    for fg_name,ref_property in base_fg_name_metaref.items(): ## updating the target schema with the meta:refProperty
+                        for ref in t_schema.schema.get('allOf',[]):
+                            tmp_target_fg_id = ref['$ref']
+                            if baseSchema.tenantId[1:] in tmp_target_fg_id:
+                                tmp_target_fg_manager = self.getSyncFieldGroupManager(tmp_target_fg_id,sandbox=target)
+                                if fg_name == tmp_target_fg_manager.title:
+                                    ref['meta:refProperty'] = ref_property
+                            else:
+                                if fg_name == ref['$ref']:
+                                    ref['meta:refProperty'] = ref_property
+                    self.dict_targetComponents[target]['schemaDescriptors'][name_base_schema] = list_new_descriptors
+                    t_schema.updateSchema()
+                else: ## schema does not exist in target
+                    if verbose:
+                        print(f"schema '{name_base_schema}' does not exist in target {target}, creating it")
+                    ## Check schema class: 
+                    ## Limited support -> does not support custom elements defined in classes
+                    baseClassId = baseSchema.classId
+                    tenantidId = baseSchema.tenantId
+                    if tenantidId[1:] in baseClassId: ## custom class
+                        if baseClassId not in [value.id for key, value in self.dict_baseComponents['class'].items() if value is not None]: ## if the class is not already synchronized in the base cache
+                            baseClassManager = classmanager.ClassManager(baseClassId,config=self.baseConfig,sandbox=target,localFolder=self.localfolder,sandboxBase=self.baseSandbox,tenantidId=tenantidId)
+                        else:
+                            baseClassManager = [value for key, value in self.dict_baseComponents['class'].items() if value is not None and value.id == baseClassId][0]
+                        self.__syncClass__(baseClassManager,force=force,verbose=verbose)
+                        targetClassManager = self.dict_targetComponents[target]['class'][baseClassManager.title]
+                        classId_toUse = targetClassManager.id
+                    else:
+                        classId_toUse = baseClassId
+                    new_schema = schemamanager.SchemaManager(title=name_base_schema,config=self.dict_targetsConfig[target],schemaClass=classId_toUse,sandbox=target)
+                    new_schema.setDescription(base_schema_description)
+                    for fg_name in base_field_groups_names:
+                        if baseSchema.tenantId[1:] not in dict_base_fg_name_id[fg_name]: ## ootb field group
+                            new_schema.addFieldGroup(dict_base_fg_name_id[fg_name])
+                            if verbose:
+                                print(f"field group '{fg_name}' is a OOTB field group, using it")
+                            ## adding the field group to the target components
                             self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
                         else:
-                            pass ## if the field group is already in the cache, we can use it directly
-                ## handling descriptors
-                list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI=targetSchemaAPI,verbose=verbose)
-                ## handling the meta:refProperty setup if any
-                base_allOf = baseSchema.schema.get('allOf',[])
-                base_fg_name_metaref = {}
-                for refEl in base_allOf: ## retrieving the meta:refProperty from the base schema
-                    if 'meta:refProperty' in refEl.keys():
-                        tmp_base_fg_id = refEl['$ref']
-                        if baseSchema.tenantId[1:] in tmp_base_fg_id:
-                            tmp_base_fg_manager = self.getSyncFieldGroupManager(tmp_base_fg_id,sandbox=baseSchema.sandbox)
-                            base_fg_name_metaref[tmp_base_fg_manager.title] = refEl['meta:refProperty']
-                        else:
-                            base_fg_name_metaref[tmp_base_fg_id] = refEl['meta:refProperty']
-                for fg_name,ref_property in base_fg_name_metaref.items(): ## updating the target schema with the meta:refProperty
-                    for ref in t_schema.schema.get('allOf',[]):
-                        tmp_target_fg_id = ref['$ref']
-                        if baseSchema.tenantId[1:] in tmp_target_fg_id:
-                            tmp_target_fg_manager = self.getSyncFieldGroupManager(tmp_target_fg_id,sandbox=target)
-                            if fg_name == tmp_target_fg_manager.title:
-                                ref['meta:refProperty'] = ref_property
-                        else:
-                            if fg_name == ref['$ref']:
-                                ref['meta:refProperty'] = ref_property
-                self.dict_targetComponents[target]['schemaDescriptors'][name_base_schema] = list_new_descriptors
-                t_schema.updateSchema()
-            else: ## schema does not exist in target
-                if verbose:
-                    print(f"schema '{name_base_schema}' does not exist in target {target}, creating it")
-                ## Check schema class: 
-                ## Limited support -> does not support custom elements defined in classes
-                baseClassId = baseSchema.classId
-                tenantidId = baseSchema.tenantId
-                if tenantidId[1:] in baseClassId: ## custom class
-                    if baseClassId not in [value.id for key, value in self.dict_baseComponents['class'].items() if value is not None]: ## if the class is not already synchronized in the base cache
-                        baseClassManager = classmanager.ClassManager(baseClassId,config=self.baseConfig,sandbox=target,localFolder=self.localfolder,sandboxBase=self.baseSandbox,tenantidId=tenantidId)
+                            tmp_FieldGroup = baseSchema.getFieldGroupManager(fg_name)
+                            self.__syncFieldGroup__(tmp_FieldGroup,force=force,verbose=verbose)
+                            new_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][fg_name].id)
+                    res = new_schema.createSchema()
+                    if '$id' in res.keys():
+                        t_schema = schemamanager.SchemaManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
                     else:
-                        baseClassManager = [value for key, value in self.dict_baseComponents['class'].items() if value is not None and value.id == baseClassId][0]
-                    self.__syncClass__(baseClassManager,force=force,verbose=verbose)
-                    targetClassManager = self.dict_targetComponents[target]['class'][baseClassManager.title]
-                    classId_toUse = targetClassManager.id
-                else:
-                    classId_toUse = baseClassId
-                new_schema = schemamanager.SchemaManager(title=name_base_schema,config=self.dict_targetsConfig[target],schemaClass=classId_toUse,sandbox=target)
-                new_schema.setDescription(base_schema_description)
-                for fg_name in base_field_groups_names:
-                    if baseSchema.tenantId[1:] not in dict_base_fg_name_id[fg_name]: ## ootb field group
-                        new_schema.addFieldGroup(dict_base_fg_name_id[fg_name])
-                        if verbose:
-                            print(f"field group '{fg_name}' is a OOTB field group, using it")
-                        ## adding the field group to the target components
-                        self.dict_targetComponents[target]['fieldgroup'][fg_name] = fieldgroupmanager.FieldGroupManager(dict_base_fg_name_id[fg_name],config=self.dict_targetsConfig[target],sandbox=target)
-                    else:
-                        tmp_FieldGroup = baseSchema.getFieldGroupManager(fg_name)
-                        self.__syncFieldGroup__(tmp_FieldGroup,force=force,verbose=verbose)
-                        new_schema.addFieldGroup(self.dict_targetComponents[target]['fieldgroup'][fg_name].id)
-                res = new_schema.createSchema()
-                if '$id' in res.keys():
-                    t_schema = schemamanager.SchemaManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
-                else:
-                    print(res)
-                    raise Exception("the schema could not be created in the target sandbox")
-                ## copying the schema creation so it can be fetch later for B2B references
+                        print(res)
+                        raise Exception("the schema could not be created in the target sandbox")
+                    ## copying the schema creation so it can be fetch later for B2B references
+                    self.dict_targetComponents[target]['schema'][name_base_schema] = t_schema
+                    ## handling descriptors
+                    list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI,verbose=verbose)
+                    self.dict_targetComponents[target]['schemaDescriptors'][name_base_schema] = list_new_descriptors
+                    ## handling the meta:refProperty setup if any
+                    base_allOf = baseSchema.schema.get('allOf',[])
+                    base_fg_name_metaref = {}
+                    for refEl in base_allOf: ## retrieving the meta:refProperty from the base schema
+                        if 'meta:refProperty' in refEl.keys():
+                            tmp_base_fg_id = refEl['$ref']
+                            if baseSchema.tenantId[1:] in tmp_base_fg_id:
+                                tmp_base_fg_manager = self.getSyncFieldGroupManager(tmp_base_fg_id,sandbox=baseSchema.sandbox)
+                                base_fg_name_metaref[tmp_base_fg_manager.title] = refEl['meta:refProperty']
+                            else:
+                                base_fg_name_metaref[tmp_base_fg_id] = refEl['meta:refProperty']
+                    for fg_name,ref_property in base_fg_name_metaref.items(): ## updating the target schema with the meta:refProperty
+                        for ref in t_schema.schema.get('allOf',[]):
+                            tmp_target_fg_id = ref['$ref']
+                            if baseSchema.tenantId[1:] in tmp_target_fg_id:
+                                tmp_target_fg_manager = self.getSyncFieldGroupManager(tmp_target_fg_id,sandbox=target)
+                                if fg_name == tmp_target_fg_manager.title:
+                                    ref['meta:refProperty'] = ref_property
+                            else:
+                                if fg_name == ref['$ref']:
+                                    ref['meta:refProperty'] = ref_property
+                    t_schema.updateSchema()
                 self.dict_targetComponents[target]['schema'][name_base_schema] = t_schema
-                ## handling descriptors
-                list_new_descriptors = self.__syncDescriptor__(baseSchema,t_schema,targetSchemaAPI,verbose=verbose)
-                self.dict_targetComponents[target]['schemaDescriptors'][name_base_schema] = list_new_descriptors
-                ## handling the meta:refProperty setup if any
-                base_allOf = baseSchema.schema.get('allOf',[])
-                base_fg_name_metaref = {}
-                for refEl in base_allOf: ## retrieving the meta:refProperty from the base schema
-                    if 'meta:refProperty' in refEl.keys():
-                        tmp_base_fg_id = refEl['$ref']
-                        if baseSchema.tenantId[1:] in tmp_base_fg_id:
-                            tmp_base_fg_manager = self.getSyncFieldGroupManager(tmp_base_fg_id,sandbox=baseSchema.sandbox)
-                            base_fg_name_metaref[tmp_base_fg_manager.title] = refEl['meta:refProperty']
-                        else:
-                            base_fg_name_metaref[tmp_base_fg_id] = refEl['meta:refProperty']
-                for fg_name,ref_property in base_fg_name_metaref.items(): ## updating the target schema with the meta:refProperty
-                    for ref in t_schema.schema.get('allOf',[]):
-                        tmp_target_fg_id = ref['$ref']
-                        if baseSchema.tenantId[1:] in tmp_target_fg_id:
-                            tmp_target_fg_manager = self.getSyncFieldGroupManager(tmp_target_fg_id,sandbox=target)
-                            if fg_name == tmp_target_fg_manager.title:
-                                ref['meta:refProperty'] = ref_property
-                        else:
-                            if fg_name == ref['$ref']:
-                                ref['meta:refProperty'] = ref_property
-                t_schema.updateSchema()
-            self.dict_targetComponents[target]['schema'][name_base_schema] = t_schema
-        self._syncing_schemas.discard(name_base_schema)
+        finally:
+            self._syncing_schemas.discard(name_base_schema)
 
     def __syncDescriptor__(self,baseSchemaManager:schemamanager.SchemaManager|None=None,targetSchemaManager:schemamanager.SchemaManager|None=None,targetSchemaAPI:schema.Schema|None=None,verbose:bool=False)-> dict:
         """
@@ -914,6 +911,15 @@ class Synchronizer:
         if not isinstance(targetSchemaManager,schemamanager.SchemaManager):
             raise TypeError("the targetSchemaManager must be a SchemaManager object")
         base_descriptors = baseSchemaManager.getDescriptors()
+        type_priority = {
+            "xdm:descriptorIdentity": 0,
+            "xdm:descriptorReferenceIdentity": 1,
+            "xdm:descriptorOneToOne": 2,
+            "xdm:descriptorOneToMany": 3,
+            "xdm:descriptorDeprecated": 10,
+        }
+        ### sorting descriptors for getting identity first
+        base_descriptors = sorted(base_descriptors,key=lambda item: type_priority.get(item["@type"], 5))
         if len(base_descriptors) == 0:
             return []
         if verbose:
@@ -927,6 +933,8 @@ class Synchronizer:
                 for json_file in folder.glob('*.json'):
                     myschemas.append(json.load(FileIO(json_file)))
         target_descriptors = targetSchemaManager.getDescriptors()
+        ## sorting descriptors for getting identity first
+        target_descriptors = sorted(target_descriptors,key=lambda item: type_priority.get(item["@type"], 99))
         list_descriptors = []
         for baseDescriptor in base_descriptors:
             descType = baseDescriptor['@type']
@@ -934,8 +942,9 @@ class Synchronizer:
                 case "xdm:descriptorIdentity":
                     target_identitiesDecs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorIdentity']
                     baseIdentityNS = baseDescriptor['xdm:namespace'].lower()
+                    baseIdentityPath = baseDescriptor['xdm:sourceProperty'].lower()
                     if self.baseConfig is not None and self.localfolder is None:
-                        identityConn = identity.Identity(config=self.baseConfig,region=self.region)
+                        identityConn = identity.Identity(config=self.baseConfig)
                         baseIdentities = identityConn.getIdentities()
                     elif self.localfolder is not None:
                         baseIdentities = []
@@ -943,7 +952,8 @@ class Synchronizer:
                             for file in folder.glob('*.json'):
                                 id_file = json.load(FileIO(file))
                                 baseIdentities.append(id_file)
-                    if baseIdentityNS not in [el['xdm:namespace'].lower() for el in target_identitiesDecs]: ## identity descriptor does not exists in target schema
+                    existing_identity_descs = [el for el in target_identitiesDecs if el['xdm:namespace'].lower() == baseIdentityNS and el['xdm:sourceProperty'].lower() == baseIdentityPath]
+                    if len(existing_identity_descs) == 0: ## identity descriptor does not exists in target schema
                         def_identity = [el for el in baseIdentities if el['code'].lower() == baseIdentityNS][0]
                         self.__syncIdentity__(def_identity,verbose=verbose)
                         new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,
@@ -952,8 +962,11 @@ class Synchronizer:
                                                                             identityPrimary=baseDescriptor['xdm:isPrimary'],
                                                                             )
                         res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
                     else:
-                        res = [el for el in target_identitiesDecs if el['xdm:namespace'].lower() == baseIdentityNS][0]
+                        res = existing_identity_descs[0]
                     list_descriptors.append(res)
                 case "xdm:descriptorOneToOne": ## lookup definition
                     target_OneToOne = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorOneToOne']
@@ -970,6 +983,9 @@ class Synchronizer:
                                                                         completePath=baseDescriptor['xdm:sourceProperty'],
                                                                         targetSchema=target_targetSchemaId)
                             res = targetSchemaManager.createDescriptor(new_desc)
+                            if '@id' not in res.keys():
+                                print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                                print(res)
                         else:
                             res = [el for el in target_OneToOne if el['xdm:destinationSchema'] == target_targetSchemaId][0]
                     else: ## schema does not exist in target
@@ -992,6 +1008,9 @@ class Synchronizer:
                                                                         completePath=baseDescriptor['xdm:sourceProperty'],
                                                                         targetSchema=target_targetSchemaId)
                         res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
                     list_descriptors.append(res)
                 case "xdm:descriptorLabel":
                     ## handling labels on Field Groups
@@ -1006,6 +1025,9 @@ class Synchronizer:
                                                                         labels=labels,
                                                                         )
                         res = targetFG.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
                     else: ## descriptor already exists in target
                         ## check if all labels are the same
                         res = [el for el in target_descriptors if el['xdm:sourceProperty'] == baseDescriptor["xdm:sourceProperty"]][0]
@@ -1014,7 +1036,7 @@ class Synchronizer:
                             new_def = {"@type": res["@type"],'xdm:sourceProperty':res['xdm:sourceProperty'],
                                         'xdm:sourceSchema':res['xdm:sourceSchema'],"xdm:sourceVersion":int(res['xdm:sourceVersion'])+1,
                                         'xdm:labels':labels}
-                            res = targetFG.updateDescriptor(new_def)
+                            res = targetFG.updateDescriptor(res['@id'],new_def)
                     list_descriptors.append(res)
                             
                 case "xdm:alternateDisplayInfo":
@@ -1031,25 +1053,28 @@ class Synchronizer:
                                                                             alternateTitle=alternateTitle,alternateDescription=alternateDescription,
                                                                             alternateNote=alternateNote,alternateEnum=alternateEnum)
                         res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
                     else: ## descriptor already exists in target
                         res = [el for el in target_alternateDisplayInfo if el['xdm:sourceProperty'] == baseDescriptor['xdm:sourceProperty']][0]
                         target_alternateTitle = res.get('xdm:title',{}).get('en_us',None)
                         target_alternateNote = res.get('xdm:note',{}).get('en_us',None)
                         target_alternateDescription = res.get('xdm:description',{}).get('en_us',None)
-                        target_alternateNote = baseDescriptor.get('xdm:note',{}).get('en_us',None)
-                        target_alternateEnum = baseDescriptor.get('xdm:excludeMetaEnum',None)
+                        target_alternateNote = res.get('xdm:note',{}).get('en_us',None)
+                        target_alternateEnum = res.get('xdm:excludeMetaEnum',None)
                         ## check if the alternateTitle, alternateNote and alternateDescription are the same
                         if target_alternateTitle != alternateTitle or target_alternateNote != alternateNote or target_alternateDescription != alternateDescription or str(target_alternateEnum) != str(alternateEnum):
                             new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,
                                                                             completePath=baseDescriptor['xdm:sourceProperty'],
                                                                             alternateTitle=alternateTitle,alternateDescription=alternateDescription,
                                                                             alternateNote=alternateNote,alternateEnum=alternateEnum)
-                            res = targetSchemaManager.updateDescriptor(new_def)
+                            res = targetSchemaManager.updateDescriptor(res['@id'],new_desc)
                     list_descriptors.append(res)
                 case "xdm:descriptorReferenceIdentity": ## can be referenced by other schemas
                     baseIdentityNS = baseDescriptor['xdm:identityNamespace']
                     if self.baseConfig is not None and self.localfolder is None:
-                        identityConn = identity.Identity(config=self.baseConfig,region=self.region)
+                        identityConn = identity.Identity(config=self.baseConfig)
                         baseIdentities = identityConn.getIdentities()
                     elif self.localfolder is not None:
                         baseIdentities = []
@@ -1066,6 +1091,9 @@ class Synchronizer:
                                                                         identityNSCode=baseDescriptor['xdm:identityNamespace'],
                                                                         )
                         res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
                     else: ## descriptor already exists in target
                         res = [el for el in target_referenceIdentity if el['xdm:sourceProperty'] == baseDescriptor['xdm:sourceProperty']][0]
                     list_descriptors.append(res)
@@ -1074,8 +1102,122 @@ class Synchronizer:
                     if baseDescriptor['xdm:sourceProperty'] not in [el['xdm:sourceProperty'] for el in target_deprecated]: ## descriptor does not exists in target
                         new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,completePath=baseDescriptor['xdm:sourceProperty'])
                         res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
                     else:
                         res = [el for el in target_deprecated if el['xdm:sourceProperty'] == baseDescriptor['xdm:sourceProperty']][0]
+                    list_descriptors.append(res)
+                case "xdm:descriptorRelationship":
+                    target_relationshipDescs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorRelationship']
+                    base_targetSchemaId = baseDescriptor['xdm:destinationSchema']
+                    if self.baseConfig is not None:
+                        base_targetSchemaName = [schemaName for schemaName,schemaId in baseSchemaAPI.data.schemas_id.items() if schemaId == base_targetSchemaId][0]
+                    elif self.localfolder is not None:
+                        base_targetSchemaName = [sc['title'] for sc in myschemas if sc['$id'] == base_targetSchemaId][0]
+                    if base_targetSchemaName in list(targetSchemaAPI.data.schemas_altId.keys()):## schema already exists in target
+                        target_targetSchemaId = targetSchemaAPI.data.schemas_id[base_targetSchemaName]
+                        ## checking if the descriptor already exists in target
+                        if target_targetSchemaId not in [el['xdm:destinationSchema'] for el in target_relationshipDescs]: ## descriptor does not exist in target
+                            new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,
+                                                                        completePath=baseDescriptor['xdm:sourceProperty'],
+                                                                        targetSchema=target_targetSchemaId,
+                                                                        targetCompletePath=baseDescriptor['xdm:destinationProperty'],
+                                                                        cardinality=baseDescriptor['xdm:cardinality'],
+                                                                        sourceToDestinationTitle=baseDescriptor.get('xdm:sourceToDestinationTitle',None),
+                                                                        destinationToSourceTitle=baseDescriptor.get('xdm:destinationToSourceTitle',None)
+                                                                        )
+                            res = targetSchemaManager.createDescriptor(new_desc)
+                            if '@id' not in res.keys():
+                                print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                                print(res)
+                        else:
+                            res = [el for el in target_relationshipDescs if el['xdm:destinationSchema'] == target_targetSchemaId][0]
+                    else: ## schema does not exist in target
+                        if self.baseConfig is not None and self.localfolder is None:
+                            base_targetSchemaManager = schemamanager.SchemaManager(base_targetSchemaId,config=self.baseConfig)
+                        elif self.localfolder is not None:
+                            found = False
+                            for folder in self.schemaFolder:
+                                for file in folder.glob('*.json'):
+                                    base_targetSchema = json.load(FileIO(file))
+                                    if base_targetSchema['$id'] == base_targetSchemaId:
+                                        base_targetSchemaManager = schemamanager.SchemaManager(base_targetSchema,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
+                                        found = True
+                                        break
+                                if found:
+                                    break
+                        self.__syncSchema__(base_targetSchemaManager,verbose=verbose)
+                        target_targetSchemaId = self.dict_targetComponents[targetSchemaManager.sandbox]['schema'][base_targetSchemaName].id
+                        new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,
+                                                                        completePath=baseDescriptor['xdm:sourceProperty'],
+                                                                        targetSchema=target_targetSchemaId,
+                                                                        targetCompletePath=baseDescriptor['xdm:destinationProperty'],
+                                                                        cardinality=baseDescriptor['xdm:cardinality'],
+                                                                        sourceToDestinationTitle=baseDescriptor.get('xdm:sourceToDestinationTitle',None),
+                                                                        destinationToSourceTitle=baseDescriptor.get('xdm:destinationToSourceTitle',None)
+                                                                        )
+                        res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
+                    list_descriptors.append(res)
+                case "xdm:descriptorTimeSeriesGranularity": ## schema-wide, no sourceProperty
+                    target_granularityDescs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorTimeSeriesGranularity']
+                    baseGranularity = baseDescriptor.get('xdm:granularity','day')
+                    baseTimezone = baseDescriptor.get('xdm:ianaTimezone','UTC')
+                    if len(target_granularityDescs) == 0: ## descriptor does not exists in target
+                        new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,
+                                                                        granularity=baseGranularity,
+                                                                        timezone=baseTimezone)
+                        res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
+                    else: ## descriptor already exists in target
+                        res = target_granularityDescs[0]
+                        if res.get('xdm:granularity') != baseGranularity or res.get('xdm:ianaTimezone') != baseTimezone:
+                            new_def = {"@type": res["@type"],'xdm:sourceSchema':res['xdm:sourceSchema'],"xdm:sourceVersion":int(res.get('xdm:sourceVersion',1))+1,
+                                        'xdm:granularity':baseGranularity,'xdm:ianaTimezone':baseTimezone}
+                            res = targetSchemaManager.updateDescriptor(res['@id'],new_def)
+                    list_descriptors.append(res)
+                case "xdm:descriptorTimestamp":
+                    target_timestampDescs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorTimestamp']
+                    if baseDescriptor['xdm:sourceProperty'] not in [el['xdm:sourceProperty'] for el in target_timestampDescs]: ## descriptor does not exists in target
+                        new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,completePath=baseDescriptor['xdm:sourceProperty'])
+                        res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
+                    else:
+                        res = [el for el in target_timestampDescs if el['xdm:sourceProperty'] == baseDescriptor['xdm:sourceProperty']][0]
+                    list_descriptors.append(res)
+                case "xdm:descriptorVersion":
+                    target_versionDescs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorVersion']
+                    if baseDescriptor['xdm:sourceProperty'] not in [el['xdm:sourceProperty'] for el in target_versionDescs]: ## descriptor does not exists in target
+                        new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,completePath=baseDescriptor['xdm:sourceProperty'])
+                        res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
+                    else:
+                        res = [el for el in target_versionDescs if el['xdm:sourceProperty'] == baseDescriptor['xdm:sourceProperty']][0]
+                    list_descriptors.append(res)
+                case "xdm:descriptorPrimaryKey": ## xdm:sourceProperty is a list of paths
+                    target_primaryKeyDescs = [desc for desc in target_descriptors if desc['@type'] == 'xdm:descriptorPrimaryKey']
+                    basePrimaryKeyPaths = baseDescriptor['xdm:sourceProperty']
+                    if len(target_primaryKeyDescs) == 0: ## descriptor does not exists in target
+                        new_desc = targetSchemaManager.createDescriptorOperation(descType=descType,completePath=basePrimaryKeyPaths)
+                        res = targetSchemaManager.createDescriptor(new_desc)
+                        if '@id' not in res.keys():
+                            print(f"descriptor {baseDescriptor['@id']}, type {baseDescriptor['@type']} could not be created in the target schema {targetSchemaManager.title}")
+                            print(res)
+                    else: ## descriptor already exists in target
+                        res = target_primaryKeyDescs[0]
+                        if set(res.get('xdm:sourceProperty',[])) != set(basePrimaryKeyPaths):
+                            new_def = {"@type": res["@type"],'xdm:sourceSchema':res['xdm:sourceSchema'],"xdm:sourceVersion":int(res.get('xdm:sourceVersion',1))+1,
+                                        'xdm:sourceProperty':basePrimaryKeyPaths}
+                            res = targetSchemaManager.updateDescriptor(res['@id'],new_def)
                     list_descriptors.append(res)
         return list_descriptors
 

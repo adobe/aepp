@@ -17,7 +17,7 @@ It crawls the other `aepp` modules ([schema](./schema.md), [catalog](./catalog.m
   - [Building the graph](#building-the-graph)
     - [buildGraph](#buildgraph)
     - [buildSchemaRelationships](#buildschemarelationships)
-    - [addPathAttribute](#addpathattribute)
+    - [addPathAttributes](#addpathattributes)
     - [addSchemaAttributes](#addschemaattributes)
     - [addDatasetAttributes](#adddatasetattributes)
     - [loadGraph](#loadgraph)
@@ -94,7 +94,7 @@ Arguments:
 myGraph.buildSchemaRelationships(detail=True)
 ```
 
-### addPathAttribute
+### addPathAttributes
 
 Attaches custom attributes to an existing schema-path node. The path node must already exist in the graph, which means the graph has to have been built (or loaded) with `detail=True` beforehand.\
 Arguments:
@@ -105,7 +105,7 @@ Arguments:
 ```python
 myGraph.buildKnowledgeGraph(detail=True)
 
-myGraph.addPathAttribute(
+myGraph.addPathAttributes(
     "person.name.firstName",
     {"piiType": "name", "owner": "marketing"}
 )

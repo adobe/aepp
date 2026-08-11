@@ -18,7 +18,9 @@ Patch:
 * Extending KnowledgeGraph with destination Flows for `segments` and `profile attributes`
 * Extending capability of `FlowManager` to better support destination flows and their attributes.
 * Patch the name of the dataset created during extraction to reflect the name and not the table name. It means that the file name can evolve over time now. 
-* Fix identification of audiences shares in detination when no end date provided in Graph.
+* Fix identification of audiences shares in destination when no end date provided in Graph.
+* Fix that some descriptors were not created in the target schema when synchronizing between sandboxes.
+* offer that we can pass a list of artifact types to extract in `extractSandboxArtifacts` method. It will allow to extract only specific artifacts instead of all of them.
 
 ## version 0.5.7
 * adding the `create_b2b_artifacts` method in the CLI. 

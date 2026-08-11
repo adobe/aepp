@@ -2234,13 +2234,15 @@ class ServiceShell(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='extract_artifacts', description='Extract artifacts from AEP to a local folder',add_help=True)
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
         parser.add_argument('-f','--filters', help='Name to be used to filter schemas and datasets extraction. It does not impact other artifact types. Multiple filters can be separated by space.', nargs='*', default=None)
+        parser.add_argument('-at','--artifact_type', help="The type of artifact to extract. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy',audience'. If not provided, it will extract all the artifacts", nargs='*', default=None)
         try:
             console.print("Extracting artifacts...", style="blue")
             args = parser.parse_args(shlex.split(args))
             aepp.extractSandboxArtifacts(
                 sandbox=self.config,
                 localFolder=args.localfolder,
-                filters=args.filters
+                filters=args.filters,
+                artifactType=args.artifact_type
             )
             console.print(Panel("Extraction completed!", style="green"))
         except SystemExit:

@@ -1186,6 +1186,7 @@ class SchemaManager:
                                 labels: list[str]=None,
                                 granularity:str="day",
                                 cardinality:str="M:1",
+                                **kwargs
                                 )->dict:
         """
         Create a descriptor object to be used in the createDescriptor.
@@ -1209,12 +1210,17 @@ class SchemaManager:
             timezone : OPTIONAL : The proper timezone identifier value from the TZ identifier column (see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
             granularity : OPTION : hour or day (default),
             cardinality : OPTIONAL : The cardinality of the relationship. default is "M:1"
+        possible kwargs:
+            sourceToDestinationTitle : OPTIONAL : If you want to add a title for the relationship from source to destination.
+            destinationToSourceTitle : OPTIONAL : If you want to add a title for the relationship from destination to source.
         """
         if descType not in self.DESCRIPTOR_TYPES:
             raise Exception(f"The value provided ({descType}) is not supported by this method")
         if descType != "xdm:descriptorTimeSeriesGranularity":
             if completePath is None:
                 raise ValueError("Require a field complete path")
+            elif isinstance(completePath,list):
+                completePath = [path if path.startswith('/') else '/'+path.replace('.','/') for path in completePath]
             else:
                 if completePath.startswith('/') == False:
                     completePath = '/'+completePath.replace('.','/')
@@ -1294,6 +1300,10 @@ class SchemaManager:
                 "xdm:destinationVersion": 1,
                 "xdm:cardinality": cardinality
             }
+            if kwargs.get('sourceToDestinationTitle') is not None:
+                obj["xdm:sourceToDestinationTitle"] = kwargs.get('sourceToDestinationTitle')
+            if kwargs.get('destinationToSourceTitle') is not None:
+                obj["xdm:destinationToSourceTitle"] = kwargs.get('destinationToSourceTitle')
             if targetNamespace is not None:
                 obj["xdm:destinationNamespace"] = targetNamespace
         elif descType == "xdm:descriptorPrimaryKey":

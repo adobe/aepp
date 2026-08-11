@@ -177,6 +177,7 @@ def extractSandboxArtifacts(
     localFolder: Union[str, Path] = None,
     ootb: bool = True,
     filters: list = None,
+    artifactTypes: str | list[str] = None,
     retry: int = 2,
     **kwargs
 ):
@@ -186,8 +187,9 @@ def extractSandboxArtifacts(
         sandbox: REQUIRED: the instance of a ConnectObject that contains the sandbox information and connection.
         localFolder: OPTIONAL: the local folder where to extract the sandbox. If not provided, it will use the current working directory and name the folder the name of the sandbox.
         ootb : OPTIONAL : If you want to also download the OOTB elements
-        filters: OPTIONAL: a list of names to apply as filter when extracting the sandbox artifacts. It will filter Datasets and Schemas based on the name passed (lower and partial match).
+        filters: OPTIONAL: a list of names to apply as filter when extracting the sandbox artifacts. It will filter Datasets, Schemas and based on the name passed (lower and partial match).
             Identities, Field Groups, Data Types, Classes will not be filtered.
+        artifactTypes: OPTIONAL: the type of artifact to extract. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy','audience'. If not provided, it will extract all the artifacts.
         retry: OPTIONAL: the number of retry in case of connection error for the modules (default is 2)
     """
     if sandbox is None:
@@ -197,6 +199,10 @@ def extractSandboxArtifacts(
         completePath = mypath / f'{sandbox.sandbox}'
     else:
         completePath = Path(localFolder)
+    if type(artifactTypes) == str:
+        artifactTypes = [artifactTypes]
+    elif artifactTypes is None:
+        artifactTypes = []
     if filters is None:
         filters = []
     from aepp import schema, catalog, identity,customerprofile, segmentation, tags
@@ -268,88 +274,102 @@ def extractSandboxArtifacts(
                 json.dump(definition,f,indent=2)
         except Exception as e: ### some geo data types are not available
             pass
-    behavElements = [(element, behavPath, '$id', 'title', sch.getBehavior) for element in behaviors]
-    with ThreadPoolExecutor(thread_name_prefix = 'behavior') as thread_pool:
-        results = thread_pool.map(writingFullFile, behavElements)
-    ## writing classes
-    classesElements = [(element, classPath, '$id', 'title',sch.getClass) for element in myclasses]
-    with ThreadPoolExecutor(thread_name_prefix = 'behavior') as thread_pool:
-        results = thread_pool.map(writingFalseFile, classesElements)
-    classGlobalElements = [(element, classPath, '$id', 'title',sch.getClass) for element in classesGlobal]
-    with ThreadPoolExecutor(thread_name_prefix = 'classGlobal') as thread_pool:
-        results = thread_pool.map(writingFullFile, classGlobalElements)
+    if len(artifactTypes) == 0 or 'behavior' in artifactTypes:
+        behavElements = [(element, behavPath, '$id', 'title', sch.getBehavior) for element in behaviors]
+        with ThreadPoolExecutor(thread_name_prefix = 'behavior') as thread_pool:
+            results = thread_pool.map(writingFullFile, behavElements)
+    if len(artifactTypes) == 0 or 'class' in artifactTypes:
+        ## writing classes
+        classesElements = [(element, classPath, '$id', 'title',sch.getClass) for element in myclasses]
+        with ThreadPoolExecutor(thread_name_prefix = 'behavior') as thread_pool:
+            results = thread_pool.map(writingFalseFile, classesElements)
+        classGlobalElements = [(element, classPath, '$id', 'title',sch.getClass) for element in classesGlobal]
+        with ThreadPoolExecutor(thread_name_prefix = 'classGlobal') as thread_pool:
+            results = thread_pool.map(writingFullFile, classGlobalElements)
     myschemas = sch.getSchemas()
     if filters is not None and len(filters) > 0:
         myschemas = [schema for schema in myschemas if any(fil.lower() in schema.get('title','').lower() for fil in filters)]
     all_ids = [element['$id'] for element in myschemas]
-    schemaElement = [(element, schemaPath, '$id', 'title', sch.getSchema) for element in myschemas]
-    with ThreadPoolExecutor(thread_name_prefix = 'schema') as thread_pool:
-        results = thread_pool.map(writingFalseFile, schemaElement)
-    ## writing field groups
+    if len(artifactTypes) == 0 or 'schema' in artifactTypes:
+        ## writing schemas
+        schemaElement = [(element, schemaPath, '$id', 'title', sch.getSchema) for element in myschemas]
+        with ThreadPoolExecutor(thread_name_prefix = 'schema') as thread_pool:
+            results = thread_pool.map(writingFalseFile, schemaElement)
     myfgs = sch.getFieldGroups()
     all_ids += [element['$id'] for element in myfgs]
-    fgsElements = [(element, fieldgroupPath, '$id', 'title', sch.getFieldGroup) for element in myfgs]
-    with ThreadPoolExecutor(thread_name_prefix = 'fieldgroup') as thread_pool:  
-        results = thread_pool.map(writingFalseFile, fgsElements)
-    if ootb:
-        globalFgs = sch.getFieldGroupsGlobal()
-        globalFgsElements = [(element, fieldgroupPathGlobale, '$id', 'title', sch.getFieldGroup) for element in globalFgs]
-        with ThreadPoolExecutor(thread_name_prefix = 'globalFieldgroup') as thread_pool:
-            results = thread_pool.map(writingFalseFile, globalFgsElements)
-        ### exception for a fieldgroup not supported by default getFieldGroups endpoint
-        myfg = sch.getFieldGroup('https://ns.adobe.com/experience/intelligentServices/event-journeyai-sendtimeoptimization-summary',full=True,xtype='xed')
-        title_myfg = __titleSafe__(myfg.get('title',myfg.get('$id','unknown')))
-        with open(f"{fieldgroupPathGlobale / title_myfg}.json",'w') as f:
-            json.dump(myfg,f,indent=2)
-    ## writing data types
-    mydt = sch.getDataTypes()
-    datatypeElements = [(element, datatypePath, 'meta:altId', 'title', sch.getDataType) for element in mydt]
-    with ThreadPoolExecutor(thread_name_prefix = 'datatype') as thread_pool:
-        results = thread_pool.map(writingFalseFile, datatypeElements)
-    if ootb:
-        globalDataTypes = sch.getDataTypesGlobal()
-        globalDataTypesElements = [(element, datatypePathGlobal, 'meta:altId', 'title', sch.getDataType) for element in globalDataTypes]
-        with ThreadPoolExecutor(thread_name_prefix = 'globalDatatype') as thread_pool:
-            results = thread_pool.map(writingFalseFile, globalDataTypesElements)
-    ## writing descriptors
-    descriptors = sch.getDescriptors()
-    descriptors = [desc for desc in descriptors if desc.get('xdm:sourceSchema','') in all_ids]
-    descriptorsElements = [(element,descriptorPath,'@id',"@id",None) for element in descriptors]
-    with ThreadPoolExecutor(thread_name_prefix = 'descriptors') as thread_pool:
-        results = thread_pool.map(writingFullFile, descriptorsElements)
-    datasets = cat.getDataSets(output='list')
-    if filters is not None and len(filters) > 0:
-        datasets = [dataset for dataset in datasets if any(fil.lower() in dataset.get('name','').lower() for fil in filters)]
-    for ds in datasets:
-        if len(ds.get('unifiedTags',[])) > 0:
-            tag_names = [dict_id_name.get(tag_id) for tag_id in ds.get('unifiedTags',[])]
-            ds['unifiedTags'] = tag_names
-        filename = __titleSafe__(ds.get('name',ds.get('tags',{}).get('adobe/pqs/table',[ds.get('id','unknown')])[0])).lower()
-        with open(f"{datasetPath / filename}.json",'w') as f:
-            json.dump(ds,f,indent=2)
-    identities = ide.getIdentities()
-    for el in identities:
-        with open(f"{identityPath / el['code']}.json",'w') as f:
-            json.dump(el,f,indent=2)
-    ## merge policies
-    ups = customerprofile.Profile(config=sandbox)
-    mymergePolicies = ups.getMergePolicies()
-    for el in mymergePolicies:
-        with open(f"{mergePolicyPath / el.get('id','unknown')}.json",'w') as f:
-            json.dump(el,f,indent=2)
+    if len(artifactTypes) == 0 or 'fieldgroup' in artifactTypes:
+        ## writing field groups
+        fgsElements = [(element, fieldgroupPath, '$id', 'title', sch.getFieldGroup) for element in myfgs]
+        with ThreadPoolExecutor(thread_name_prefix = 'fieldgroup') as thread_pool:  
+            results = thread_pool.map(writingFalseFile, fgsElements)
+        if ootb:
+            globalFgs = sch.getFieldGroupsGlobal()
+            globalFgsElements = [(element, fieldgroupPathGlobale, '$id', 'title', sch.getFieldGroup) for element in globalFgs]
+            with ThreadPoolExecutor(thread_name_prefix = 'globalFieldgroup') as thread_pool:
+                results = thread_pool.map(writingFalseFile, globalFgsElements)
+            ### exception for a fieldgroup not supported by default getFieldGroups endpoint
+            myfg = sch.getFieldGroup('https://ns.adobe.com/experience/intelligentServices/event-journeyai-sendtimeoptimization-summary',full=True,xtype='xed')
+            title_myfg = __titleSafe__(myfg.get('title',myfg.get('$id','unknown')))
+            with open(f"{fieldgroupPathGlobale / title_myfg}.json",'w') as f:
+                json.dump(myfg,f,indent=2)
+    if len(artifactTypes) == 0 or "datatype" in artifactTypes:
+        ## writing data types
+        mydt = sch.getDataTypes()
+        datatypeElements = [(element, datatypePath, 'meta:altId', 'title', sch.getDataType) for element in mydt]
+        with ThreadPoolExecutor(thread_name_prefix = 'datatype') as thread_pool:
+            results = thread_pool.map(writingFalseFile, datatypeElements)
+        if ootb:
+            globalDataTypes = sch.getDataTypesGlobal()
+            globalDataTypesElements = [(element, datatypePathGlobal, 'meta:altId', 'title', sch.getDataType) for element in globalDataTypes]
+            with ThreadPoolExecutor(thread_name_prefix = 'globalDatatype') as thread_pool:
+                results = thread_pool.map(writingFalseFile, globalDataTypesElements)
+    if len(artifactTypes) == 0 or "descriptor" in artifactTypes:
+        ## writing descriptors
+        descriptors = sch.getDescriptors()
+        descriptors = [desc for desc in descriptors if desc.get('xdm:sourceSchema','') in all_ids]
+        descriptorsElements = [(element,descriptorPath,'@id',"@id",None) for element in descriptors]
+        with ThreadPoolExecutor(thread_name_prefix = 'descriptors') as thread_pool:
+            results = thread_pool.map(writingFullFile, descriptorsElements)
+    if len(artifactTypes) == 0 or "dataset" in artifactTypes:
+        datasets = cat.getDataSets(output='list')
+        if filters is not None and len(filters) > 0:
+            datasets = [dataset for dataset in datasets if any(fil.lower() in dataset.get('name','').lower() for fil in filters)]
+        for ds in datasets:
+            if len(ds.get('unifiedTags',[])) > 0:
+                tag_names = [dict_id_name.get(tag_id) for tag_id in ds.get('unifiedTags',[])]
+                ds['unifiedTags'] = tag_names
+            filename = __titleSafe__(ds.get('name',ds.get('tags',{}).get('adobe/pqs/table',[ds.get('id','unknown')])[0])).lower()
+            with open(f"{datasetPath / filename}.json",'w') as f:
+                json.dump(ds,f,indent=2)
+    if len(artifactTypes) == 0 or "identity" in artifactTypes:
+        ## writing identities
+        identities = ide.getIdentities()
+        for el in identities:
+            with open(f"{identityPath / el['code']}.json",'w') as f:
+                json.dump(el,f,indent=2)
+    if len(artifactTypes) == 0 or "mergepolicy" in artifactTypes:
+        ## merge policies
+        ups = customerprofile.Profile(config=sandbox)
+        mymergePolicies = ups.getMergePolicies()
+        for el in mymergePolicies:
+            with open(f"{mergePolicyPath / el.get('id','unknown')}.json",'w') as f:
+                json.dump(el,f,indent=2)
     ## audiences
-    mysegmentation = segmentation.Segmentation(config=sandbox)
-    try:
-        audiences = mysegmentation.getAudiences()
-    except Exception as e:
-        audiences = mysegmentation.getSegments()
-    for el in audiences:
-        safe_name = __titleSafe__(el.get('name','unknown'))
-        if len(el.get('tags',[])) > 0:
-            tag_names = [dict_id_name.get(tag_id) for tag_id in el.get('tags',[])]
-            el['tags'] = tag_names
-        with open(f"{audiencePath / safe_name}.json",'w') as f:
-            json.dump(el,f,indent=2)
+    if len(artifactTypes) == 0 or "audience" in artifactTypes:
+        mysegmentation = segmentation.Segmentation(config=sandbox)
+        try:
+            audiences = mysegmentation.getAudiences()
+        except Exception as e:
+            audiences = mysegmentation.getSegments()
+        if filters is not None and len(filters) > 0:
+            audiences = [audience for audience in audiences if any(fil.lower() in audience.get('name','').lower() for fil in filters)]
+        for el in audiences:
+            safe_name = __titleSafe__(el.get('name','unknown'))
+            if len(el.get('tags',[])) > 0:
+                tag_names = [dict_id_name.get(tag_id) for tag_id in el.get('tags',[])]
+                el['tags'] = tag_names
+            with open(f"{audiencePath / safe_name}.json",'w') as f:
+                json.dump(el,f,indent=2)
 
 def extractSandboxArtifact(
     sandbox: 'ConnectObject' = None,
@@ -568,10 +588,11 @@ def __extractSchema__(schemaEl: str,folder: Union[str, Path] = None,sandbox: 'Co
             if descriptor.get('@type','') == 'xdm:descriptorIdentity':
                 namespace = descriptor['xdm:namespace']
                 __extractIdentity__(namespace,folder,sandbox,retry)
-            if descriptor.get('@type','') == 'xdm:descriptorRelationship' or descriptor.get('@type','') == 'xdm:descriptorOneToOne':
+            if descriptor.get('xdm:destinationSchema') is not None:
                 targetSchema = descriptor['xdm:destinationSchema']
                 if targetSchema not in _visited:
                     __extractSchema__(targetSchema,folder,sandbox,retry,_visited)
+            
 
 
 def __extractIdentity__(identityStr: str,folder: Union[str, Path] = None,sandbox: 'ConnectObject' = None,retry: int = 2):
