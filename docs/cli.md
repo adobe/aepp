@@ -13,6 +13,7 @@ The AEPP Command Line Interface (CLI) is a powerful tool that allows developers 
   - [Dataset Methods](#dataset-methods)
   - [Audience Methods](#audience-methods)
   - [Flow Service](#flow-service)
+  - [Deletion Methods](#deletion-methods)
   - [Identities methods](#identities-methods)
   - [Query Service Methods](#query-service-methods)
   - [Tools & Migration](#tools--migration)
@@ -95,6 +96,8 @@ Parameters:
 Switch the active sandbox session after initial configuration.\
 Arguments:
 * `sandbox` : The name of the sandbox to switch to.
+
+The command first tries to validate the sandbox name against the list returned by the Sandboxes API. If that API is not accessible with your current credentials (e.g. your service account lacks the "Manage Sandboxes" permission), a yellow warning is shown and the switch proceeds unvalidated instead of being blocked.
 
 #### get_sandboxes
 List all sandboxes available in the current organization.
@@ -268,6 +271,17 @@ Arguments:
 #### get_snapshot_datasets
 Get the list of snapshot datasets in the current sandbox.\
 
+#### get_dataset_expiration
+Get the TTL (Time To Live) / `rowExpiration` setting for a dataset. ONLY WORKS ON Experience Event Datasets.\
+Arguments:
+* `dataset` : The Dataset ID or Name.
+
+#### set_dataset_expiration
+Set the TTL (Time To Live) / `rowExpiration` setting for a dataset. ONLY WORKS ON Experience Event Datasets.\
+Arguments:
+* `dataset` : The Dataset ID or Name.
+* `-t`, `--ttl` : TTL value in days.
+
 #### createDataset
 Create a new dataset.\
 Arguments:
@@ -383,6 +397,56 @@ Arguments:
 * `-mn`, `--minutes` : Lookback window in minutes.
 * `-H`, `--hours` : Lookback window in hours.
 * `-d`, `--days` : Lookback window in days (default: 0).
+
+### Deletion Methods
+
+These commands wrap the [`deletion`](./deletion.md) module to let you remove artifacts directly from the sandbox you are connected to.\
+Every command resolves the artifact by name or ID, prints a warning panel describing exactly what will be impacted (and, when `--associated_artifacts` is used, a `Summary` line totaling every artifact that will be deleted across the full cascade), and requires you to type the artifact's name back to confirm before anything is deleted. Pass `-y true` to skip the confirmation prompt (useful for scripting).\
+**These operations are irreversible.**
+
+#### delete_dataset
+Delete a dataset from the current sandbox.\
+Arguments:
+* `dataset` : Dataset name or ID to delete.
+* `-a`, `--associated_artifacts` : Boolean. Also delete the associated dataflows and schema (which itself cascades to that schema's field groups and data types). Default False.
+* `-y`, `--yes` : Boolean. Skip the confirmation prompt. Default False.
+
+#### delete_schema
+Delete a schema from the current sandbox.\
+Arguments:
+* `schema` : Schema title, `$id`, or `alt:Id` to delete.
+* `-a`, `--associated_artifacts` : Boolean. Also delete the field groups and data types used by this schema. Default False.
+* `-y`, `--yes` : Boolean. Skip the confirmation prompt. Default False.
+
+#### delete_dataflow
+Delete a dataflow from the current sandbox.\
+Arguments:
+* `flow` : Dataflow name or ID to delete.
+* `-a`, `--associated_artifacts` : Boolean. Also delete the associated source and target connections. Default False.
+* `-y`, `--yes` : Boolean. Skip the confirmation prompt. Default False.
+
+#### delete_audience
+Delete an audience/segment from the current sandbox.\
+If the audience is activated to any destination, it is first removed from those destination flows (shown in an "Impacted Destination Flows" table) before being deleted.\
+Arguments:
+* `audience` : Audience name or ID to delete.
+* `-w`, `--waittime` : Seconds to wait for destination flow updates to propagate before deleting. Default 30.
+* `-y`, `--yes` : Boolean. Skip the confirmation prompt. Default False.
+
+Example:
+```bash
+# Delete a dataset only (leave its schema and dataflows untouched)
+delete_dataset "my_dataset_name"
+
+# Delete a dataset and cascade to its dataflows and schema
+delete_dataset "my_dataset_name" -a true
+
+# Delete a schema and its field groups/data types without being prompted
+delete_schema "_tenant.schemas.abc123" -a true -y true
+
+# Non-interactive mode
+python -m aepp.cli -cf config_api.json -sx dev -cmd "delete_audience \"my_audience_name\" -y true"
+```
 
 ### Identities Methods
 

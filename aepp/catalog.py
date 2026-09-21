@@ -584,6 +584,20 @@ class Catalog:
             data['datasetId'] = datasetId
         return data
 
+    def getDataSetExpiration(self,datasetId:str = None) -> dict:
+        """
+        Return the expiration information of a dataset.
+        Arguments:
+            datasetId : REQUIRED : Id of the dataset for which the expiration information should be retrieved.
+        """
+        if datasetId is None:
+            raise Exception("Expected a datasetId argument")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getDataSetExpiration for : {datasetId}")
+        path = f"/ttl/{datasetId}"
+        res = self.connector.getData(self.endpoint+path, headers=self.header)
+        return res
+
     def deleteDataSet(self, datasetId: str = None) -> None:
         """
         Delete a dataset by its id.
@@ -764,6 +778,16 @@ class Catalog:
             datasetId : REQUIRED : Dataset ID to be patched
             data : REQUIRED : The patch operation to be performed on the dataset.
                 see reference here: https://developer.adobe.com/experience-platform-apis/references/catalog/#operation/patchDataSetV2
+            
+                Example: 
+                {
+                "extensions": {
+                    "adobe_lakeHouse": {
+                        "rowExpiration": {
+                            "ttlValue": "P3M"  // A 3 month retention period
+                        }
+                    }
+                }
         """
         if datasetId is None:
             raise ValueError("Require a datasetId")
@@ -773,6 +797,32 @@ class Catalog:
         if self.loggingEnabled:
             self.logger.debug(f"Starting patchDataSetV2 for datasetId: {datasetId}")
         res = self.connector.patchData(self.endpoint+path, data=data)
+        return res
+
+    def setDatasetTTL(self,datasetId:str=None,ttlValue:str=None)->dict:
+        """
+        Set the TTL (Time To Live) for the dataset.
+        Arguments:
+            datasetId : REQUIRED : Dataset ID for which the TTL is to be set
+            ttlValue : REQUIRED : The TTL value to be set (e.g., "P3M" for 3 months, "P1Y" for 1 year,  "P30D" for 30 days (minimum))
+        """
+        if datasetId is None:
+            raise ValueError("Require a datasetId")
+        if ttlValue is None:
+            raise ValueError("Require a ttlValue")
+        path = f"/v2/dataSets/{datasetId}"
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting setDatasetTTL for datasetId: {datasetId}")
+        data = {
+                "extensions": {
+                    "adobe_lakeHouse": {
+                        "rowExpiration": {
+                            "ttlValue": ttlValue
+                        }
+                    }
+                }
+            }
+        res = self.patchDatasetV2(datasetId=datasetId, data=data)
         return res
     
     def putDataset(self,datasetId:str=None,data:dict=None)->dict:

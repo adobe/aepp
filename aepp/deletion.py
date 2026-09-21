@@ -143,7 +143,7 @@ class Deletion:
                     res_dt = sch.deleteDataType(datatypeId=datatypeId)
                     result['datatypes'][datatypeId] = res_dt
                 res_fg = sch.deleteFieldGroup(fieldGroupId=fieldgroupId)
-                result['fieldGroupName'][fieldgroupId] = res_fg
+                result['fieldGroup'][fieldgroupId] = res_fg
         return result
     
     def deleteDataFlow(self,flowId: str,associatedArtifacts:bool=False) -> dict:

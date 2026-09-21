@@ -6,6 +6,8 @@ This module is NOT an existing module in Adobe Experience Platform.\
 It has been created as many customers do not know how to delete artifacts in Adobe Experience Platform. Also, it covers the deletion of dependencies if you want to delete more than the artifacts.\
 Example: Deleting the Schema may not be enough, but you would like to also delete all the associated Field Groups and Data Types associated.  
 
+**CLI**: These methods are also available as interactive `delete_dataset`, `delete_schema`, `delete_dataflow` and `delete_audience` commands in the [CLI](./cli.md#deletion-methods), with a warning panel and a confirmation step in front of them.
+
 ## Menu
 - [Deletion module in aepp](#deletion-module-in-aepp)
   - [Menu](#menu)

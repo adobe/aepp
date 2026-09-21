@@ -1,6 +1,6 @@
 # Knowledge Graph aepp
 
-The `knowledgegraph` module builds an [RDF](https://www.w3.org/RDF/) knowledge graph of the artefacts living in a single AEP sandbox (classes, schemas, field groups, data types, datasets, identities, ingestion flows, audiences) and the relationships between them (implements, contains, linked identity, relationship/lookup, used in audience, ...).
+The `knowledgegraph` module builds an [RDF](https://www.w3.org/RDF/) knowledge graph of the artefacts living in a single AEP sandbox (classes, schemas, field groups, data types, datasets, identities, ingestion flows, merge policies, audiences) and the relationships between them (implements, contains, linked identity, relationship/lookup, used in audience, ...).
 
 It crawls the other `aepp` modules ([schema](./schema.md), [catalog](./catalog.md), [customerprofile](./customerprofile.md), [identity](./identity.md), [segmentation](./segmentation.md), [flowservice](./flowservice.md)) and turns the discovered artefacts into a set of RDF triples using [rdflib](https://rdflib.readthedocs.io/). The triple store can then be serialized to Turtle, or rendered as an interactive or static diagram.
 
@@ -22,6 +22,7 @@ It crawls the other `aepp` modules ([schema](./schema.md), [catalog](./catalog.m
     - [addDatasetAttributes](#adddatasetattributes)
     - [loadGraph](#loadgraph)
     - [exportTurtle](#exportturtle)
+    - [query](#query)
     - [exportInteractiveDiagram](#exportinteractivediagram)
     - [exportNodeDiagram](#exportnodediagram)
   - [Full example](#full-example)
@@ -49,7 +50,7 @@ mySandbox = aepp.importConfigFile('myconfig.json',sandbox='mysandbox',connectIns
 myGraph = knowledgegraph.KnowledgeGraph(config=mySandbox)
 ```
 
-During instantiation, the class instantiates its own copy of the `Schema`, `Catalog`, `Profile`, `FlowService`, `Identity` and `Segmentation` classes (`schemaAPI`, `catalogAPI`, `customerProfileAPI`, `flowServiceAPI`, `identityAPI`, `segmentationAPI` attributes) so no additional instantiation is required before calling `buildKnowledgeGraph`.
+During instantiation, the class instantiates its own copy of the `Schema`, `Catalog`, `Profile`, `FlowService`, `Identity` and `Segmentation` classes (`schemaAPI`, `catalogAPI`, `customerProfileAPI`, `flowServiceAPI`, `identityAPI`, `segmentationAPI` attributes) so no additional instantiation is required before calling `buildGraph`.
 
 ## Knowledge Graph attributes
 
@@ -57,13 +58,13 @@ Once instantiated, the `KnowledgeGraph` object exposes the following attributes:
 
 * sandbox : name of the sandbox being graphed.
 * config : the `ConnectObject` (or dict) used to connect to the sandbox.
-* triples : list kept for reference (the actual triples live inside the `rdflib.Graph` returned by `buildKnowledgeGraph`).
+* triples : list kept for reference (the actual triples live inside the `rdflib.Graph` returned by `buildGraph`).
 * schemaAPI, catalogAPI, customerProfileAPI, flowServiceAPI, identityAPI, segmentationAPI : the underlying module instances used to crawl the sandbox.
 * tenant : tenant ID of the sandbox, as returned by `schemaAPI.getTenantId()`.
 * tenantNamespace : `rdflib.Namespace` built from the tenant ID.
 * tenantGlobal : `rdflib.Namespace("Adobe")`, used for OOTB (global) artefacts.
 * SANDBOX, SCHEMA, CATALOG, IDENTITY, PROFILE, FLOWS, AUDIENCES : the `rdflib.Namespace` instances used to mint node URIs for each artefact family. See [Namespaces](#namespaces).
-* global_graph : the last `rdflib.Graph` produced by `buildKnowledgeGraph()` (`None` until built or loaded).
+* global_graph : the last `rdflib.Graph` produced by `buildGraph()` (`None` until built or loaded).
 * schema_graph : the last `rdflib.Graph` produced by `buildSchemaRelationships()` (`None` until built or loaded).
 * ARTEFACT_TYPES : class attribute listing the artefact types the class knows how to crawl: `schema`, `class`, `fieldgroup`, `datatype`, `dataset`, `identity`, `audience`, `mergePolicy`.
 
@@ -71,7 +72,7 @@ Once instantiated, the `KnowledgeGraph` object exposes the following attributes:
 
 ### buildGraph
 
-Crawls the sandbox (classes, schemas, field groups, data types, datasets, ingestion flows, identities, audiences) and returns the populated `rdflib.Graph`. The result is also cached on `self.global_graph`.\
+Crawls the sandbox (classes, schemas, field groups, data types, datasets, ingestion flows, identities, merge policies, audiences) and returns the populated `rdflib.Graph`. The result is also cached on `self.global_graph`.\
 Arguments:
 * hasData : OPTIONAL : if True, retrieves information based on datasets that contains data. Default `True`.
 * detail : OPTIONAL : if True, adds row-level information for each schema (field paths, `xdmType`, identity field, primary key, description, ...). Default `True`.
@@ -88,7 +89,7 @@ myGraph.buildGraph(enabled=True, detail=True)
 
 A lighter version of `buildGraph` restricted to the XDM artefacts (class, schema, field group, data type). It skips datasets, identities, ingestion flows and audiences. The result is cached on `self.schema_graph`.\
 Arguments:
-* detail : OPTIONAL : if True, adds row-level field path information, same as `buildKnowledgeGraph`. Default False.
+* detail : OPTIONAL : if True, adds row-level field path information, same as `buildGraph`. Default False.
 
 ```python
 myGraph.buildSchemaRelationships(detail=True)
@@ -103,7 +104,7 @@ Arguments:
 * graph : OPTIONAL : the graph to mutate. Defaults to `self.global_graph`, then `self.schema_graph`.
 
 ```python
-myGraph.buildKnowledgeGraph(detail=True)
+myGraph.buildGraph(detail=True)
 
 myGraph.addPathAttributes(
     "person.name.firstName",
@@ -113,14 +114,14 @@ myGraph.addPathAttributes(
 
 ### addSchemaAttributes
 
-Attaches custom attributes to an existing schema node. The schema node must already exist in the graph (created when `buildKnowledgeGraph` or `buildSchemaRelationships` was run).\
+Attaches custom attributes to an existing schema node. The schema node must already exist in the graph (created when `buildGraph` or `buildSchemaRelationships` was run).\
 Arguments:
 * schemaId : REQUIRED : the XDM schema `$id` or altId.
 * attributes : REQUIRED : a dictionary of `{predicate: value}` added as literal triples on that schema node.
 * graph : OPTIONAL : the graph to mutate. Defaults to `self.global_graph`, then `self.schema_graph`.
 
 ```python
-myGraph.buildKnowledgeGraph()
+myGraph.buildGraph()
 
 myGraph.addSchemaAttributes(
     "https://ns.adobe.com/mytenant/schemas/loyaltymembers",
@@ -130,14 +131,14 @@ myGraph.addSchemaAttributes(
 
 ### addDatasetAttributes
 
-Attaches custom attributes to an existing dataset node. The dataset node must already exist in the graph (created when `buildKnowledgeGraph` or `buildSchemaRelationships` was run).\
+Attaches custom attributes to an existing dataset node. The dataset node must already exist in the graph (created when `buildGraph` or `buildSchemaRelationships` was run).\
 Arguments:
 * datasetId : REQUIRED : the dataset ID (from the catalog).
 * attributes : REQUIRED : a dictionary of `{predicate: value}` added as literal triples on that dataset node.
 * graph : OPTIONAL : the graph to mutate. Defaults to `self.global_graph`, then `self.schema_graph`.
 
 ```python
-myGraph.buildKnowledgeGraph()
+myGraph.buildGraph()
 
 myGraph.addDatasetAttributes(
     "5f7a1b2c3d4e5f6a7b8c9d0e",
@@ -165,8 +166,31 @@ Arguments:
 * graph : OPTIONAL : the graph to export. Defaults to `self.global_graph`, then `self.schema_graph`.
 
 ```python
-myGraph.buildKnowledgeGraph()
+myGraph.buildGraph()
 myGraph.exportTurtle("mysandbox.ttl")
+```
+
+### query
+
+Runs a SPARQL query against the graph and returns the results as a `list` of plain Python `dict` (one per result row, values converted with `.toPython()`) instead of raw `rdflib` `Result` rows - easier to load straight into a `pandas.DataFrame`.\
+Arguments:
+* sparql_string : REQUIRED : the SPARQL query to execute.
+* graph : OPTIONAL : the graph to query. Defaults to `self.global_graph`, then `self.schema_graph`.
+
+```python
+myGraph.buildGraph()
+
+rows = myGraph.query(f"""
+    PREFIX schema: <{myGraph.SCHEMA}>
+    SELECT ?schema ?label WHERE {{
+        ?schema a schema:schema .
+        ?schema rdfs:label ?label .
+    }}
+    LIMIT 10
+""")
+
+import pandas as pd
+df = pd.DataFrame(rows)
 ```
 
 ### exportInteractiveDiagram
@@ -178,7 +202,7 @@ Arguments:
 * simplified : OPTIONAL : if True, only class, schema, dataset and identity nodes are shown, with human-readable labels instead of URI fragments. Default False.
 
 ```python
-myGraph.buildKnowledgeGraph(detail=True)
+myGraph.buildGraph(detail=True)
 myGraph.exportInteractiveDiagram("mysandbox.html", simplified=True)
 ```
 
@@ -193,7 +217,7 @@ Arguments:
   PNG/SVG require `pip install graphviz` and the [Graphviz binaries](https://graphviz.org/download/) installed on your machine.
 
 ```python
-myGraph.buildKnowledgeGraph(detail=True)
+myGraph.buildGraph(detail=True)
 
 ## interactive neighbourhood of a schema, matched by (partial) label
 myGraph.exportNodeDiagram("Loyalty Members", "loyalty-members.html")
@@ -219,6 +243,17 @@ myGraph.buildGraph(enabled=True, detail=True)
 
 ## persist the graph so it can be reloaded later without re-crawling the sandbox
 myGraph.exportTurtle("mysandbox.ttl")
+
+## query it - e.g. every schema and its label
+rows = myGraph.query(f"""
+    PREFIX schema: <{myGraph.SCHEMA}>
+    SELECT ?schema ?label WHERE {{
+        ?schema a schema:schema .
+        ?schema rdfs:label ?label .
+    }}
+""")
+for row in rows:
+    print(row['schema'], row['label'])
 
 ## full interactive diagram, simplified to the main artefact types
 myGraph.exportInteractiveDiagram("mysandbox-overview.html", simplified=True)
@@ -266,6 +301,7 @@ Nodes are typed with `rdf:type` (`RDF.type`) using the following values:
 | `Flows.IngestionFlow` | an ingestion flow (source connector) |
 | `Flows.DestinationFlow` | a destination flow |
 | `Audiences.audience` | an audience  |
+| `Profile.MergePolicy` | a merge policy |
 
 Identity namespace nodes (under `IDENTITY`) and audience nodes (under `AUDIENCES`) are not typed with `rdf:type`; they are recognized by the predicates that point to them (`IDENTITY.linked`, `AUDIENCES.contains`).
 
@@ -277,8 +313,9 @@ The most relevant predicates used across the graph:
 | -- | -- |
 | `RDF.type` | node type  (could be IdentityNamespace, class, schema, fieldgroup, datatype, path, DCAT.Dataset, Ingestion Flow, audience )|
 | `RDFS.label` | human-readable title of a node |
-| `DCTERMS.title` | dataset title |
+| `DCTERMS.title` | dataset / merge policy title |
 | `SANDBOX.contains` | sandbox contains a top-level family (schema, catalog, flows, audiences, profile, identity) or a dataset/flow |
+| `PROFILE.contains` | the Profile Node contains the `UPS`/`UIS` sub-containers, the `MERGE_POLICIES` sub-container, and any dataset enabled for Profile/Identity |
 | `XDM.contains` | The Schema Node contains classes, a schema contains a field path (`detail=True`) |
 | `XDM.implements` | a schema implements a class and Field Groups, a dataset implements a schema |
 | `XDM.relationship` | a schema (or field path) has a lookup/relationship to another schema, or to an identity namespace |
@@ -298,6 +335,10 @@ The most relevant predicates used across the graph:
 | `PROFILE.participates`| a dataset can participates in `UPS` or `UIS` |
 | `PROFILE.counts` | number of profiles in a dataset |
 | `PROFILE.linked` | a dataset is linked to the Profile Node if it has been enabled |
+| `PROFILE.schema` | the XDM schema name a merge policy applies to |
+| `PROFILE.activeOnEdge` | whether a merge policy is the one currently active on edge (boolean) |
+| `PROFILE.default` | whether a merge policy is the sandbox's default merge policy (boolean) |
+| `PROFILE.policyType` | the attribute-merge strategy of a merge policy, e.g. `timestampOrdered`, `dataSetPrecedence` |
 | `FLOWS.frequency` | frequency of a flow, either STREAMING or BATCH |
 | `FLOWS.loads` | a flow loads data into a dataset |
 | `FLOWS.usedIn` | a field path or an audience is used in a flow (`detail=True`) |
@@ -306,7 +347,11 @@ The most relevant predicates used across the graph:
 | `FLOWS.mandatoryAttributes` | The list of mandatory attributes for a destination flow (`detail=True`) |
 | `FLOWS.primaryAttributes` | The list of primary attributes for a destination flow (`detail=True`) |
 | `AUDIENCES.contains`| audience containment of different audiences IDs |
+| `AUDIENCES.description` | the audience's description |
+| `AUDIENCES.lifecycleState` | the audience's lifecycle state (e.g. `PUBLISHED`, `DRAFT`) |
 | `AUDIENCES.evaluation` | evaluation methods for the audience, either `BATCH`, `STREAMING`, `EDGE` |
+| `AUDIENCES.totalProfiles` | number of profiles currently qualified for the audience, when available in its metrics |
+| `AUDIENCES.mergePolicy` | links an audience to the `Profile.MergePolicy` node used to evaluate it |
 | `AUDIENCES.usedIn` | a field path is used by an audience definition (`detail=True`) |
 | `AUDIENCES.behavior` | a field path is used by an audience definition (`detail=True`) and the behavior type, either `Profile-based`, `Event-based` or `Relationship-based` |
 
@@ -325,6 +370,11 @@ graph TD
     Identity -->|contains| Namespace
     Profile --> |contains| UPS
     Profile --> |contains| UIS
+    Profile --> |contains| MergePolicyId
+    MergePolicyId -->|schema| Schema
+    MergePolicyId -->|activeOnEdge| True
+    MergePolicyId -->|default| True
+    MergePolicyId -->|policyType| timestampOrdered
     XDM --> Class
     Schema -->|implements| Class
     Schema --> Path["Path (field path)"]
@@ -362,6 +412,7 @@ graph TD
     AudienceId --> |evaluation| Batch
     AudienceId --> |evaluation| Streaming
     AudienceId --> |evaluation| Edge
+    AudienceId --> |mergePolicy| MergePolicyId
     AudienceId --> |usedIn| FlowId
     
 ```

@@ -181,6 +181,7 @@ class KnowledgeGraph:
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, PROFILE_NODE))
         graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.UPS))
         graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.UIS))
+        graph.add((PROFILE_NODE, self.PROFILE.contains, self.PROFILE.MERGE_POLICIES))
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, IDENTITY_NODE))
         graph.add((SANDBOX_NODE, RDFS.label, Literal(self.sandbox)))
         for element in self.__namespace_preview__:
@@ -268,9 +269,19 @@ class KnowledgeGraph:
                                 graph.add((self.SCHEMA[sourceProperty.replace('/','.').replace('[*]','')[1:]],self.SCHEMA.relationship, self.SCHEMA.implementation))
                             sourceProperty = sourceProperty[0]
                             graph.add((self.SCHEMA[sourceProperty],self.SCHEMA.relationship, Literal("descriptorPrimaryKey")))
-        if kwargs.get('verbose',False) == True:
-            print(f"  --Datasets")
         if kwargs.get('only_schema',False) == False:
+            if kwargs.get('verbose',False) == True:
+                print(f"  --Merge Policies")
+            mergePolicies = self.customerProfileAPI.getMergePolicies()
+            for mergePolicy in mergePolicies:
+                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], RDF.type, self.PROFILE.MergePolicy))
+                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], DCTERMS.title, Literal(mergePolicy.get('name'))))
+                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.schema, Literal(mergePolicy.get('schema',{}).get('name'),datatype=XSD.string)))
+                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.activeOnEdge, Literal(mergePolicy.get('isActiveOnEdge',False),datatype=XSD.boolean)))
+                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.default, Literal(mergePolicy.get('default',False),datatype=XSD.boolean)))
+                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.policyType, Literal(mergePolicy.get('attributeMerge',{}).get('type','unknown'),datatype=XSD.string)))
+            if kwargs.get('verbose',False) == True:
+                print(f"  --Datasets")
             for index, row in df_datasets.iterrows():
                 graph.add((CATALOG_NODE, self.CATALOG.contains, self.CATALOG[row['id']]))
                 graph.add((self.CATALOG[row['id']], RDF.type, DCAT.Dataset))
@@ -302,6 +313,8 @@ class KnowledgeGraph:
             for audience in audiences:
                 graph.add((AUDIENCES_NODE, self.AUDIENCES.contains, self.AUDIENCES[audience['id']]))
                 graph.add((self.AUDIENCES[audience['id']], RDFS.label, Literal(audience.get('name'))))
+                graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.description, Literal(audience.get('description'))))
+                graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.lifecycleState, Literal(audience.get('lifecycleState'))))
                 graph.add((self.AUDIENCES[audience['id']], RDF.type, self.AUDIENCES.audience))
                 evaluationInfo = audience.get('evaluationInfo',{})
                 if evaluationInfo.get('batch',{}).get('enabled',False):
@@ -310,6 +323,10 @@ class KnowledgeGraph:
                     graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.evaluation, Literal("STREAMING")))
                 if evaluationInfo.get('synchronous',{}).get('enabled',False):
                     graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.evaluation, Literal("EDGE")))
+                if audience.get('metrics',{}).get('data',None) is not None:
+                    graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.totalProfiles, Literal(audience.get('metrics',{}).get('data',{}).get('totalProfiles',0),datatype=XSD.integer)))
+                if audience.get('mergePolicyId',None) is not None:
+                    graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.mergePolicy, self.PROFILE.MERGE_POLICIES[audience.get('mergePolicyId')]))
                 paths = self.segmentationAPI.extractPaths(audience)
                 if paths is not None:
                     for path in paths:
@@ -401,13 +418,13 @@ class KnowledgeGraph:
         Build relationships between schemas and their XDM artefacts (class, fieldgroup, datatype).
         Does not include datasets, identities, audiences, or merge policies.
         """
-        self.schema_graph = self.buildKnowledgeGraph(detail=detail, only_schema=True)
+        self.schema_graph = self.buildGraph(detail=detail, only_schema=True)
         return self.schema_graph
 
     def addPathAttributes(self, path: str, attributes: dict, graph: Graph = None) -> Graph:
         """
         Attach custom attributes to an existing schema path node.
-        The path node must already exist in the graph (created when buildKnowledgeGraph
+        The path node must already exist in the graph (created when buildGraph
         or buildSchemaRelationships was run with detail=True).
         Arguments:
             path       : REQUIRED : the XDM field path (dot notation, e.g. "person.name.firstName").
@@ -417,7 +434,7 @@ class KnowledgeGraph:
         """
         g = graph or self.global_graph or self.schema_graph
         if g is None:
-            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
         node = self.SCHEMA[path.replace('{}', '').replace('[]', '')]
         if (node, self.SCHEMA.path, None) not in g:
             raise ValueError(f"Path '{path}' not found in the schema graph. Build the graph with detail=True first.")
@@ -428,7 +445,7 @@ class KnowledgeGraph:
     def addSchemaAttributes(self, schemaId: str, attributes: dict, graph: Graph = None) -> Graph:
         """
         Attach custom attributes to an existing schema node.
-        The schema node must already exist in the graph (created when buildKnowledgeGraph
+        The schema node must already exist in the graph (created when buildGraph
         or buildSchemaRelationships was run).
         Arguments:
             schemaId  : REQUIRED : the XDM schema $id or altId.
@@ -438,7 +455,7 @@ class KnowledgeGraph:
         """
         g = graph or self.global_graph or self.schema_graph
         if g is None:
-            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
         node = URIRef(schemaId)
         if (node, RDF.type, self.SCHEMA.schema) not in g:
             raise ValueError(f"Schema '{schemaId}' not found in the graph. Build the graph first.")
@@ -449,7 +466,7 @@ class KnowledgeGraph:
     def addDatasetAttributes(self, datasetId: str, attributes: dict, graph: Graph = None) -> Graph:
         """
         Attach custom attributes to an existing dataset node.
-        The dataset node must already exist in the graph (created when buildKnowledgeGraph
+        The dataset node must already exist in the graph (created when buildGraph
         or buildSchemaRelationships was run).
         Arguments:
             datasetId  : REQUIRED : the dataset ID (from the catalog).
@@ -459,7 +476,7 @@ class KnowledgeGraph:
         """
         g = graph or self.global_graph or self.schema_graph
         if g is None:
-            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
         node = self.CATALOG[datasetId]
         if (node, RDF.type, DCAT.Dataset ) not in g:
             raise ValueError(f"Dataset '{datasetId}' not found in the graph. Build the graph first.")
@@ -631,11 +648,29 @@ class KnowledgeGraph:
         """
         g = graph or self.global_graph or self.schema_graph
         if g is None:
-            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
         turtle = g.serialize(format="turtle")
         if path is not None:
             Path(path).write_text(turtle, encoding="utf-8")
         return None
+
+    def query(self, sparql_string: str, graph: Graph = None) -> list:
+        """
+        Run a SPARQL query against the knowledge graph and return the results as a
+        list of dictionaries (one per row, values converted with .toPython()) instead
+        of raw rdflib Result rows - easier to load straight into a pandas.DataFrame.
+        Arguments:
+            sparql_string : REQUIRED : the SPARQL query to execute.
+            graph         : OPTIONAL : graph to query. Defaults to self.global_graph, then self.schema_graph.
+        """
+        g = graph or self.global_graph or self.schema_graph
+        if g is None:
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
+        results = g.query(sparql_string)
+        return [
+            {str(var): (row[var].toPython() if row[var] is not None else None) for var in results.vars}
+            for row in results
+        ]
 
     def exportInteractiveDiagram(self, path: Union[str, Path], graph: Graph = None, simplified: bool = False) -> None:
         """
@@ -657,7 +692,7 @@ class KnowledgeGraph:
             )
         g = graph or self.global_graph or self.schema_graph
         if g is None:
-            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
 
         nodes, edges = self._build_display_data(g, simplified)
 
@@ -739,7 +774,7 @@ class KnowledgeGraph:
         """
         g = graph or self.global_graph or self.schema_graph
         if g is None:
-            raise RuntimeError("No graph built. Call buildKnowledgeGraph() or buildSchemaRelationships() first.")
+            raise RuntimeError("No graph built. Call buildGraph() or buildSchemaRelationships() first.")
 
         all_nodes, all_edges = self._build_display_data(g, simplified=False)
 

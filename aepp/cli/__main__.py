@@ -1,5 +1,5 @@
 import aepp
-from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation, customerprofile, knowledgegraph
+from aepp import synchronizer, schema, schemamanager, fieldgroupmanager, datatypemanager, identity, queryservice,catalog,flowservice,sandboxes, segmentation, customerprofile, knowledgegraph, deletion
 from aepp.cli.upsfieldsanalyzer import UpsFieldsAnalyzer
 import argparse, cmd, shlex, json
 from functools import wraps
@@ -97,6 +97,21 @@ class ServiceShell(cmd.Cmd):
             self.prompt = f"{self.config.sandbox}> "
             console.print(Panel(f"Connected to [bold green]{self.sandbox}[/bold green]", style="blue"))
 
+    def _confirm_destructive(self, action:str, target_name:str, warning_lines:list, skip_confirm:bool) -> bool:
+        """
+        Print a warning panel describing the implications of a destructive action and require the
+        user to type the target's name back to confirm. Returns True if the action should proceed.
+        """
+        body = "\n".join(f"- {line}" for line in warning_lines)
+        console.print(Panel(body, title=f"[bold red]WARNING: about to {action} '{target_name}' in sandbox '{self.config.sandbox}'[/bold red]", border_style="red"))
+        if skip_confirm:
+            return True
+        answer = console.input(f"Type the name [bold]{target_name}[/bold] to confirm, or anything else to cancel: ")
+        if answer.strip() != target_name:
+            console.print("Cancelled. No changes were made.", style="yellow")
+            return False
+        return True
+
     def do_create_config_file(self, arg:Any) -> None:
         """Create a configuration file for storing your AEP API connection details."""
 
@@ -160,6 +175,7 @@ class ServiceShell(cmd.Cmd):
         except SystemExit:
             return
 
+    @login_required
     def do_change_sandbox(self, args:Any) -> None:
         """Change the current sandbox after configuration"""
         parser = argparse.ArgumentParser(prog='change sandbox', add_help=True)
@@ -169,9 +185,14 @@ class ServiceShell(cmd.Cmd):
             if args.sandbox is None:
                  console.print(Panel("(!) Please provide a sandbox name using -sx or --sandbox", style="red"))
                  return
-            config_sandbox = sandboxes.Sandboxes(config=self.config)
-            list_sandboxes = config_sandbox.getSandboxes()
-            if args.sandbox not in [sb.get("name") for sb in list_sandboxes]:
+            try:
+                config_sandbox = sandboxes.Sandboxes(config=self.config)
+                list_sandboxes = config_sandbox.getSandboxes()
+                sandbox_names = [sb.get("name") for sb in list_sandboxes]
+            except Exception as e:
+                console.print(Panel(f"(!) Could not verify sandbox names (the Sandboxes API may not be accessible with your current credentials): {str(e)}\nProceeding without validation.", style="yellow"))
+                sandbox_names = None
+            if sandbox_names is not None and args.sandbox not in sandbox_names:
                 console.print(Panel(f"(!) Sandbox '{args.sandbox}' not found in your org. Please provide a valid sandbox name.", style="red"))
                 return
             if self.config is not None:
@@ -1260,6 +1281,53 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
+
+    @login_required
+    def do_get_dataset_expiration(self, args:Any) -> None:
+        """Get the TTL (Time To Live) for datasets in the current sandbox. ONLY WORKS ON Experience Event Datasets"""
+        parser = argparse.ArgumentParser(prog='get_dataset_expiration', add_help=True)
+        parser.add_argument("dataset", help="Dataset ID or Dataset Name to retrieve TTL for",type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            datasetId = None
+            for ds in datasets:
+                if ds.get("name","") == args.dataset or ds.get("id","") == args.dataset:
+                    datasetId = ds.get("id")
+                    break
+            if not datasetId:
+                raise ValueError(f"Dataset '{args.dataset}' not found")
+            ttl_info = aepp_cat.getDataSetExpiration(datasetId)
+            console.print(ttl_info, style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
+    def do_set_dataset_expiration(self,args:Any)->None:
+        """Set the TTL (Time To Live) for a dataset in the current sandbox. ONLY WORKS ON Experience Event Datasets"""
+        parser = argparse.ArgumentParser(prog='set_dataset_expiration', add_help=True)
+        parser.add_argument("dataset", help="Dataset ID or Dataset Name to set TTL for",type=str)
+        parser.add_argument("-t", "--ttl", help="TTL value in days",type=int)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            datasetId = None
+            for ds in datasets:
+                if ds.get("name","") == args.dataset or ds.get("id","") == args.dataset:
+                    datasetId = ds.get("id")
+                    break
+            if not datasetId:
+                raise ValueError(f"Dataset '{args.dataset}' not found")
+            aepp_cat.getDataSetExpiration(datasetId, args.ttl)
+            console.print(f"TTL for dataset '{args.dataset}' set to {args.ttl} days", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
     
     @login_required
     def do_get_snapshot_datasets(self,args:Any) -> None:
@@ -1474,11 +1542,13 @@ class ServiceShell(cmd.Cmd):
                     segment_shared_dict[segId] = entry
                     continue
                 else:
-                    try:
-                        if datetime.fromisoformat(scheduleEnd) > datetime.fromisoformat(scheduleEnd):
-                            segment_shared_dict[segId] = entry
-                    except ValueError:
-                        pass
+                    existingEnd = existing.get("scheduleEnd")
+                    if existingEnd is not None:
+                        try:
+                            if datetime.fromisoformat(scheduleEnd) > datetime.fromisoformat(existingEnd):
+                                segment_shared_dict[segId] = entry
+                        except ValueError:
+                            pass
             dateNow = datetime.now()
             for aud in audiences:
                 aud['usedInFlow'] = True if segment_shared_dict.get(aud.get("id","N/A"),{}) != {} else False
@@ -1586,7 +1656,7 @@ class ServiceShell(cmd.Cmd):
             audienceIds : list of audience IDs such as "audienceId1" "audienceId2" "audienceId3"
         """
         parser = argparse.ArgumentParser(prog="flexible_audience_evaluation",description='Create a flexible audience evaluation job for the sandbox',add_help=True)
-        parser.add_argument("audience_ids",description="list of audience IDs such as 'audienceId1' 'audienceId2' 'audienceId3'",type=str,nargs="+")
+        parser.add_argument("audience_ids",help="list of audience IDs such as 'audienceId1' 'audienceId2' 'audienceId3'",type=str,nargs="+")
         try:
             from aepp import segmentation
             args = parser.parse_args(shlex.split(args))
@@ -1943,6 +2013,232 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
+    def do_delete_dataset(self, args:Any) -> None:
+        """Delete a dataset from the current sandbox. This is a destructive, irreversible operation - use with caution."""
+        parser = argparse.ArgumentParser(prog='delete_dataset', add_help=True)
+        parser.add_argument("dataset", help="Dataset name or ID to delete")
+        parser.add_argument("-a","--associated_artifacts",help="Boolean. Also delete the associated dataflows and schema. Default False.",type=str2bool,default=False)
+        parser.add_argument("-y","--yes",help="Boolean. Skip the confirmation prompt. Default False.",type=str2bool,default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_cat = catalog.Catalog(config=self.config)
+            datasets = aepp_cat.getDataSets(output='list')
+            dataset = next((ds for ds in datasets if ds.get("name") == args.dataset or ds.get("id") == args.dataset), None)
+            if dataset is None:
+                console.print(f"(!) Dataset '{args.dataset}' not found.", style="red")
+                return
+            datasetId = dataset.get("id")
+            schemaRef = dataset.get('schemaRef',{}).get('id')
+            warnings = [f"Dataset ID: {datasetId}"]
+            if dataset.get("dataIngested"):
+                warnings.append("[bold yellow]This dataset has ingested data - deleting it permanently removes that data.[/bold yellow]")
+            if args.associated_artifacts:
+                aepp_flow = flowservice.FlowService(config=self.config)
+                target_dataflows = aepp_flow.getTargetConnections()
+                source_dataflows = aepp_flow.getSourceConnections()
+                list_target_ids = [fl['id'] for fl in target_dataflows if fl.get('params',{}).get('dataSetId') == datasetId]
+                list_source_datalake = [fl for fl in source_dataflows if fl.get('name') == 'Datalake Source Connection']
+                list_source_ids = [fl['id'] for fl in list_source_datalake if fl.get('params',{}).get('dataSetId') == datasetId]
+                flows = aepp_flow.getFlows()
+                impacted_flows = [f for f in flows if f.get('sourceConnectionIds',[""])[0] in list_source_ids or f.get('targetConnectionIds',[""])[0] in list_target_ids]
+                connection_count = sum(len(f.get('sourceConnectionIds',[])) + len(f.get('targetConnectionIds',[])) for f in impacted_flows)
+                if impacted_flows:
+                    names = ", ".join(f.get('name','N/A') for f in impacted_flows)
+                    warnings.append(f"[bold red]{len(impacted_flows)} dataflow(s) will also be deleted (+ {connection_count} connection(s)):[/bold red] {names}")
+                fg_count, dt_count = 0, 0
+                if schemaRef:
+                    try:
+                        schemaManager = schemamanager.SchemaManager(schemaRef, config=self.config)
+                        fg_count = len(schemaManager.fieldGroups)
+                        dt_ids = set()
+                        for fieldgroupId, fieldgroupName in schemaManager.fieldGroups.items():
+                            myFG = schemaManager.getFieldGroupManager(fieldgroupName)
+                            dt_ids.update(myFG.dataTypes.keys())
+                        dt_count = len(dt_ids)
+                    except Exception:
+                        pass
+                    detail = f" (+ {fg_count} field group(s), {dt_count} data type(s))" if (fg_count or dt_count) else ""
+                    warnings.append(f"[bold red]Associated schema will also be deleted:[/bold red] {schemaRef}{detail}")
+                summary_bits = ["1 dataset"]
+                if impacted_flows:
+                    summary_bits.append(f"{len(impacted_flows)} dataflow(s)")
+                if connection_count:
+                    summary_bits.append(f"{connection_count} connection(s)")
+                if schemaRef:
+                    summary_bits.append("1 schema")
+                if fg_count:
+                    summary_bits.append(f"{fg_count} field group(s)")
+                if dt_count:
+                    summary_bits.append(f"{dt_count} data type(s)")
+                warnings.append(f"[bold red]Summary: this will permanently delete {' + '.join(summary_bits)}.[/bold red]")
+            else:
+                warnings.append("Associated dataflows and schema will be left untouched (pass -a true to cascade).")
+            warnings.append("[bold red]This action is irreversible.[/bold red]")
+            if not self._confirm_destructive("delete dataset", dataset.get('name'), warnings, args.yes):
+                return
+            deleter = deletion.Deletion(config=self.config)
+            res = deleter.deleteDataset(datasetId=datasetId, associatedArtifacts=args.associated_artifacts)
+            console.print_json(data=res)
+            console.print(f"Dataset '{dataset.get('name')}' deletion completed.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
+    def do_delete_schema(self, args:Any) -> None:
+        """Delete a schema from the current sandbox. This is a destructive, irreversible operation - use with caution."""
+        parser = argparse.ArgumentParser(prog='delete_schema', add_help=True)
+        parser.add_argument("schema", help="Schema title, $id or alt:Id to delete")
+        parser.add_argument("-a","--associated_artifacts",help="Boolean. Also delete the field groups and data types used exclusively by this schema. Default False.",type=str2bool,default=False)
+        parser.add_argument("-y","--yes",help="Boolean. Skip the confirmation prompt. Default False.",type=str2bool,default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_schema = schema.Schema(config=self.config)
+            schemas = aepp_schema.getSchemas()
+            if args.schema in aepp_schema.data.schemas_altId.keys():
+                schemaId = aepp_schema.data.schemas_altId[args.schema]
+            else:
+                schemaId = args.schema
+            schema_info = next((sc for sc in schemas if sc.get('$id') == schemaId or sc.get('meta:altId') == schemaId), None)
+            if schema_info is None:
+                console.print(f"(!) Schema '{args.schema}' not found.", style="red")
+                return
+            warnings = [f"Schema ID: {schema_info.get('meta:altId')}"]
+            if args.associated_artifacts:
+                schemaManager = schemamanager.SchemaManager(schemaId, config=self.config)
+                fg_names = list(schemaManager.fieldGroups.values())
+                dt_all_ids = set()
+                if fg_names:
+                    warnings.append(f"[bold red]{len(fg_names)} field group(s) will also be deleted:[/bold red] {', '.join(fg_names)}")
+                    for fieldgroupId, fieldgroupName in schemaManager.fieldGroups.items():
+                        myFG = schemaManager.getFieldGroupManager(fieldgroupName)
+                        dt_names = list(myFG.dataTypes.values())
+                        dt_all_ids.update(myFG.dataTypes.keys())
+                        if dt_names:
+                            warnings.append(f"  [bold red]Data type(s) used by '{fieldgroupName}' that will also be deleted:[/bold red] {', '.join(dt_names)}")
+                summary_bits = ["1 schema"]
+                if fg_names:
+                    summary_bits.append(f"{len(fg_names)} field group(s)")
+                if dt_all_ids:
+                    summary_bits.append(f"{len(dt_all_ids)} data type(s)")
+                warnings.append(f"[bold red]Summary: this will permanently delete {' + '.join(summary_bits)}.[/bold red]")
+            else:
+                warnings.append("Associated field groups and data types will be left untouched (pass -a true to cascade).")
+            warnings.append("[bold yellow]Deletion will fail if the schema is still enabled for Profile/Identity, or referenced by a dataset.[/bold yellow]")
+            warnings.append("[bold red]This action is irreversible.[/bold red]")
+            if not self._confirm_destructive("delete schema", schema_info.get('title'), warnings, args.yes):
+                return
+            deleter = deletion.Deletion(config=self.config)
+            res = deleter.deleteSchema(schemaId=schemaId, associatedArtifacts=args.associated_artifacts)
+            console.print_json(data=res)
+            console.print(f"Schema '{schema_info.get('title')}' deletion completed.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
+    def do_delete_dataflow(self, args:Any) -> None:
+        """Delete a dataflow from the current sandbox. This is a destructive, irreversible operation - use with caution."""
+        parser = argparse.ArgumentParser(prog='delete_dataflow', add_help=True)
+        parser.add_argument("flow", help="Dataflow name or ID to delete")
+        parser.add_argument("-a","--associated_artifacts",help="Boolean. Also delete the associated source and target connections. Default False.",type=str2bool,default=False)
+        parser.add_argument("-y","--yes",help="Boolean. Skip the confirmation prompt. Default False.",type=str2bool,default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_flow = flowservice.FlowService(config=self.config)
+            flows = aepp_flow.getFlows()
+            flow_info = next((f for f in flows if f.get("name") == args.flow or f.get("id") == args.flow), None)
+            if flow_info is None:
+                console.print(f"(!) Dataflow '{args.flow}' not found.", style="red")
+                return
+            flowId = flow_info.get("id")
+            source_ids = flow_info.get('sourceConnectionIds',[])
+            target_ids = flow_info.get('targetConnectionIds',[])
+            warnings = [f"Dataflow ID: {flowId}"]
+            if args.associated_artifacts:
+                if source_ids:
+                    warnings.append(f"[bold red]{len(source_ids)} source connection(s) will also be deleted:[/bold red] {', '.join(source_ids)}")
+                if target_ids:
+                    warnings.append(f"[bold red]{len(target_ids)} target connection(s) will also be deleted:[/bold red] {', '.join(target_ids)}")
+                total_conn = len(source_ids) + len(target_ids)
+                summary_bits = ["1 dataflow"]
+                if total_conn:
+                    summary_bits.append(f"{total_conn} connection(s)")
+                warnings.append(f"[bold red]Summary: this will permanently delete {' + '.join(summary_bits)}.[/bold red]")
+            else:
+                warnings.append("Source and target connections will be left untouched (pass -a true to cascade).")
+            base_conn = flow_info.get('inheritedAttributes',{}).get('sourceConnections',[{}])[0].get('baseConnection',{}).get('id')
+            if base_conn:
+                warnings.append(f"Base connection {base_conn} will [italic]not[/italic] be deleted (it may be shared by other dataflows).")
+            warnings.append("[bold yellow]Any ingestion or activation currently relying on this dataflow will stop immediately.[/bold yellow]")
+            warnings.append("[bold red]This action is irreversible.[/bold red]")
+            if not self._confirm_destructive("delete dataflow", flow_info.get('name'), warnings, args.yes):
+                return
+            deleter = deletion.Deletion(config=self.config)
+            res = deleter.deleteDataFlow(flowId=flowId, associatedArtifacts=args.associated_artifacts)
+            console.print_json(data=res)
+            console.print(f"Dataflow '{flow_info.get('name')}' deletion completed.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
+    def do_delete_audience(self, args:Any) -> None:
+        """Delete an audience/segment from the current sandbox. This is a destructive, irreversible operation - use with caution."""
+        parser = argparse.ArgumentParser(prog='delete_audience', add_help=True)
+        parser.add_argument("audience", help="Audience name or ID to delete")
+        parser.add_argument("-y","--yes",help="Boolean. Skip the confirmation prompt. Default False.",type=str2bool,default=False)
+        parser.add_argument("-w","--waittime",help="Seconds to wait for destination flow updates to propagate before deleting. Default 30.",type=int,default=30)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            seg = segmentation.Segmentation(config=self.config)
+            try:
+                audiences = seg.getAudiences()
+            except Exception:
+                audiences = seg.getSegments()
+            audience = next((aud for aud in audiences if aud.get("id") == args.audience or aud.get("name") == args.audience), None)
+            if audience is None:
+                console.print(f"(!) Audience '{args.audience}' not found.", style="red")
+                return
+            audienceId = audience.get("id")
+            warnings = [f"Audience ID: {audienceId}"]
+            aepp_flow = flowservice.FlowService(config=self.config)
+            destination_flows = aepp_flow.getFlows(onlyDestinations=True)
+            impacted_flows = []
+            for flow in destination_flows:
+                try:
+                    selectors = flow['transformations'][0]['params']['segmentSelectors']['selectors']
+                except (KeyError, IndexError):
+                    continue
+                if audienceId in [s.get('value',{}).get('id') for s in selectors]:
+                    impacted_flows.append({"id": flow.get("id","N/A"), "name": flow.get("name","N/A")})
+            if impacted_flows:
+                console.print(f"(!) Audience '{audience.get('name')}' is activated to the following destination(s). It will be removed from each before deletion:", style="bold red")
+                table = Table(title="Impacted Destination Flows")
+                table.add_column("ID", style="cyan")
+                table.add_column("Name", style="magenta")
+                for f in impacted_flows:
+                    table.add_row(f["id"], f["name"])
+                console.print(table)
+                warnings.append(f"[bold red]{len(impacted_flows)} destination(s) will be updated to remove this audience (see table above).[/bold red]")
+                warnings.append(f"The deletion will wait {args.waittime}s after updating those destinations before removing the audience.")
+            warnings.append("[bold yellow]Any active exports/activations built on this audience will stop receiving updates.[/bold yellow]")
+            warnings.append("[bold red]This action is irreversible.[/bold red]")
+            if not self._confirm_destructive("delete audience", audience.get('name'), warnings, args.yes):
+                return
+            deleter = deletion.Deletion(config=self.config)
+            res = deleter.deleteAudience(audienceId=audienceId, waittime=args.waittime)
+            console.print_json(data=res)
+            console.print(f"Audience '{audience.get('name')}' deletion completed.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
     def do_get_queries(self, args:Any)-> None:
         """List top 1000 queries in the current sandbox for the last 24 hours by default, optionally filtered by dataset ID. Display top 10 in console and export all to a CSV file."""
         parser = argparse.ArgumentParser(prog='get_queries', add_help=True)
@@ -2234,7 +2530,7 @@ class ServiceShell(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='extract_artifacts', description='Extract artifacts from AEP to a local folder',add_help=True)
         parser.add_argument('-lf','--localfolder', help='Local folder to extract artifacts to', default='./extractions')
         parser.add_argument('-f','--filters', help='Name to be used to filter schemas and datasets extraction. It does not impact other artifact types. Multiple filters can be separated by space.', nargs='*', default=None)
-        parser.add_argument('-at','--artifact_type', help="The type of artifact to extract. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy',audience'. If not provided, it will extract all the artifacts", nargs='*', default=None)
+        parser.add_argument('-at','--artifact_types', help="The type of artifact to extract. Possible values are: 'class','schema','fieldgroup','datatype','descriptor','dataset','identity','mergepolicy','audience'. If not provided, it will extract all the artifacts", nargs='*', default=None)
         try:
             console.print("Extracting artifacts...", style="blue")
             args = parser.parse_args(shlex.split(args))
@@ -2242,7 +2538,7 @@ class ServiceShell(cmd.Cmd):
                 sandbox=self.config,
                 localFolder=args.localfolder,
                 filters=args.filters,
-                artifactType=args.artifact_type
+                artifactTypes=args.artifact_types
             )
             console.print(Panel("Extraction completed!", style="green"))
         except SystemExit:
@@ -2282,7 +2578,7 @@ class ServiceShell(cmd.Cmd):
         parser.add_argument('artifact', help='artifact to sync (name or id)')
         parser.add_argument('-at','--artifactType', help='artifact type that has been passed, these type are supported: "schema","fieldgroup","datatype","descriptor","dataset","identity","mergepolicy","audience" ',type=str)
         parser.add_argument('-t','--targets', help='target sandboxes',nargs='+',type=str)
-        parser.add_argument('-lf','--localfolder', help='Local folder(s) to use for sync',default='extractions',nargs='+',type=str)
+        parser.add_argument('-lf','--localfolder', help='Local folder(s) to use for sync (if not using base sandbox)',default=None,nargs='+',type=str)
         parser.add_argument('-b','--baseSandbox', help='Base sandbox for synchronization (if not using local folder)',type=str)
         parser.add_argument('-v','--verbose', help='Enable verbose output (default True)',default=True,type=str2bool)
         parser.add_argument("-f","--force",help="Boolean. force the creation or synchronization of the artefact. (Default False)",default=False,type=str2bool)
@@ -2388,6 +2684,7 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         
+    @login_required
     def do_load_graph(self,args:Any) -> None:
         """Load a graph from a turtle file"""
         parser = argparse.ArgumentParser(prog='load_graph', description='Load a graph from a turtle file',add_help=True)
@@ -2402,6 +2699,7 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
     
+    @login_required
     def do_add_path_attributes(self,args:Any) -> None:
         """Add path attributes to the previously built graph. Attributes are passed as --attributes predicate1=value1 predicate2=value2 ..."""
         parser = argparse.ArgumentParser(prog='add_path_attributes', description='Add path attributes to the previously built graph',add_help=True)
@@ -2425,6 +2723,7 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
 
+    @login_required
     def do_add_schema_attributes(self,args:Any) -> None:
         """Add schema attributes to the previously built graph. Attributes are passed as --attributes predicate1=value1 predicate2=value2 ..."""
         parser = argparse.ArgumentParser(prog='add_schema_attributes', description='Add schema attributes to the previously built graph',add_help=True)
@@ -2448,6 +2747,7 @@ class ServiceShell(cmd.Cmd):
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         
+    @login_required
     def do_add_dataset_attributes(self,args:Any) -> None:
         """Add dataset attributes to the previously built graph. Attributes are passed as --attributes predicate1=value1 predicate2=value2 ..."""
         parser = argparse.ArgumentParser(prog='add_dataset_attributes', description='Add dataset attributes to the previously built graph',add_help=True)
@@ -2512,6 +2812,8 @@ class ServiceShell(cmd.Cmd):
                      "get_observable_schema_json",
                      "get_observable_schema_csv",
                      "get_snapshot_datasets",
+                     "get_dataset_expiration",
+                     "set_dataset_expiration",
                      "createDataset",
                      "enable_dataset",
                      "enable_dataset_for_ups",
@@ -2528,6 +2830,10 @@ class ServiceShell(cmd.Cmd):
                   "get_flow_partial_success",
                   "create_dataset_http_source",
                   "get_DLZ_credential"],
+        "Deletion": ["delete_dataset",
+                     "delete_schema",
+                     "delete_dataflow",
+                     "delete_audience"],
         "Queries": ["get_queries",
                     "query",
                     "query_segment_population"],

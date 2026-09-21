@@ -2,6 +2,21 @@
 
 This page list all of the changes that came during the different release of the aepp module.
 
+## version 0.5.9
+* Adding CLI destructive commands `delete_dataset`, `delete_schema`, `delete_dataflow` and `delete_audience`, wrapping the `deletion` module with an impact-warning panel and a type-to-confirm safeguard before anything is deleted. [documentation](./cli.md#deletion-methods)
+* Fix `Deletion.deleteSchema` returning its field group results under the wrong key (`fieldGroupName` instead of `fieldGroup`).
+* Extending Knowledge Graph `buildGraph` with Merge Policy nodes, linked to their schema and to the audiences that use them (`mergePolicy`, `totalProfiles`).
+* Fix `KnowledgeGraph.buildSchemaRelationships` raising an `AttributeError` by calling the graph builder under its old name (`buildKnowledgeGraph` instead of `buildGraph`).
+* Adding `KnowledgeGraph.query` to run a SPARQL query and get back a list of plain dictionaries (ready for `pandas.DataFrame`) instead of raw `rdflib` result rows. [documentation](./knowledge-graph.md#query)
+* Requiring an active sandbox connection (`login_required`) on the Knowledge Graph CLI commands `load_graph`, `add_path_attributes`, `add_schema_attributes` and `add_dataset_attributes`, which could previously be called before connecting.
+* `change_sandbox` in the CLI now falls back with a warning instead of crashing when the Sandboxes API isn't accessible with the current credentials.
+* Fix `flexible_audience_evaluation` in the CLI raising an error because of an invalid `argparse` keyword.
+* Fix `extract_artifacts` in the CLI not passing its artifact type filter through to `extractSandboxArtifacts` due to a flag name mismatch (`--artifact_type` vs `artifactTypes`).
+* `sync` in the CLI no longer defaults `--localfolder` to `"extractions"`, avoiding an unintended local-folder sync when `--baseSandbox` is used instead.
+* Fix `dateEnd` comparison when checking whether an audience is still actively shared to a destination flow.
+* Adding `getDataSetExpiration` method in `catalog` module, and documenting the dataset TTL/`rowExpiration` example for `patchDataSet`.
+* Adding `get_dataset_expiration` and `set_dataset_expiration` commands in the CLI, wrapping `Catalog.getDataSetExpiration` to read and update a dataset's TTL/`rowExpiration`. [documentation](./cli.md#dataset-methods)
+
 ## version 0.5.8
 * adding `get_flow_partial_success` in the CLI to export the partial success flows
 * Improving docstring information on CLI 
