@@ -941,7 +941,7 @@ class FieldGroupManager:
             raise Exception("The Field Group is not Editable via Field Group Manager")
         if path is None:
             raise ValueError("path must provided")
-        dataType = dataType.replace('[]','')
+        dataType = dataType.replace('[]','').lower()
         typeTyped = ["string","boolean","double","long","int","integer","number","short","byte","date","datetime",'date-time',"boolean","object",'array','dataType','map']
         if dataType not in typeTyped:
             raise TypeError(f'Expecting one of the following type : "string","boolean","double","long","int","integer","short","byte","date","datetime","date-time","boolean","object","byte","dataType", "map". Got {dataType}')
@@ -1429,7 +1429,8 @@ class FieldGroupManager:
         if 'path' not in df_import.columns or 'xdmType' not in df_import.columns or ('fieldGroup' not in df_import.columns and 'unknown' in self.title):
             raise AttributeError("missing a column [xdmType, path, or fieldGroup] in your dataframe fieldgroup")
         df_import = df_import[~(df_import.duplicated('path'))].copy() ## removing duplicated paths
-        df_import = df_import[df_import['origin'] != 'dataType'].copy() ## removing path created by data type
+        if 'origin' in df_import.columns:
+            df_import = df_import[df_import['origin'] != 'dataType'].copy() ## removing path created by data type
         list_datatype_roots = list(self.getDataTypePaths().keys())
         df_import = df_import[~df_import['path'].isin(list_datatype_roots)].copy() ### removing the path that will link to data type, taking care of them later
         df_import['title'] = df_import['title'].fillna('')

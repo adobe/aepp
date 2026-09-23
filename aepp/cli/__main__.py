@@ -1017,9 +1017,12 @@ class ServiceShell(cmd.Cmd):
             if args.schema:
                 ## chech if schema title is found
                 if args.schema in [sch for sch in aepp_schema.data.schemas_altId.keys()]:
-                    schema_id = aepp_schema.data.schemas_altId[args.schema]
+                    schema_id = aepp_schema.data.schemas_id[args.schema]
                 else:
-                    schema_id = args.schema
+                    if args.schema in aepp_schema.data.schemas_altId.values():
+                        schema_id = f"https://ns.adobe.com/henkel/schemas/{args.schema.split(".").pop()}"
+                    else:
+                        schema_id = args.schema
                 descriptors = aepp_schema.getDescriptors(prop=f"xdm:sourceSchema=={schema_id}")
             else:
                 descriptors = aepp_schema.getDescriptors()
@@ -1030,13 +1033,19 @@ class ServiceShell(cmd.Cmd):
                 table.add_column("Source Path", style="green")
                 table.add_column("Source Schema", style="yellow")
                 for desc in descriptors:
+                    if type(desc.get("xdm:sourceProperty","N/A")) == list:
+                        srcProperty =  ','.join(desc.get("xdm:sourceProperty"))
+                    else:
+                        srcProperty = desc.get("xdm:sourceProperty","N/A")
                     table.add_row(
                         desc.get("@id","N/A"),
                         desc.get("@type","N/A"),
-                        desc.get("xdm:sourceProperty","N/A"),
+                        srcProperty,
                         desc.get("xdm:sourceSchema","N/A")
                     )
                 console.print(table)
+            else:
+                console.print(f"No descriptor found", style="red")
             if args.save:
                 if args.schema:
                     filename = f"descriptors_{args.schema}.json"
@@ -1045,8 +1054,6 @@ class ServiceShell(cmd.Cmd):
                 with open(filename, 'w') as f:
                     json.dump(descriptors, f, indent=4)
                 console.print(f"Descriptors saved to {filename}.", style="green")
-            else:
-                console.print("(!) No descriptors found.", style="red")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -1117,6 +1124,33 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
+
+    @login_required
+    def do_delete_fieldgroup(self,args:Any) -> None:
+        parser = argparse.ArgumentParser(prog="delete_fieldgroup",add_help=True)
+        parser.add_argument("fieldgroup",help="Field Group Name or ID to be deleted")
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_schema = schema.Schema(config=self.config)
+            fieldgroups = aepp_schema.getFieldGroups()
+            ## chech if schema title is found
+            if args.fieldgroup in [fg for fg in aepp_schema.data.fieldGroups_altId.keys()]:
+                fg_id = aepp_schema.data.fieldGroups_altId[args.fieldgroup]
+            elif args.fieldgroup in aepp_schema.data.fieldGroups_altId.values() or args.fieldgroup in aepp_schema.data.fieldGroups_id.values():
+                fg_id = args.fieldgroup
+            else:
+                console.print("required a field group name or ID to delete", style="red")
+                return
+            res = aepp_schema.deleteFieldGroup(fg_id)
+            if res != 204 and res != "204":
+                console.print(f"(!) Error: Field Group '{args.fieldgroup}' could not be deleted. Response code: {res}", style="red")
+            else:
+                console.print(f"Field Group '{args.fieldgroup}' deleted successfully.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
     
     @login_required
     def do_upload_fieldgroup_definition_xdm(self,args:Any) -> None:
@@ -2796,6 +2830,7 @@ class ServiceShell(cmd.Cmd):
                    "get_fieldgroup_json",
                    "get_fieldgroup_csv",
                    "get_fieldgroup_xdm",
+                   "delete_fieldgroup",
                    "get_datatypes",
                    "get_datatype_json",
                    "get_datatype_csv",
@@ -2837,7 +2872,7 @@ class ServiceShell(cmd.Cmd):
         "Queries": ["get_queries",
                     "query",
                     "query_segment_population"],
-        "Hygiene": ["get_hygiene_works","get_hygiene_work"],
+        "Hygiene": ["get_hygiene_works","get_hygiene_work","get_hygiene_quotas"],
         "Profiles": [
                     "get_identities",
                     "create_identity",

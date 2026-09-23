@@ -15,7 +15,12 @@ This page list all of the changes that came during the different release of the 
 * `sync` in the CLI no longer defaults `--localfolder` to `"extractions"`, avoiding an unintended local-folder sync when `--baseSandbox` is used instead.
 * Fix `dateEnd` comparison when checking whether an audience is still actively shared to a destination flow.
 * Adding `getDataSetExpiration` method in `catalog` module, and documenting the dataset TTL/`rowExpiration` example for `patchDataSet`.
-* Adding `get_dataset_expiration` and `set_dataset_expiration` commands in the CLI, wrapping `Catalog.getDataSetExpiration` to read and update a dataset's TTL/`rowExpiration`. [documentation](./cli.md#dataset-methods)
+* Adding `get_dataset_expiration` and `set_dataset_expiration` commands in the CLI, wrapping `Catalog.getDataSetExpiration` to read and update a dataset's TTL/`rowExpiration`. [documentation](./cli.md#dataset-methods)\
+Patch: 
+* Fixing `get_descriptors` behavior in the CLI 
+* Fixing `upload_fieldgroup_definition_csv` and `importFieldGroupDefinition` to account when there is no `origin` columns
+  * better support columns name when casing is loose
+* 
 
 ## version 0.5.8
 * adding `get_flow_partial_success` in the CLI to export the partial success flows

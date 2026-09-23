@@ -201,6 +201,11 @@ Get the XDM definition of a specific field group exported as a JSON file.\
 Arguments:
 * `fieldgroup` : Field Group Name, $id, or alt:Id.
 
+#### delete_fieldgroup
+Delete a field group from the current sandbox.\
+Arguments:
+* `fieldgroup` : Field Group Name, $id, or alt:Id to delete.
+
 #### upload_fieldgroup_definition_csv
 Create or Update a field group using a CSV definition file.\
 Arguments:

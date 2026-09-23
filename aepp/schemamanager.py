@@ -510,7 +510,7 @@ class SchemaManager:
         """
         if path is None:
             raise ValueError("path must provided")
-        dataType = dataType.replace('[]','')
+        dataType = dataType.replace('[]','').lower()
         typeTyped = ["string","boolean","double","long","int","integer","number","short","byte","date","datetime",'date-time',"boolean","object",'array','map']
         if dataType not in typeTyped:
             raise TypeError(f'Expecting one of the following type : "string","boolean","double","long","int","integer","short","byte","date","date-time","boolean","object","byte","dataType", "map". Got {dataType}')
