@@ -1101,12 +1101,13 @@ class FlowService:
             nextPage = res.get("_links").get("next", {}).get("href", "")
         return items
 
-    def createRun(self, flowId: str = None, status: str = "active") -> dict:
+    def createRun(self, flowId: str = None, status: str = "active", params: dict = None, **kwargs) -> dict:
         """
         Generate a run based on the flowId.
         Arguments:
             flowId : REQUIRED : the flow ID to run
-            status : OPTIONAL : Status of the flow
+            status : OPTIONAL : Status of the flow (default: "active")
+            params : OPTIONAL : Dictionary of run parameters (e.g., startTime, windowStartTime, windowEndTime, deltaColumn)
         """
         path = "/runs"
         if flowId is None:
@@ -1114,6 +1115,8 @@ class FlowService:
         if self.loggingEnabled:
             self.logger.debug(f"Starting createRun")
         obj = {"flowId": flowId, "status": status}
+        if params is not None:
+            obj["params"] = params
         res: dict = self.connector.postData(self.endpoint + path, data=obj)
         return res
 
