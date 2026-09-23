@@ -9,6 +9,7 @@
 #  governing permissions and limitations under the License.
 
 from aepp.schema import Schema
+from aepp.flowservice import FlowService
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -81,8 +82,41 @@ class FlowserviceTest(unittest.TestCase):
     def test_flowservice_get_runs(self):
         assert True
 
-    def test_flowservice_create_run(self):
-        assert True
+    @patch("aepp.connector.AdobeRequest")
+    def test_flowservice_create_run_default(self, mock_connector):
+        instance_conn = mock_connector.return_value
+        instance_conn.postData.return_value = {"id": "run-123"}
+        flow_service = FlowService()
+        result = flow_service.createRun(flowId="flow-abc")
+        self.assertEqual(result, {"id": "run-123"})
+        instance_conn.postData.assert_called_with(
+            flow_service.endpoint + "/runs",
+            data={"flowId": "flow-abc", "status": "active"}
+        )
+
+    @patch("aepp.connector.AdobeRequest")
+    def test_flowservice_create_run_with_params(self, mock_connector):
+        instance_conn = mock_connector.return_value
+        instance_conn.postData.return_value = {"id": "run-123"}
+        flow_service = FlowService()
+        params = {
+            "startTime": 1640995200,
+            "windowStartTime": 1640908800,
+            "windowEndTime": 1640995200
+        }
+        result = flow_service.createRun(flowId="flow-abc", status="active", params=params)
+        self.assertEqual(result, {"id": "run-123"})
+        instance_conn.postData.assert_called_with(
+            flow_service.endpoint + "/runs",
+            data={"flowId": "flow-abc", "status": "active", "params": params}
+        )
+
+    @patch("aepp.connector.AdobeRequest")
+    def test_flowservice_create_run_missing_flowid(self, mock_connector):
+        flow_service = FlowService()
+        with self.assertRaises(Exception) as cm:
+            flow_service.createRun(flowId=None)
+        self.assertIn("Require a flowId", str(cm.exception))
 
     def test_flowservice_get_run(self):
         assert True
