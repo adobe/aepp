@@ -340,7 +340,20 @@ Arguments:
 Generate a run based on the flowId.\
 Arguments:
 * flowId : REQUIRED : the flow ID to run
-* status : OPTIONAL : Status of the flow
+* status : OPTIONAL : Status of the flow (default: "active")
+* params : OPTIONAL : Dictionary of run parameters (e.g., `startTime`, `windowStartTime`, `windowEndTime`, `deltaColumn`) required for triggering on-demand batch flow runs.
+
+Example:
+```python
+res = flw.createRun(
+    flowId="<flowId>",
+    params={
+        "startTime": 1640995200,
+        "windowStartTime": 1640908800,
+        "windowEndTime": 1640995200
+    }
+)
+```
 
 #### getRun
 Return a specific runId.\
