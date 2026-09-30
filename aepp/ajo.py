@@ -71,6 +71,7 @@ class AJO:
         else:
             self.sandbox = self.connector.config["sandbox"]
         self.endpoint = aepp.config.endpoints['global']+aepp.config.endpoints["ajo"]
+        self.endpoint_offer_decisioning = aepp.config.endpoints['global']+aepp.config.endpoints["offerDecisioning"]
     
 
     def getJourneys(self, filter:str=None,fields:str=None,sort:str=None)->list:

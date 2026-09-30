@@ -178,6 +178,8 @@ Arguments:
 #### get_fieldgroups
 List all field groups in the current sandbox.\
 Arguments:
+* `-ootb`, `--ootb` : Boolean. Include out-of-the-box field groups (default: False, possible values: True, False).
+* `-f`, `--filter` : Filter the field groups based on the string.
 * `-sv`, `--save` : Save the list of field groups to a CSV file.
 
 #### get_ups_fieldgroups

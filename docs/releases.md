@@ -23,6 +23,8 @@ Patch:
 * adding `get_account_attributes` command in the CLI to retrieve account attributes for a specific user. [documentation](./cli.md#get_account_attributes)
 * adding `upload_fieldgroup_definition_xlsx` command in the CLI to create or update a field group using an Excel XLSX file. [documentation](./cli.md#upload_fieldgroup_definition_xlsx)
 * Adding params attribute to createRun in flowservice
+* Adding `--ootb` and `--filter` options to the `get_fieldgroups` command in the CLI to include out-of-the-box field groups and filter field groups based on a string.
+* Fixing knowledge graph build for Merge Policies.
 
 ## version 0.5.8
 * adding `get_flow_partial_success` in the CLI to export the partial success flows

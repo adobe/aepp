@@ -171,7 +171,7 @@ class KnowledgeGraph:
         if kwargs.get('only_schema',False) == False: 
             graph.bind("Catalog", CATALOG_NODE)
             graph.bind("Identity", IDENTITY_NODE)
-            graph.bind("Profile", PROFILE_NODE)
+            graph.bind("Profile", self.PROFILE)
             graph.bind("Flows", FLOWS_NODE)
             graph.bind("Audience", AUDIENCES_NODE)
         graph.add((SANDBOX_NODE, self.SANDBOX.contains, SCHEMA_NODE))
@@ -274,12 +274,14 @@ class KnowledgeGraph:
                 print(f"  --Merge Policies")
             mergePolicies = self.customerProfileAPI.getMergePolicies()
             for mergePolicy in mergePolicies:
-                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], RDF.type, self.PROFILE.MergePolicy))
-                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], DCTERMS.title, Literal(mergePolicy.get('name'))))
-                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.schema, Literal(mergePolicy.get('schema',{}).get('name'),datatype=XSD.string)))
-                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.activeOnEdge, Literal(mergePolicy.get('isActiveOnEdge',False),datatype=XSD.boolean)))
-                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.default, Literal(mergePolicy.get('default',False),datatype=XSD.boolean)))
-                graph.add((self.PROFILE.MERGE_POLICIES[mergePolicy['id']], self.PROFILE.policyType, Literal(mergePolicy.get('attributeMerge',{}).get('type','unknown'),datatype=XSD.string)))
+                merge_policy_uri = self.PROFILE[f"MERGE_POLICIES/{mergePolicy['id']}"]
+                graph.add((self.PROFILE.MERGE_POLICIES, self.PROFILE.contains, merge_policy_uri))
+                graph.add((merge_policy_uri, RDF.type, self.PROFILE.MergePolicy))
+                graph.add((merge_policy_uri, DCTERMS.title, Literal(mergePolicy.get('name'))))
+                graph.add((merge_policy_uri, self.PROFILE.schema, Literal(mergePolicy.get('schema',{}).get('name'),datatype=XSD.string)))
+                graph.add((merge_policy_uri, self.PROFILE.activeOnEdge, Literal(mergePolicy.get('isActiveOnEdge',False),datatype=XSD.boolean)))
+                graph.add((merge_policy_uri, self.PROFILE.default, Literal(mergePolicy.get('default',False),datatype=XSD.boolean)))
+                graph.add((merge_policy_uri, self.PROFILE.policyType, Literal(mergePolicy.get('attributeMerge',{}).get('type','unknown'),datatype=XSD.string)))
             if kwargs.get('verbose',False) == True:
                 print(f"  --Datasets")
             for index, row in df_datasets.iterrows():
@@ -326,7 +328,7 @@ class KnowledgeGraph:
                 if audience.get('metrics',{}).get('data',None) is not None:
                     graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.totalProfiles, Literal(audience.get('metrics',{}).get('data',{}).get('totalProfiles',0),datatype=XSD.integer)))
                 if audience.get('mergePolicyId',None) is not None:
-                    graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.mergePolicy, self.PROFILE.MERGE_POLICIES[audience.get('mergePolicyId')]))
+                    graph.add((self.AUDIENCES[audience['id']], self.AUDIENCES.mergePolicy, self.PROFILE[f"MERGE_POLICIES/{audience.get('mergePolicyId')}"]))
                 paths = self.segmentationAPI.extractPaths(audience)
                 if paths is not None:
                     for path in paths:

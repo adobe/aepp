@@ -66,5 +66,6 @@ endpoints = {
         "collection": "https://dcs.adobedc.net"
     },
     "audit": "/data/foundation",
-    "ajo": "/ajo"
+    "ajo": "/ajo",
+    "offerDecisioning":"/data/core/dps"
 }

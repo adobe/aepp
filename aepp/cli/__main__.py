@@ -776,14 +776,24 @@ class ServiceShell(cmd.Cmd):
     def do_get_fieldgroups(self, args:Any) -> None:
         """List all field groups in the current sandbox"""
         parser = argparse.ArgumentParser(prog='get_fieldgroups', add_help=True)
+        parser.add_argument('-ootb','--ootb',help="Boolean. Include out-of-the-box field groups. Default False. Possible values: True, False",type=str2bool,default=False)
+        parser.add_argument('-f','--filter',help="filtering the field groups based on the string",type=str,default=None)
         parser.add_argument("-sv", "--save",help="Boolean. Save field groups to CSV file. Default False. Possible values: True, False",type=str2bool,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
-            fieldgroups = aepp_schema.getFieldGroups()
+            if not args.ootb:
+                fieldgroups = aepp_schema.getFieldGroups()
+            else:
+                fieldgroups = aepp_schema.getFieldGroupsGlobal()
+            if args.filter:
+                fieldgroups = [fg for fg in fieldgroups if args.filter.lower() in fg.get("title","").lower()]
             if args.save and fieldgroups:
                 df_fgs = pd.DataFrame(fieldgroups)
-                df_fgs.to_csv(f"{self.config.sandbox}_fieldgroups.csv",index=False)
+                if args.ootb:
+                    df_fgs.to_csv(f"{self.config.sandbox}_fieldgroups_ootb.csv",index=False)
+                else:
+                    df_fgs.to_csv(f"{self.config.sandbox}_fieldgroups.csv",index=False)
             if fieldgroups:
                 table = Table(title=f"Field Groups in Sandbox: {self.config.sandbox}")
                 table.add_column("altId", style="cyan")
@@ -795,7 +805,10 @@ class ServiceShell(cmd.Cmd):
                     )
                 console.print(table)
                 if args.save:
-                    console.print(f"Field Groups exported to {self.config.sandbox}_fieldgroups.csv", style="green")
+                    if args.ootb:
+                        console.print(f"Field Groups exported to {self.config.sandbox}_fieldgroups_ootb.csv", style="green")
+                    else:
+                        console.print(f"Field Groups exported to {self.config.sandbox}_fieldgroups.csv", style="green")
             else:
                 console.print("(!) No field groups found.", style="red")
         except Exception as e:
@@ -812,6 +825,7 @@ class ServiceShell(cmd.Cmd):
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
             fieldgroups = aepp_schema.getFieldGroups()
+            fieldgroupsglobal = aepp_schema.getFieldGroupsGlobal()
             ## chech if schema title is found
             if args.fieldgroup in [fg for fg in aepp_schema.data.fieldGroups_altId.keys()]:
                 my_fieldgroup_manager = fieldgroupmanager.FieldGroupManager(
@@ -842,6 +856,7 @@ class ServiceShell(cmd.Cmd):
             args = parser.parse_args(shlex.split(args))
             aepp_schema = schema.Schema(config=self.config)
             fieldgroups = aepp_schema.getFieldGroups()
+            fieldgroupsglobal = aepp_schema.getFieldGroupsGlobal()
             ## chech if schema title is found
             if args.fieldgroup in [fg for fg in aepp_schema.data.fieldGroups_altId.keys()]:
                 my_fieldgroup_manager = fieldgroupmanager.FieldGroupManager(
