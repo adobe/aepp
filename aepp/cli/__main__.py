@@ -1126,6 +1126,31 @@ class ServiceShell(cmd.Cmd):
             return
 
     @login_required
+    def do_upload_fieldgroup_definition_xlsx(self, args:Any) -> None:
+        """Upload a field group definition from an Excel file"""
+        parser = argparse.ArgumentParser(prog='upload_fieldgroup_definition_xlsx', add_help=True)
+        parser.add_argument("xlsx_path", help="Path to the field group Excel file")
+        parser.add_argument("-sh","--sheet", help="Sheet name in the Excel file", default="Sheet1", type=str)
+        parser.add_argument("-ts","--test",help="Boolean. Test creation without uploading it to AEP. It will output a JSON file. Default False. Possible values: True, False",default=False,type=str2bool)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            myfg = fieldgroupmanager.FieldGroupManager(config=self.config)
+            myfg.importFieldGroupDefinition(fieldgroup=args.xlsx_path, sheet_name=args.sheet)
+            if args.test:
+                data = myfg.to_dict()
+                with open(f"test_{myfg.title}_fieldgroup.json", 'w') as f:
+                    json.dump(data, f, indent=4)
+                console.print(f"Field Group definition test exported to test_{myfg.title}_fieldgroup.json", style="green")
+                console.print_json(data=data)
+                return
+            res = myfg.createFieldGroup()
+            console.print(f"Field Group uploaded with ID: {res.get('meta:altId')}", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
     def do_delete_fieldgroup(self,args:Any) -> None:
         parser = argparse.ArgumentParser(prog="delete_fieldgroup",add_help=True)
         parser.add_argument("fieldgroup",help="Field Group Name or ID to be deleted")
@@ -2333,7 +2358,20 @@ class ServiceShell(cmd.Cmd):
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
             return
-        
+
+    def do_get_query(self,args:Any)->None:
+        """Retrieve a specific meta data query by its ID."""
+        parser = argparse.ArgumentParser(prog='get_query', add_help=True)
+        parser.add_argument("query_id", help="ID of the query to retrieve", type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_query = queryservice.QueryService(config=self.config)
+            result:dict = aepp_query.getQuery(queryId=args.query_id)
+            console.print_json(data=result)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
     @login_required
     def do_query(self,args:Any) -> None:
         """Execute a SQL query against the current sandbox, save the result to a CSV file and display a sample."""
@@ -2453,6 +2491,28 @@ class ServiceShell(cmd.Cmd):
                     summary_data["primaryIdentities"][primaryIdentity] += 1
             console.print_json(data=summary_data)
             console.print(f"Profile attributes exported to {self.config.sandbox}_{args.user_id}_profile_event_attributes.json", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
+    def do_get_account_attributes(self,args:Any) -> None:
+        """Get the account attributes defined in the current sandbox based on the b2b_account by default, saving it in a JSON file"""
+        parser = argparse.ArgumentParser(prog='get_account_attributes', add_help=True)
+        parser.add_argument("-uid","--user_id", help="User ID of the user", default=None,type=str)
+        parser.add_argument("-ns","--namespace", help="Namespace of the user", default="b2b_account",type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            aepp_profile = customerprofile.Profile(config=self.config)
+            account_attributes = aepp_profile.getEntity(
+                entityId=args.user_id,
+                entityIdNS=args.namespace,
+                schema_name='_xdm.context.account'
+            )
+            with open(f"{self.config.sandbox}_account_attributes.json", 'w') as f:
+                json.dump(account_attributes, f, indent=4)
+            console.print_json(data=account_attributes)
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
         except SystemExit:
@@ -2838,8 +2898,10 @@ class ServiceShell(cmd.Cmd):
                    "enable_schema_for_ups",
                    "create_fieldgroup_template",
                    "upload_fieldgroup_definition_csv",
+                   "upload_fieldgroup_definition_xlsx",
                    "upload_fieldgroup_definition_xdm",
-                   "create_b2b_artifacts"
+                   "create_b2b_artifacts",
+                   "get_descriptors"
                    ],
         "Datasets": ["get_datasets",
                      "get_datasets_tablenames",
@@ -2870,6 +2932,7 @@ class ServiceShell(cmd.Cmd):
                      "delete_dataflow",
                      "delete_audience"],
         "Queries": ["get_queries",
+                    "get_query",
                     "query",
                     "query_segment_population"],
         "Hygiene": ["get_hygiene_works","get_hygiene_work","get_hygiene_quotas"],
@@ -2878,6 +2941,7 @@ class ServiceShell(cmd.Cmd):
                     "create_identity",
                     "get_merge_policies",
                     "get_profile_attributes",
+                    "get_account_attributes",
                      "get_profile_events",
                      "get_profile_attributes_lineage",
                      "get_profile_attribute_lineage",

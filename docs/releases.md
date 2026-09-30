@@ -20,7 +20,9 @@ Patch:
 * Fixing `get_descriptors` behavior in the CLI 
 * Fixing `upload_fieldgroup_definition_csv` and `importFieldGroupDefinition` to account when there is no `origin` columns
   * better support columns name when casing is loose
-* 
+* adding `get_account_attributes` command in the CLI to retrieve account attributes for a specific user. [documentation](./cli.md#get_account_attributes)
+* adding `upload_fieldgroup_definition_xlsx` command in the CLI to create or update a field group using an Excel XLSX file. [documentation](./cli.md#upload_fieldgroup_definition_xlsx)
+* Adding params attribute to createRun in flowservice
 
 ## version 0.5.8
 * adding `get_flow_partial_success` in the CLI to export the partial success flows

@@ -225,6 +225,20 @@ Arguments:
 * `xdm_path` : Path to the JSON file.
 * `-ts`, `--test` : Boolean. Test the upload locally without sending to AEP (default: False, possible values: True, False).
 
+
+#### upload_fieldgroup_definition_xlsx
+Create or Update a field group using an Excel XLSX file.\
+Arguments:
+* `xlsx_path` : Path to the XLSX file.
+* `-sh`, `--sheet` : Name of the sheet in the XLSX file to use (default: "Sheet1").
+* `-ts`, `--test` : Boolean. Test the upload locally without sending to AEP (default: False, possible values: True, False).
+
+
+#### get_descriptors
+List all descriptors in the current sandbox.\
+Arguments:
+* `-sv`, `--save` : Save the list of descriptors to a CSV file.
+
 #### get_datatypes
 List all data types in the current sandbox.\
 
@@ -506,6 +520,12 @@ Retrieve the profile attributes for a specific user, saving it in a JSON file.\
 Arguments:
 * `-uid`,`--user_id` : User ID of the user.
 * `-ns`,`--namespace` : Namespace of the user.
+
+#### get_account_attributes
+Retrieve the account attributes for a specific user, saving it in a JSON file.\
+Arguments:
+* `-uid`,`--user_id` : User ID of the user.
+* `-ns`,`--namespace` : Namespace of the user (default: `b2b_account`).
 
 #### get_profile_events
 Retrieve all UPS events for a specific user, saving it in a JSON file.\
