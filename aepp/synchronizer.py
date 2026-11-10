@@ -432,6 +432,10 @@ class Synchronizer:
         baseClassName = baseClass.title
         baseBehavior = baseClass.behavior
         for target in self.dict_targetsConfig.keys():
+            if baseClassName in self.dict_targetComponents[target]['class'] and not force:
+                if verbose:
+                    print(f"Class '{baseClassName}' already synchronized to target {target}. Skipping synchronization.")
+                continue
             targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
             t_classes = targetSchema.getClasses()
             if baseClassName in targetSchema.data.classes_id.keys(): ## class already exists in target
@@ -569,6 +573,18 @@ class Synchronizer:
         name_base_fieldgroup = baseFieldGroup.title
         base_fg_classIds = baseFieldGroup.classIds
         base_fg_description = baseFieldGroup.description
+        base_class_managers = {}
+        for baseClassId in base_fg_classIds:
+            if baseFieldGroup.tenantId[1:] in baseClassId and baseClassId not in base_class_managers:
+                baseCustomClassManager = next(
+                    (manager for manager in self.dict_baseComponents['class'].values()
+                     if manager is not None and manager.id == baseClassId),
+                    None
+                )
+                if baseCustomClassManager is None:
+                    baseCustomClassManager = classmanager.ClassManager(baseClassId,config=self.baseConfig,localFolder=self.localfolder,sandbox=self.baseSandbox)
+                self.__syncClass__(baseCustomClassManager,force=force,verbose=verbose)
+                base_class_managers[baseClassId] = baseCustomClassManager
         for target in self.dict_targetsConfig.keys():
             t_fieldgroup = None
             targetSchema = schema.Schema(config=self.dict_targetsConfig[target])
@@ -576,9 +592,8 @@ class Synchronizer:
             ### handling custom class associated with FG
             fg_class_ids = []
             for baseClassId in base_fg_classIds:
-                if baseFieldGroup.tenantId[1:] in baseClassId:
-                    baseCustomClassManager = classmanager.ClassManager(baseClassId,config=self.baseConfig,localFolder=self.localfolder)
-                    self.__syncClass__(baseCustomClassManager,verbose=verbose)
+                if baseClassId in base_class_managers:
+                    baseCustomClassManager = base_class_managers[baseClassId]
                     fg_class_ids.append(self.dict_targetComponents[target]['class'][baseCustomClassManager.title].id)
                 else:
                     fg_class_ids.append(baseClassId)
@@ -658,6 +673,8 @@ class Synchronizer:
                             t_fieldgroup = fieldgroupmanager.FieldGroupManager(res['$id'],config=self.dict_targetsConfig[target],sandbox=target)
                 else:
                     if len(t_fieldgroup.classIds) != len(fg_class_ids):
+                        if verbose:
+                            print(f"field group '{name_base_fieldgroup}' supported class IDs differ in target {target}, {len(t_fieldgroup.classIds)} vs {len(fg_class_ids)} updating it")
                         t_fieldgroup.updateClassSupported(fg_class_ids)
                         res = t_fieldgroup.updateFieldGroup()
                         if '$id' not in res.keys():

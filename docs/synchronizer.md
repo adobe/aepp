@@ -46,6 +46,8 @@ Once instantiated the synchronizer object will contains certain attributes:
 * dict_targetComponents : A dictionary of the target components that has been created. A cache mechanisme to optimize the future usage of these components in the future.
 * syncIssues : A variable created when using syncAll method that shows the artifact that could not be migrated.
 
+Resolved target classes are reused within a `Synchronizer` instance, avoiding repeated class API lookups for shared dependencies. Use `force=True` to recheck cached target classes, or `flush_cache()` to clear the component caches. Field-group synchronization also reuses cached source class managers and resolves each custom-class dependency once across all targets.
+
 
 ### Synchronizer methods: 
 
