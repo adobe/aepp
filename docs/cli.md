@@ -451,7 +451,7 @@ Arguments:
 All flow commands require an active sandbox connection. Use `help <command>` for a summary or `<command> -h` for argument help.
 
 #### create_dataset_http_source
-Create an HTTP streaming endpoint for a specific dataset.\
+Create an HTTP streaming endpoint for a specific dataset for XDM compatible payloads (no mapping).\
 Arguments:
 * `dataset` : Name or ID of the Dataset.
 
